@@ -2,16 +2,7 @@ import { useState, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Send, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
-
-const PROJECTS = {
-  'HWS0023': {
-    contractNo: 'HWS0023',
-    regNo: '2024123457',
-    description: 'Installation of Curb, Sidewalk and Ped-Ramp Various locations',
-    borough: 'Queens',
-    contractor: 'Benny Bowers Contracting Co.'
-  }
-}
+import { PROJECTS } from '../../data/mockData'
 
 const DETAILED_ACTIVITIES = [
   { name: 'Excavation', fromSta: '', toSta: '', remarks: '' },

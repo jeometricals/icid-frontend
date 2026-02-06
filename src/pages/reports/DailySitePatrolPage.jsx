@@ -1,16 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Send } from 'lucide-react'
-
-const PROJECTS = {
-  'HWS0023': {
-    contractNo: 'HWS0023',
-    regNo: '2024123457',
-    description: 'Installation of Curb, Sidewalk and Ped-Ramp Various locations',
-    borough: 'Queens',
-    contractor: 'Benny Bowers Contracting Co.'
-  }
-}
+import { PROJECTS } from '../../data/mockData'
 
 const SITE_MAINTENANCE_CHECKS = [
   'Has waste, rubbish and debris been removed from site?',

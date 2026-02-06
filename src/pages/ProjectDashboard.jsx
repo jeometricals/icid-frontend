@@ -2,55 +2,20 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { HardHat, LogOut, Cloud, ArrowLeft, FileText, ClipboardCheck, Building } from 'lucide-react'
 import { format } from 'date-fns'
+import { PROJECTS, REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
 
-// Mock project data - would come from Supabase in production
-const PROJECTS = {
-  'HWS0023': {
-    contractNo: 'HWS0023',
-    regNo: '2024123457',
-    description: 'Installation of Curb, Sidewalk and Ped-Ramp Various locations',
-    borough: 'Queens',
-    contractor: 'Benny Bowers Contracting Co.'
-  },
-  'SE384': {
-    contractNo: 'SE384',
-    regNo: '2024198765',
-    description: 'Sewer System Rehabilitation',
-    borough: 'Brooklyn',
-    contractor: 'Empire Sewer Works Inc.'
-  },
-  'WMB092': {
-    contractNo: 'WMB092',
-    regNo: '2024156789',
-    description: 'Water Main Replacement Project',
-    borough: 'Manhattan',
-    contractor: 'Metropolitan Water Solutions'
+// Add icons to report types
+const REPORT_TYPES = REPORT_TYPES_DATA.map(type => {
+  const iconMap = {
+    'general': FileText,
+    'daily-patrol': ClipboardCheck,
+    'curb-sidewalk': Building
   }
-}
-
-const REPORT_TYPES = [
-  {
-    id: 'general',
-    title: 'General',
-    description: 'General Inspector\'s Daily Report',
-    icon: FileText,
-    path: '/report/general'
-  },
-  {
-    id: 'daily-patrol',
-    title: 'Daily Site Patrol',
-    description: 'Maintenance and Safety Checklist',
-    icon: ClipboardCheck,
-    path: '/report/daily-patrol'
-  },
-  {
-    id: 'curb-sidewalk',
-    title: 'Curb, Sidewalk, Concrete Base & Pedestrian Ramp',
-    description: 'Infrastructure Installation Report',
-    icon: Building,
-    path: '/report/curb-sidewalk'
+  return {
+    ...type,
+    icon: iconMap[type.id]
   }
-]
+})
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()

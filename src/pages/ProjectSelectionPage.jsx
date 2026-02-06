@@ -3,34 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { HardHat, LogOut, Cloud, Sun, CloudRain, User } from 'lucide-react'
 import { format } from 'date-fns'
+import { PROJECTS } from '../data/mockData'
 
-// Mock project data - in production this would come from Supabase
-const MOCK_PROJECTS = [
-  {
-    id: 'HWS0023',
-    contractNo: 'HWS0023',
-    regNo: '2024123457',
-    description: 'Installation of Curb, Sidewalk and Ped-Ramp Various locations',
-    borough: 'Queens',
-    contractor: 'Benny Bowers Contracting Co.'
-  },
-  {
-    id: 'SE384',
-    contractNo: 'SE384',
-    regNo: '2024198765',
-    description: 'Sewer System Rehabilitation',
-    borough: 'Brooklyn',
-    contractor: 'Empire Sewer Works Inc.'
-  },
-  {
-    id: 'WMB092',
-    contractNo: 'WMB092',
-    regNo: '2024156789',
-    description: 'Water Main Replacement Project',
-    borough: 'Manhattan',
-    contractor: 'Metropolitan Water Solutions'
-  }
-]
+// Convert PROJECTS object to array for display
+const MOCK_PROJECTS = Object.keys(PROJECTS).map(id => ({
+  id,
+  ...PROJECTS[id]
+}))
 
 export default function ProjectSelectionPage() {
   const { user, signOut, isDemoMode } = useAuth()
