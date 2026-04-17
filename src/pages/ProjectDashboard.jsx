@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { HardHat, LogOut, Cloud, ArrowLeft, FileText, ClipboardCheck, Building } from 'lucide-react'
 import { format } from 'date-fns'
-import { PROJECTS, REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
+import { REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
+import { getProjectById } from '../services/api'
 
 // Add icons to report types
 const REPORT_TYPES = REPORT_TYPES_DATA.map(type => {
@@ -21,9 +23,35 @@ export default function ProjectDashboard() {
   const { projectId } = useParams()
   const navigate = useNavigate()
   const { signOut, user, isDemoMode } = useAuth()
-  const project = PROJECTS[projectId]
+  const [project, setProject] = useState(null)
+  const [loadingProject, setLoadingProject] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
-  if (!project) {
+  useEffect(() => {
+    getProjectById(projectId)
+      .then(data => setProject(data))
+      .catch(() => setNotFound(true))
+      .finally(() => setLoadingProject(false))
+  }, [projectId])
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login')
+  }
+
+  const handleReportSelect = (reportPath) => {
+    navigate(`/project/${projectId}${reportPath}`)
+  }
+
+  if (loadingProject) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
+      </div>
+    )
+  }
+
+  if (notFound || !project) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -34,15 +62,6 @@ export default function ProjectDashboard() {
         </div>
       </div>
     )
-  }
-
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
-
-  const handleReportSelect = (reportPath) => {
-    navigate(`/project/${projectId}${reportPath}`)
   }
 
   return (
@@ -123,20 +142,38 @@ export default function ProjectDashboard() {
           <div className="text-sm space-y-1">
             <p className="text-gray-600">
               <span className="font-medium text-construction-700">Contract No:</span>{' '}
-              <span className="text-construction-900 font-bold">{project.contractNo}</span>
+              <span className="text-construction-900 font-bold">{project.project_id}</span>
             </p>
+            {project.registration_code && (
+              <p className="text-gray-600">
+                <span className="font-medium text-construction-700">Reg. No:</span> {project.registration_code}
+              </p>
+            )}
             <p className="text-gray-600">
-              <span className="font-medium text-construction-700">Reg. No:</span> {project.regNo}
+              <span className="font-medium text-construction-700">Project Name:</span> {project.project_name}
             </p>
-            <p className="text-gray-600">
-              <span className="font-medium text-construction-700">Project Description:</span> {project.description}
-            </p>
-            <p className="text-gray-600">
-              <span className="font-medium text-construction-700">Borough:</span> {project.borough}
-            </p>
-            <p className="text-gray-600">
-              <span className="font-medium text-construction-700">Contractor:</span> {project.contractor}
-            </p>
+            {project.project_description && (
+              <p className="text-gray-600">
+                <span className="font-medium text-construction-700">Description:</span> {project.project_description}
+              </p>
+            )}
+            {project.borough && (
+              <p className="text-gray-600">
+                <span className="font-medium text-construction-700">Borough:</span> {project.borough}
+              </p>
+            )}
+            {project.status && (
+              <p className="text-gray-600">
+                <span className="font-medium text-construction-700">Status:</span>{' '}
+                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                  project.status === 'active'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {project.status}
+                </span>
+              </p>
+            )}
           </div>
         </div>
 

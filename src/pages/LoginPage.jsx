@@ -8,7 +8,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn, enterDemoMode, user, isSupabaseConfigured } = useAuth()
+  const { signIn, enterDemoMode, user } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -22,12 +22,6 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
-    if (!isSupabaseConfigured) {
-      setError('Supabase is not configured. Please check your environment variables.')
-      setLoading(false)
-      return
-    }
 
     const { error } = await signIn(username, password)
     

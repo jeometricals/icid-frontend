@@ -1,5 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { createContext, useContext, useState } from 'react'
 
 const AuthContext = createContext({})
 
@@ -11,89 +10,45 @@ export const useAuth = () => {
   return context
 }
 
+// Dev user — hardcoded for development (user_id=28 in the DB)
+const DEV_USER = {
+  id: 28,
+  email: 'KhanG@magnoleng.pc',
+  user_metadata: {
+    full_name: 'Genghis Khan',
+    role: 'inspector'
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [isDemoMode, setIsDemoMode] = useState(false)
 
-  useEffect(() => {
-    // Check for existing session
-    if (isSupabaseConfigured()) {
-      checkUser()
-      
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null)
-        setLoading(false)
-      })
-
-      return () => subscription.unsubscribe()
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
-  const checkUser = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-    } catch (error) {
-      console.error('Error checking user session:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const signIn = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      return { data: null, error }
-    }
+  const signIn = async (_email, _password) => {
+    // Auth is hardcoded for development — always signs in as the dev user
+    setUser(DEV_USER)
+    setIsDemoMode(false)
+    return { data: DEV_USER, error: null }
   }
 
   const signOut = async () => {
-    try {
-      if (isDemoMode) {
-        setUser(null)
-        setIsDemoMode(false)
-        return { error: null }
-      }
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setUser(null)
-      return { error: null }
-    } catch (error) {
-      return { error }
-    }
+    setUser(null)
+    setIsDemoMode(false)
+    return { error: null }
   }
 
   const enterDemoMode = () => {
-    const demoUser = {
-      id: 'demo-user',
-      email: 'demo@icid.co',
-      user_metadata: {
-        full_name: 'Demo Inspector',
-        role: 'inspector'
-      }
-    }
-    setUser(demoUser)
+    setUser(DEV_USER)
     setIsDemoMode(true)
   }
 
   const value = {
     user,
-    loading,
+    loading: false,
     isDemoMode,
     signIn,
     signOut,
     enterDemoMode,
-    isSupabaseConfigured: isSupabaseConfigured()
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
