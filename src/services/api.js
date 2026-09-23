@@ -65,3 +65,15 @@ export async function getReport(reportId) {
   const json = await apiFetch(`/v1/reports/${reportId}`)
   return json.data
 }
+
+/**
+ * Lists a project's reports, most recently edited first. reporterUuid and status ('draft' | 'submitted') are optional filters.
+ * Returns an array of report rows, each with a description_preview (null if the form was never saved).
+ */
+export async function listReports({ projectId, reporterUuid, status }) {
+  const params = new URLSearchParams({ project_id: projectId })
+  if (reporterUuid) params.set('reporter_uuid', reporterUuid)
+  if (status) params.set('status', status)
+  const json = await apiFetch(`/v1/reports/?${params}`)
+  return json.data
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getProjectsForUser, getProjectById, createReport, saveGeneralForm, getReport } from '../api'
+import { getProjectsForUser, getProjectById, createReport, saveGeneralForm, getReport, listReports } from '../api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -259,5 +259,40 @@ describe('getReport', () => {
   it('throws when fetch itself fails', async () => {
     mockFetchFailure('Network error')
     await expect(getReport(REPORT_ID)).rejects.toThrow('Network error')
+  })
+})
+
+describe('listReports', () => {
+  const ROWS = [{ ...MOCK_REPORT, description_preview: 'Poured curb' }]
+
+  it('GETs /v1/reports/ with all filters as query params', async () => {
+    mockFetch(200, { status: 'success', data: ROWS })
+    await listReports({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, status: 'draft' })
+    const url = new URL(fetch.mock.calls[0][0])
+    expect(url.pathname).toBe('/v1/reports/')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      project_id: 'HWS0023',
+      reporter_uuid: REPORTER_UUID,
+      status: 'draft',
+    })
+    expect(fetchInit().method).toBe('GET')
+  })
+
+  it('leaves out filters that are not given', async () => {
+    mockFetch(200, { status: 'success', data: [] })
+    await listReports({ projectId: 'HWS0023' })
+    const url = new URL(fetch.mock.calls[0][0])
+    expect(Object.fromEntries(url.searchParams)).toEqual({ project_id: 'HWS0023' })
+  })
+
+  it('returns the data array', async () => {
+    mockFetch(200, { status: 'success', data: ROWS })
+    const result = await listReports({ projectId: 'HWS0023' })
+    expect(result).toEqual(ROWS)
+  })
+
+  it('throws the backend message on error', async () => {
+    mockFetch(500, { detail: 'Failed to list reports' })
+    await expect(listReports({ projectId: 'HWS0023' })).rejects.toThrow('Failed to list reports')
   })
 })
