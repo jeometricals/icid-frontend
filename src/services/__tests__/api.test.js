@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getProjectsForUser, getProjectById } from '../api'
+import { getProjectsForUser, getProjectById, createReport, saveGeneralForm, getReport } from '../api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,7 +44,8 @@ describe('getProjectsForUser', () => {
     mockFetch(200, { status: 'success', data: MOCK_PROJECTS })
     await getProjectsForUser(28)
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/projects/?user_id=28')
+      expect.stringContaining('/v1/projects/?user_id=28'),
+      { method: 'GET' }
     )
   })
 
@@ -80,7 +81,8 @@ describe('getProjectById', () => {
     mockFetch(200, { status: 'success', data: MOCK_PROJECT_DETAIL })
     await getProjectById('P001')
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/projects/P001')
+      expect.stringContaining('/v1/projects/P001'),
+      { method: 'GET' }
     )
   })
 
@@ -103,5 +105,159 @@ describe('getProjectById', () => {
   it('throws when fetch itself fails', async () => {
     mockFetchFailure('Network error')
     await expect(getProjectById('P001')).rejects.toThrow('Network error')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Error message formatting
+// ---------------------------------------------------------------------------
+
+describe('error messages', () => {
+  it('joins FastAPI 422 validation messages instead of throwing [object Object]', async () => {
+    mockFetch(422, {
+      detail: [
+        { loc: ['body', 'foo'], msg: 'Extra inputs are not permitted' },
+        { loc: ['body', 'date'], msg: 'Input should be a valid string' },
+      ],
+    })
+    await expect(getProjectById('P001')).rejects.toThrow(
+      'Extra inputs are not permitted; Input should be a valid string'
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reports
+// ---------------------------------------------------------------------------
+
+const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
+const REPORTER_UUID = '327d3ed2-a3d6-4235-9408-7fe721b12bed'
+
+const MOCK_REPORT = {
+  report_id: REPORT_ID,
+  reporter_uuid: REPORTER_UUID,
+  project_id: 'HWS0023',
+  report_date: '2026-09-23',
+  status: 'draft',
+  created_at: '2026-09-23T14:00:00Z',
+  updated_at: '2026-09-23T14:00:00Z',
+}
+
+const MOCK_FORM = { date: '2026-09-23', sheetNo: '1', description: 'Poured curb', payItems: [] }
+
+function fetchInit() {
+  return fetch.mock.calls[0][1]
+}
+
+describe('createReport', () => {
+  it('POSTs to /v1/reports/ with snake_case body and JSON header', async () => {
+    mockFetch(201, { status: 'success', data: MOCK_REPORT })
+    await createReport({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-23' })
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/reports\/$/), expect.any(Object))
+    const init = fetchInit()
+    expect(init.method).toBe('POST')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual({
+      project_id: 'HWS0023',
+      reporter_uuid: REPORTER_UUID,
+      report_date: '2026-09-23',
+    })
+  })
+
+  it('omits report_date when not given so the backend defaults it', async () => {
+    mockFetch(201, { status: 'success', data: MOCK_REPORT })
+    await createReport({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID })
+    expect(JSON.parse(fetchInit().body)).toEqual({ project_id: 'HWS0023', reporter_uuid: REPORTER_UUID })
+  })
+
+  it('returns the created report row', async () => {
+    mockFetch(201, { status: 'success', data: MOCK_REPORT })
+    const result = await createReport({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID })
+    expect(result).toEqual(MOCK_REPORT)
+  })
+
+  it('throws the backend message on 403 (reporter not on project)', async () => {
+    mockFetch(403, { detail: 'Reporter is not assigned to this project' })
+    await expect(createReport({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID }))
+      .rejects.toThrow('Reporter is not assigned to this project')
+  })
+
+  it('throws the backend message on 404 (project not found)', async () => {
+    mockFetch(404, { detail: 'Project not found' })
+    await expect(createReport({ projectId: 'NOPE', reporterUuid: REPORTER_UUID }))
+      .rejects.toThrow('Project not found')
+  })
+
+  it('throws when fetch itself fails', async () => {
+    mockFetchFailure('Network error')
+    await expect(createReport({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID }))
+      .rejects.toThrow('Network error')
+  })
+})
+
+describe('saveGeneralForm', () => {
+  const SAVED = { report_id: REPORT_ID, completed_form_id: 'cf-1', saved_at: '2026-09-23T14:05:00Z' }
+
+  it('PUTs the form data unchanged as JSON to /v1/reports/{id}/general', async () => {
+    mockFetch(200, { status: 'success', data: SAVED })
+    await saveGeneralForm(REPORT_ID, MOCK_FORM)
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/v1/reports/${REPORT_ID}/general`),
+      expect.any(Object)
+    )
+    const init = fetchInit()
+    expect(init.method).toBe('PUT')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(JSON.parse(init.body)).toEqual(MOCK_FORM)
+  })
+
+  it('returns the save confirmation', async () => {
+    mockFetch(200, { status: 'success', data: SAVED })
+    const result = await saveGeneralForm(REPORT_ID, MOCK_FORM)
+    expect(result).toEqual(SAVED)
+  })
+
+  it('throws the backend message on 409 (report not a draft)', async () => {
+    mockFetch(409, { detail: 'Only draft reports can be edited' })
+    await expect(saveGeneralForm(REPORT_ID, MOCK_FORM)).rejects.toThrow('Only draft reports can be edited')
+  })
+
+  it('throws the backend message on 404 (report not found)', async () => {
+    mockFetch(404, { detail: 'Report not found' })
+    await expect(saveGeneralForm(REPORT_ID, MOCK_FORM)).rejects.toThrow('Report not found')
+  })
+
+  it('throws when fetch itself fails', async () => {
+    mockFetchFailure('Network error')
+    await expect(saveGeneralForm(REPORT_ID, MOCK_FORM)).rejects.toThrow('Network error')
+  })
+})
+
+describe('getReport', () => {
+  const WITH_FORM = { ...MOCK_REPORT, general_form: MOCK_FORM }
+
+  it('GETs /v1/reports/{id}', async () => {
+    mockFetch(200, { status: 'success', data: WITH_FORM })
+    await getReport(REPORT_ID)
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/v1/reports/${REPORT_ID}`),
+      { method: 'GET' }
+    )
+  })
+
+  it('returns the report with its general_form', async () => {
+    mockFetch(200, { status: 'success', data: WITH_FORM })
+    const result = await getReport(REPORT_ID)
+    expect(result).toEqual(WITH_FORM)
+  })
+
+  it('throws the backend message on 404', async () => {
+    mockFetch(404, { detail: 'Report not found' })
+    await expect(getReport(REPORT_ID)).rejects.toThrow('Report not found')
+  })
+
+  it('throws when fetch itself fails', async () => {
+    mockFetchFailure('Network error')
+    await expect(getReport(REPORT_ID)).rejects.toThrow('Network error')
   })
 })
