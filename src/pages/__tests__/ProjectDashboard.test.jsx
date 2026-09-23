@@ -197,3 +197,17 @@ describe('ProjectDashboard sign out', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/login')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Drafts entry point
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard drafts button', () => {
+  it("navigates to this project's drafts list", async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByRole('button', { name: 'Drafts' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/drafts')
+  })
+})

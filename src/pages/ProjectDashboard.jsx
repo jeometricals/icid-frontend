@@ -182,7 +182,10 @@ export default function ProjectDashboard() {
           <button className="bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center">
             <h3 className="font-bold text-lg">New Inspector Daily Diary</h3>
           </button>
-          <button className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center">
+          <button
+            onClick={() => navigate(`/project/${projectId}/drafts`)}
+            className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
+          >
             <h3 className="font-bold text-lg">Drafts</h3>
           </button>
           <button className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center">

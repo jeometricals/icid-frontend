@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboard from './pages/ProjectDashboard'
+import DraftsListPage from './pages/DraftsListPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import DailySitePatrolPage from './pages/reports/DailySitePatrolPage'
 import CurbSidewalkPage from './pages/reports/CurbSidewalkPage'
@@ -50,6 +51,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProjectDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project/:projectId/drafts"
+        element={
+          <ProtectedRoute>
+            <DraftsListPage />
           </ProtectedRoute>
         }
       />
