@@ -21,6 +21,8 @@ const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
 const SAVED_AT = '2026-09-23T14:05:00Z'
 const SAVED_TEXT = `Saved at ${format(new Date(SAVED_AT), 'HH:mm')}`
 const OTHER_REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000002'
+const SUBMITTED_AT = '2026-09-23T15:10:00Z'
+const SUBMITTED_TEXT = `Submitted at ${format(new Date(SUBMITTED_AT), "HH:mm 'on' MMMM d, yyyy")}`
 
 // A saved draft as GET /v1/reports/{id} returns it (general_form has every key, camelCase)
 function savedReport(id, description, overrides = {}) {
@@ -50,6 +52,7 @@ vi.mock('../../../services/api', () => ({
   createReport: vi.fn(),
   saveGeneralForm: vi.fn(),
   getReport: vi.fn(),
+  submitReport: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -59,6 +62,8 @@ beforeEach(() => {
   api.saveGeneralForm.mockResolvedValue({ report_id: REPORT_ID, completed_form_id: 'cf-1', saved_at: SAVED_AT })
   // Default: a server copy that would clobber local typing if the page ever reloaded it unexpectedly
   api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'SERVER COPY'))
+  api.submitReport.mockResolvedValue({ report_id: REPORT_ID, status: 'submitted', submitted_at: SUBMITTED_AT })
+  window.confirm = vi.fn(() => true) // jsdom has no confirm()
 })
 
 // Test helpers rendered beside the page: show the current URL, and navigate without remounting the page.
@@ -317,13 +322,6 @@ describe('reopening a draft', () => {
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/drafts')
   })
 
-  it('a submitted report is shown locked with Save disabled', async () => {
-    api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'Final', { status: 'submitted' }))
-    renderPage(draftUrl)
-    expect(await screen.findByText(/has been submitted and can no longer be edited/i)).toBeInTheDocument()
-    screen.getAllByRole('button', { name: /save draft/i }).forEach(b => expect(b).toBeDisabled())
-  })
-
   it('switching to another report_id loads that draft', async () => {
     api.getReport.mockImplementation(id =>
       Promise.resolve(savedReport(id, id === REPORT_ID ? 'Draft A' : 'Draft B'))
@@ -384,5 +382,107 @@ describe('first save of a new report', () => {
     await screen.findByText(/unsaved changes/i)
     expect(api.getReport).not.toHaveBeenCalled()
     expect(descriptionBox()).toHaveValue('before save + during save')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Submit flow
+// ---------------------------------------------------------------------------
+
+// Two Submit buttons (sticky header + footer) share one handler.
+const submitButton = () => screen.getAllByRole('button', { name: /submit report|submitting/i })[0]
+
+describe('Submit', () => {
+  const draftUrl = `/project/HWS0023/report/general?report_id=${REPORT_ID}`
+
+  // Opens a saved draft with nothing unsaved, ready to submit.
+  async function openSavedDraft() {
+    api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'Poured curb'))
+    renderPage(draftUrl)
+    await screen.findByDisplayValue('Poured curb')
+  }
+
+  it('is disabled on a new report that has never been saved', () => {
+    renderPage()
+    screen.getAllByRole('button', { name: /submit report/i }).forEach(b => expect(b).toBeDisabled())
+  })
+
+  it('becomes enabled once the first save creates the report', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(saveButton())
+    await screen.findByText(SAVED_TEXT)
+    expect(submitButton()).toBeEnabled()
+  })
+
+  it('with unsaved changes, asks to save first and does not confirm or submit', async () => {
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.type(descriptionBox(), ' more')
+    await user.click(submitButton())
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Please save your changes before submitting.')
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(api.submitReport).not.toHaveBeenCalled()
+  })
+
+  it('the save-first message clears after saving, and submit then goes through', async () => {
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.type(descriptionBox(), ' more')
+    await user.click(submitButton())
+    await user.click(saveButton())
+    await screen.findByText(SAVED_TEXT)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    await user.click(submitButton())
+    expect(api.submitReport).toHaveBeenCalledWith(REPORT_ID)
+  })
+
+  it('does nothing when the confirm dialog is cancelled', async () => {
+    window.confirm.mockReturnValue(false)
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.click(submitButton())
+
+    expect(window.confirm).toHaveBeenCalledWith("Submit this report? You won't be able to edit it after.")
+    expect(api.submitReport).not.toHaveBeenCalled()
+    expect(descriptionBox()).toBeEnabled()
+  })
+
+  it('on success locks the form from the submit response, without refetching', async () => {
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.click(submitButton())
+
+    expect(await screen.findByText(SUBMITTED_TEXT)).toBeInTheDocument()
+    expect(api.getReport).toHaveBeenCalledTimes(1)
+    expect(descriptionBox()).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /submit report/i })).not.toBeInTheDocument()
+  })
+
+  it('on failure shows the backend error and leaves the form editable', async () => {
+    api.submitReport.mockRejectedValue(new Error('Save the General Form before submitting'))
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.click(submitButton())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Submit failed: Save the General Form before submitting')
+    expect(descriptionBox()).toBeEnabled()
+    expect(submitButton()).toBeEnabled()
+  })
+
+  it('opening a submitted report renders it read-only with the banner', async () => {
+    api.getReport.mockResolvedValue(
+      savedReport(REPORT_ID, 'Final', { status: 'submitted', submitted_at: SUBMITTED_AT })
+    )
+    renderPage(draftUrl)
+
+    expect(await screen.findByText(SUBMITTED_TEXT)).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Final')).toBeDisabled()
+    expect(screen.getByDisplayValue('4.01')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /submit report/i })).not.toBeInTheDocument()
   })
 })

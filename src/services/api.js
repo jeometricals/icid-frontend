@@ -77,3 +77,12 @@ export async function listReports({ projectId, reporterUuid, status }) {
   const json = await apiFetch(`/v1/reports/?${params}`)
   return json.data
 }
+
+/**
+ * Submits a draft report, locking it from further edits.
+ * Returns the updated report row ({report_id, status: 'submitted', submitted_at, ...}).
+ */
+export async function submitReport(reportId) {
+  const json = await apiFetch(`/v1/reports/${reportId}/submit`, { method: 'POST' })
+  return json.data
+}

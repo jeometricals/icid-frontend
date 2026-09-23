@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getProjectsForUser, getProjectById, createReport, saveGeneralForm, getReport, listReports } from '../api'
+import { getProjectsForUser, getProjectById, createReport, saveGeneralForm, getReport, listReports, submitReport } from '../api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -294,5 +294,28 @@ describe('listReports', () => {
   it('throws the backend message on error', async () => {
     mockFetch(500, { detail: 'Failed to list reports' })
     await expect(listReports({ projectId: 'HWS0023' })).rejects.toThrow('Failed to list reports')
+  })
+})
+
+describe('submitReport', () => {
+  const SUBMITTED = { ...MOCK_REPORT, status: 'submitted', submitted_at: '2026-09-23T15:00:00Z' }
+
+  it('POSTs to /v1/reports/{id}/submit with no body', async () => {
+    mockFetch(200, { status: 'success', data: SUBMITTED })
+    await submitReport(REPORT_ID)
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`/v1/reports/${REPORT_ID}/submit$`)),
+      { method: 'POST' }
+    )
+  })
+
+  it('returns the submitted report row', async () => {
+    mockFetch(200, { status: 'success', data: SUBMITTED })
+    expect(await submitReport(REPORT_ID)).toEqual(SUBMITTED)
+  })
+
+  it('throws the backend message on 409', async () => {
+    mockFetch(409, { detail: 'Only draft reports can be submitted' })
+    await expect(submitReport(REPORT_ID)).rejects.toThrow('Only draft reports can be submitted')
   })
 })

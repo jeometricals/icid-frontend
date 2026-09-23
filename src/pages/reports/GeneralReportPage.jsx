@@ -1,16 +1,21 @@
 /**
  * General Inspector's Report form for one project (route param :projectId).
  * Opens a saved draft when the URL has ?report_id=; otherwise starts blank and puts the new report_id
- * in the URL on first save. Save Draft saves the whole form; Submit is still a placeholder.
+ * in the URL on first save. Save Draft saves the whole form; Submit locks a saved draft.
+ * A submitted report (however it was reached) renders read-only with a "Submitted at" banner.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Send, Paperclip } from 'lucide-react'
+import { ArrowLeft, Lock, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
 import { useAuth } from '../../contexts/AuthContext'
-import { createReport, getReport, saveGeneralForm } from '../../services/api'
+import { createReport, getReport, saveGeneralForm, submitReport } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
+import SubmitReportButton from '../../components/SubmitReportButton'
+
+const SUBMIT_CONFIRM = "Submit this report? You won't be able to edit it after."
+const SAVE_BEFORE_SUBMIT = 'Please save your changes before submitting.'
 
 // A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
 function emptyFormData() {
@@ -80,6 +85,11 @@ export default function GeneralReportPage() {
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
   const [reportStatus, setReportStatus] = useState('draft')
+  const [submittedAt, setSubmittedAt] = useState(null)
+
+  // Submit state. submitMessage holds the "save first" block or a failed-submit error.
+  const [submitting, setSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState(null)
   const formReportIdRef = useRef(null)
 
   const [formData, setFormData] = useState(emptyFormData)
@@ -95,6 +105,8 @@ export default function GeneralReportPage() {
         formReportIdRef.current = report.report_id
         setReportId(report.report_id)
         setReportStatus(report.status)
+        setSubmittedAt(report.submitted_at ?? null)
+        setSubmitMessage(null)
         setFormData({ ...emptyFormData(), ...(report.general_form || {}) })
         setHasUnsavedChanges(false)
         setSaveStatus('idle')
@@ -179,7 +191,10 @@ export default function GeneralReportPage() {
       setSavedAt(saved.saved_at)
       setSaveError(null)
       setSaveStatus('saved')
-      if (editCountRef.current === editCountAtStart) setHasUnsavedChanges(false)
+      if (editCountRef.current === editCountAtStart) {
+        setHasUnsavedChanges(false)
+        setSubmitMessage(null)
+      }
     } catch (err) {
       setSaveError(err.message)
       setSaveStatus('error')
@@ -188,10 +203,25 @@ export default function GeneralReportPage() {
     }
   }
 
-  const handleSubmit = () => {
-    console.log('Submitting report...', formData)
-    alert('Report submitted successfully!')
-    navigate(`/project/${projectId}`)
+  // Blocks on unsaved edits so only what's on the server gets submitted; the response drives the lock.
+  const handleSubmit = async () => {
+    if (submitting || saveStatus === 'saving') return
+    if (hasUnsavedChanges) {
+      setSubmitMessage(SAVE_BEFORE_SUBMIT)
+      return
+    }
+    if (!window.confirm(SUBMIT_CONFIRM)) return
+    setSubmitting(true)
+    setSubmitMessage(null)
+    try {
+      const report = await submitReport(reportId)
+      setReportStatus(report.status)
+      setSubmittedAt(report.submitted_at)
+    } catch (err) {
+      setSubmitMessage(`Submit failed: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (!project) {
@@ -227,6 +257,18 @@ export default function GeneralReportPage() {
 
   const isLocked = reportStatus !== 'draft'
 
+  // Save + Submit controls; rendered in the header and the footer, hidden once the report is locked.
+  const reportActions = (
+    <>
+      <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={submitting} />
+      <SubmitReportButton
+        onClick={handleSubmit}
+        submitting={submitting}
+        disabled={!reportId || saveStatus === 'saving'}
+      />
+    </>
+  )
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -240,30 +282,29 @@ export default function GeneralReportPage() {
               <ArrowLeft className="h-5 w-5" />
               <span className="font-medium">Back to Project Page</span>
             </button>
-            <div className="flex items-center space-x-3">
-              <SaveStatusText
-                status={saveStatus}
-                savedAt={savedAt}
-                error={saveError}
-                hasUnsavedChanges={hasUnsavedChanges}
-              />
-              <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={isLocked} />
-              <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
-                <Send className="h-4 w-4" />
-                <span>Submit Report</span>
-              </button>
-            </div>
+            {isLocked ? (
+              <SubmittedBanner submittedAt={submittedAt} />
+            ) : (
+              <div className="flex items-center space-x-3">
+                {submitMessage ? (
+                  <span role="alert" className="text-sm text-red-600">{submitMessage}</span>
+                ) : (
+                  <SaveStatusText
+                    status={saveStatus}
+                    savedAt={savedAt}
+                    error={saveError}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                  />
+                )}
+                {reportActions}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLocked && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
-            This report has been submitted and can no longer be edited.
-          </div>
-        )}
 
         {/* Project Info Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -281,6 +322,8 @@ export default function GeneralReportPage() {
           </div>
         </div>
 
+        {/* Every form control below is disabled in one place once the report is submitted */}
+        <fieldset disabled={isLocked} className="min-w-0 border-0 p-0 m-0">
         {/* Report Details Form */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="form-section">
@@ -645,6 +688,7 @@ export default function GeneralReportPage() {
             </button>
           </div>
         </div>
+        </fieldset>
 
         {/* Action Buttons */}
         <div className="flex justify-between items-center">
@@ -654,15 +698,23 @@ export default function GeneralReportPage() {
           >
             Cancel
           </button>
-          <div className="flex space-x-3">
-            <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={isLocked} />
-            <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
-              <Send className="h-4 w-4" />
-              <span>Submit Report</span>
-            </button>
-          </div>
+          {!isLocked && <div className="flex space-x-3">{reportActions}</div>}
         </div>
       </main>
+    </div>
+  )
+}
+
+/**
+ * Lock notice shown in the header in place of the Save/Submit controls once a report is submitted.
+ * Props: submittedAt (ISO string, or null for a report submitted before submit times were recorded).
+ */
+function SubmittedBanner({ submittedAt }) {
+  const when = submittedAt ? ` at ${format(new Date(submittedAt), "HH:mm 'on' MMMM d, yyyy")}` : ''
+  return (
+    <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2 text-sm font-medium">
+      <Lock className="h-4 w-4" />
+      <span>Submitted{when}</span>
     </div>
   )
 }
