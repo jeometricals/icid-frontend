@@ -1,13 +1,31 @@
-import { useState } from 'react'
+/**
+ * General Inspector's Report form for one project (route param :projectId).
+ * Save Draft creates the report on first save, then saves the whole form to it; Submit is still a placeholder.
+ */
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Save, Send, Paperclip } from 'lucide-react'
+import { ArrowLeft, Send, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
+import { useAuth } from '../../contexts/AuthContext'
+import { createReport, saveGeneralForm } from '../../services/api'
+import SaveDraftButton from '../../components/SaveDraftButton'
 
 export default function GeneralReportPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const project = PROJECTS[projectId]
+
+  // Draft save state. reportId is kept once created, even if the form save after it fails,
+  // so retries reuse the same report row.
+  const [reportId, setReportId] = useState(null)
+  const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
+  const [savedAt, setSavedAt] = useState(null)
+  const [saveError, setSaveError] = useState(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const savingRef = useRef(false)
+  const editCountRef = useRef(0) // bumps on every edit; lets a finished save tell if edits happened mid-flight
 
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -50,12 +68,19 @@ export default function GeneralReportPage() {
     comments: ''
   })
 
+  // Every form edit goes through here so unsaved-change tracking can't be skipped.
+  const updateForm = (updater) => {
+    setFormData(updater)
+    editCountRef.current += 1
+    setHasUnsavedChanges(true)
+  }
+
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    updateForm(prev => ({ ...prev, [field]: value }))
   }
 
   const handleNestedInputChange = (parent, field, value) => {
-    setFormData(prev => ({
+    updateForm(prev => ({
       ...prev,
       [parent]: {
         ...prev[parent],
@@ -65,7 +90,7 @@ export default function GeneralReportPage() {
   }
 
   const handleSafetyCheckChange = (field, value) => {
-    setFormData(prev => ({
+    updateForm(prev => ({
       ...prev,
       safetyChecks: {
         ...prev.safetyChecks,
@@ -75,15 +100,47 @@ export default function GeneralReportPage() {
   }
 
   const addPayItem = () => {
-    setFormData(prev => ({
+    updateForm(prev => ({
       ...prev,
       payItems: [...prev.payItems, { itemNo: '', budgetCode: '', payQuantity: '', quantityChk: '', description: '' }]
     }))
   }
 
-  const handleSaveDraft = () => {
-    console.log('Saving draft...', formData)
-    alert('Draft saved successfully!')
+  const handlePayItemChange = (index, field, value) => {
+    updateForm(prev => ({
+      ...prev,
+      payItems: prev.payItems.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    }))
+  }
+
+  // First save creates the report, later saves (and retries after an error) reuse its id.
+  const handleSaveDraft = async () => {
+    if (savingRef.current) return
+    savingRef.current = true
+    const editCountAtStart = editCountRef.current
+    setSaveStatus('saving')
+    try {
+      let id = reportId
+      if (!id) {
+        const report = await createReport({
+          projectId,
+          reporterUuid: user.id,
+          reportDate: formData.date
+        })
+        id = report.report_id
+        setReportId(id)
+      }
+      const saved = await saveGeneralForm(id, formData)
+      setSavedAt(saved.saved_at)
+      setSaveError(null)
+      setSaveStatus('saved')
+      if (editCountRef.current === editCountAtStart) setHasUnsavedChanges(false)
+    } catch (err) {
+      setSaveError(err.message)
+      setSaveStatus('error')
+    } finally {
+      savingRef.current = false
+    }
   }
 
   const handleSubmit = () => {
@@ -110,10 +167,13 @@ export default function GeneralReportPage() {
               <span className="font-medium">Back to Project Page</span>
             </button>
             <div className="flex items-center space-x-3">
-              <button onClick={handleSaveDraft} className="btn-secondary flex items-center space-x-2">
-                <Save className="h-4 w-4" />
-                <span>Save Draft</span>
-              </button>
+              <SaveStatusText
+                status={saveStatus}
+                savedAt={savedAt}
+                error={saveError}
+                hasUnsavedChanges={hasUnsavedChanges}
+              />
+              <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} />
               <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
                 <Send className="h-4 w-4" />
                 <span>Submit Report</span>
@@ -314,19 +374,49 @@ export default function GeneralReportPage() {
                   formData.payItems.map((item, index) => (
                     <tr key={index}>
                       <td className="px-4 py-2">
-                        <input type="text" className="input-field" placeholder="Item No." />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Item No."
+                          value={item.itemNo}
+                          onChange={(e) => handlePayItemChange(index, 'itemNo', e.target.value)}
+                        />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="text" className="input-field" placeholder="Code" />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Code"
+                          value={item.budgetCode}
+                          onChange={(e) => handlePayItemChange(index, 'budgetCode', e.target.value)}
+                        />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="text" className="input-field" placeholder="Qty" />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Qty"
+                          value={item.payQuantity}
+                          onChange={(e) => handlePayItemChange(index, 'payQuantity', e.target.value)}
+                        />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="text" className="input-field" placeholder="Initials" />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Initials"
+                          value={item.quantityChk}
+                          onChange={(e) => handlePayItemChange(index, 'quantityChk', e.target.value)}
+                        />
                       </td>
                       <td className="px-4 py-2">
-                        <input type="text" className="input-field" placeholder="Description" />
+                        <input
+                          type="text"
+                          className="input-field"
+                          placeholder="Description"
+                          value={item.description}
+                          onChange={(e) => handlePayItemChange(index, 'description', e.target.value)}
+                        />
                       </td>
                     </tr>
                   ))
@@ -485,10 +575,7 @@ export default function GeneralReportPage() {
             Cancel
           </button>
           <div className="flex space-x-3">
-            <button onClick={handleSaveDraft} className="btn-secondary flex items-center space-x-2">
-              <Save className="h-4 w-4" />
-              <span>Save Draft</span>
-            </button>
+            <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} />
             <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
               <Send className="h-4 w-4" />
               <span>Submit Report</span>
@@ -498,4 +585,24 @@ export default function GeneralReportPage() {
       </main>
     </div>
   )
+}
+
+/**
+ * One-line save status shown next to the Save Draft button: error, last saved time, or unsaved changes.
+ * Props: status, savedAt (ISO string or null), error (message or null), hasUnsavedChanges.
+ */
+function SaveStatusText({ status, savedAt, error, hasUnsavedChanges }) {
+  if (status === 'error') {
+    return <span className="text-sm text-red-600">Save failed: {error}. Click Save Draft to retry.</span>
+  }
+  if (status === 'saving') return null
+  const savedText = savedAt ? `Saved at ${format(new Date(savedAt), 'HH:mm')}` : null
+  if (hasUnsavedChanges) {
+    return (
+      <span className="text-sm text-gray-500">
+        Unsaved changes{savedText ? ` (last ${savedText.toLowerCase()})` : ''}
+      </span>
+    )
+  }
+  return savedText ? <span className="text-sm text-green-700">{savedText}</span> : null
 }
