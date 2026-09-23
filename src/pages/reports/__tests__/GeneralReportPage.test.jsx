@@ -63,7 +63,8 @@ beforeEach(() => {
   // Default: a server copy that would clobber local typing if the page ever reloaded it unexpectedly
   api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'SERVER COPY'))
   api.submitReport.mockResolvedValue({ report_id: REPORT_ID, status: 'submitted', submitted_at: SUBMITTED_AT })
-  window.confirm = vi.fn(() => true) // jsdom has no confirm()
+  window.confirm = vi.fn(() => true) // jsdom has no confirm() or alert()
+  window.alert = vi.fn()
 })
 
 // Test helpers rendered beside the page: show the current URL, and navigate without remounting the page.
@@ -402,40 +403,49 @@ describe('Submit', () => {
     await screen.findByDisplayValue('Poured curb')
   }
 
-  it('is disabled on a new report that has never been saved', () => {
-    renderPage()
-    screen.getAllByRole('button', { name: /submit report/i }).forEach(b => expect(b).toBeDisabled())
-  })
-
-  it('becomes enabled once the first save creates the report', async () => {
+  it('on a new report with unsaved typing, stays clickable and alerts to save first', async () => {
     const user = userEvent.setup()
     renderPage()
-    await user.click(saveButton())
-    await screen.findByText(SAVED_TEXT)
+    await user.type(descriptionBox(), 'Poured curb')
     expect(submitButton()).toBeEnabled()
-  })
-
-  it('with unsaved changes, asks to save first and does not confirm or submit', async () => {
-    const user = userEvent.setup()
-    await openSavedDraft()
-    await user.type(descriptionBox(), ' more')
     await user.click(submitButton())
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Please save your changes before submitting.')
+    expect(window.alert).toHaveBeenCalledWith('Please save your changes before submitting.')
     expect(window.confirm).not.toHaveBeenCalled()
     expect(api.submitReport).not.toHaveBeenCalled()
   })
 
-  it('the save-first message clears after saving, and submit then goes through', async () => {
+  it('on a blank never-saved report, alerts to save first', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(submitButton())
+
+    expect(window.alert).toHaveBeenCalledWith('Please save your changes before submitting.')
+    expect(api.submitReport).not.toHaveBeenCalled()
+  })
+
+  it('with unsaved changes on a saved draft, alerts to save first and does not confirm or submit', async () => {
+    const user = userEvent.setup()
+    await openSavedDraft()
+    await user.type(descriptionBox(), ' more')
+    expect(submitButton()).toBeEnabled()
+    await user.click(submitButton())
+
+    expect(window.alert).toHaveBeenCalledWith('Please save your changes before submitting.')
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(api.submitReport).not.toHaveBeenCalled()
+  })
+
+  it('after saving the changes, submit goes through', async () => {
     const user = userEvent.setup()
     await openSavedDraft()
     await user.type(descriptionBox(), ' more')
     await user.click(submitButton())
     await user.click(saveButton())
     await screen.findByText(SAVED_TEXT)
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 
     await user.click(submitButton())
+    expect(window.alert).toHaveBeenCalledTimes(1)
     expect(api.submitReport).toHaveBeenCalledWith(REPORT_ID)
   })
 

@@ -87,7 +87,7 @@ export default function GeneralReportPage() {
   const [reportStatus, setReportStatus] = useState('draft')
   const [submittedAt, setSubmittedAt] = useState(null)
 
-  // Submit state. submitMessage holds the "save first" block or a failed-submit error.
+  // Submit state. submitMessage holds a failed-submit error (cleared by the next successful save or submit).
   const [submitting, setSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState(null)
   const formReportIdRef = useRef(null)
@@ -206,8 +206,9 @@ export default function GeneralReportPage() {
   // Blocks on unsaved edits so only what's on the server gets submitted; the response drives the lock.
   const handleSubmit = async () => {
     if (submitting || saveStatus === 'saving') return
-    if (hasUnsavedChanges) {
-      setSubmitMessage(SAVE_BEFORE_SUBMIT)
+    // A never-saved report has nothing on the server to submit, so it gets the same message
+    if (hasUnsavedChanges || !reportId) {
+      window.alert(SAVE_BEFORE_SUBMIT)
       return
     }
     if (!window.confirm(SUBMIT_CONFIRM)) return
@@ -264,7 +265,7 @@ export default function GeneralReportPage() {
       <SubmitReportButton
         onClick={handleSubmit}
         submitting={submitting}
-        disabled={!reportId || saveStatus === 'saving'}
+        disabled={saveStatus === 'saving'}
       />
     </>
   )
