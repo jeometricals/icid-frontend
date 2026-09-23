@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import GeneralReportPage from '../GeneralReportPage'
 import * as api from '../../../services/api'
@@ -20,10 +20,36 @@ const DEV_USER = {
 const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
 const SAVED_AT = '2026-09-23T14:05:00Z'
 const SAVED_TEXT = `Saved at ${format(new Date(SAVED_AT), 'HH:mm')}`
+const OTHER_REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000002'
+
+// A saved draft as GET /v1/reports/{id} returns it (general_form has every key, camelCase)
+function savedReport(id, description, overrides = {}) {
+  return {
+    report_id: id,
+    status: 'draft',
+    general_form: {
+      date: '2026-09-20', sheetNo: 'S-7', workActivityStart: '07:00', workActivityEnd: '', inspectorTimeStart: '',
+      inspectorTimeEnd: '', dailyTempLow: '', dailyTempHigh: '', weatherAM: 'Clear', weatherPM: '',
+      description, payItems: [{ itemNo: '4.01', budgetCode: '', payQuantity: '12', quantityChk: '', description: '' }],
+      workforce: { superintendent: '', foreman: '2', operator: '', flagger: '' },
+      equipment: {
+        frontEndLoader: { model: '', number: '' }, backhoe: { model: '', number: '' },
+        truckDump: { model: '', number: '' }, excavator: { model: '', number: '' },
+      },
+      safetyChecks: {
+        plasticBarrels: true, pedestrianBarricades: null, timberCurbs: null, timberBreakawayBarricades: null,
+        generalSafety: null, localEmergencyAccess: null, fencing: null, plates: null, arrowBoard: null, siteCleaned: null,
+      },
+      safetyRemarks: '', comments: '',
+    },
+    ...overrides,
+  }
+}
 
 vi.mock('../../../services/api', () => ({
   createReport: vi.fn(),
   saveGeneralForm: vi.fn(),
+  getReport: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -31,14 +57,32 @@ beforeEach(() => {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: DEV_USER })
   api.createReport.mockResolvedValue({ report_id: REPORT_ID, status: 'draft' })
   api.saveGeneralForm.mockResolvedValue({ report_id: REPORT_ID, completed_form_id: 'cf-1', saved_at: SAVED_AT })
+  // Default: a server copy that would clobber local typing if the page ever reloaded it unexpectedly
+  api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'SERVER COPY'))
 })
 
-function renderPage() {
+// Test helpers rendered beside the page: show the current URL, and navigate without remounting the page.
+function RouterProbe() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  return (
+    <>
+      <div data-testid="url">{location.pathname + location.search}</div>
+      <button onClick={() => navigate('/project/HWS0023/report/general?report_id=' + OTHER_REPORT_ID)}>
+        go to other draft
+      </button>
+    </>
+  )
+}
+
+function renderPage(url = '/project/HWS0023/report/general') {
   return render(
-    <MemoryRouter initialEntries={['/project/HWS0023/report/general']}>
+    <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/project/:projectId/report/general" element={<GeneralReportPage />} />
+        <Route path="*" element={<div>other page</div>} />
       </Routes>
+      <RouterProbe />
     </MemoryRouter>
   )
 }
@@ -195,5 +239,150 @@ describe('unsaved changes', () => {
 
     finishSave({ report_id: REPORT_ID, completed_form_id: 'cf-1', saved_at: SAVED_AT })
     expect(await screen.findByText(/unsaved changes/i)).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reopening a draft from ?report_id=
+// ---------------------------------------------------------------------------
+
+describe('reopening a draft', () => {
+  const draftUrl = `/project/HWS0023/report/general?report_id=${REPORT_ID}`
+
+  it('loads the saved form into the fields', async () => {
+    api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'Poured curb on 5th Ave'))
+    renderPage(draftUrl)
+
+    expect(await screen.findByDisplayValue('Poured curb on 5th Ave')).toBeInTheDocument()
+    expect(api.getReport).toHaveBeenCalledWith(REPORT_ID)
+    expect(screen.getByDisplayValue('S-7')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('4.01')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('2026-09-20')).toBeInTheDocument()
+    // Loading is not an edit
+    expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a spinner instead of the form while loading', async () => {
+    api.getReport.mockReturnValue(new Promise(() => {}))
+    renderPage(draftUrl)
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/detailed description of work/i)).not.toBeInTheDocument()
+  })
+
+  it('saves edits to the opened draft without creating a new report', async () => {
+    api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'Poured curb'))
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+    await user.type(await screen.findByDisplayValue('Poured curb'), ' - day 2')
+    await user.click(saveButton())
+
+    await screen.findByText(SAVED_TEXT)
+    expect(api.createReport).not.toHaveBeenCalled()
+    expect(api.saveGeneralForm).toHaveBeenCalledWith(
+      REPORT_ID,
+      expect.objectContaining({ description: 'Poured curb - day 2', sheetNo: 'S-7' })
+    )
+  })
+
+  it('a report with no saved form opens blank and saves to the same report', async () => {
+    api.getReport.mockResolvedValue({ report_id: REPORT_ID, status: 'draft', general_form: null })
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+    await user.type(await screen.findByPlaceholderText(/detailed description of work/i), 'First words')
+    await user.click(saveButton())
+
+    await screen.findByText(SAVED_TEXT)
+    expect(api.createReport).not.toHaveBeenCalled()
+    expect(api.saveGeneralForm).toHaveBeenCalledWith(REPORT_ID, expect.objectContaining({ description: 'First words' }))
+  })
+
+  it('on load failure shows the error, and Retry loads again', async () => {
+    api.getReport
+      .mockRejectedValueOnce(new Error('Report not found'))
+      .mockResolvedValueOnce(savedReport(REPORT_ID, 'Loaded on retry'))
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+
+    expect(await screen.findByText('Report not found')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+    expect(await screen.findByDisplayValue('Loaded on retry')).toBeInTheDocument()
+    expect(api.getReport).toHaveBeenCalledTimes(2)
+  })
+
+  it('Back to Drafts goes to the project drafts list', async () => {
+    api.getReport.mockRejectedValue(new Error('Network error'))
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+    await user.click(await screen.findByRole('button', { name: /back to drafts/i }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/drafts')
+  })
+
+  it('a submitted report is shown locked with Save disabled', async () => {
+    api.getReport.mockResolvedValue(savedReport(REPORT_ID, 'Final', { status: 'submitted' }))
+    renderPage(draftUrl)
+    expect(await screen.findByText(/has been submitted and can no longer be edited/i)).toBeInTheDocument()
+    screen.getAllByRole('button', { name: /save draft/i }).forEach(b => expect(b).toBeDisabled())
+  })
+
+  it('switching to another report_id loads that draft', async () => {
+    api.getReport.mockImplementation(id =>
+      Promise.resolve(savedReport(id, id === REPORT_ID ? 'Draft A' : 'Draft B'))
+    )
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+    await screen.findByDisplayValue('Draft A')
+
+    await user.click(screen.getByRole('button', { name: /go to other draft/i }))
+    expect(await screen.findByDisplayValue('Draft B')).toBeInTheDocument()
+  })
+
+  it('a slow response for the previous report_id does not overwrite the current one', async () => {
+    let resolveA
+    api.getReport.mockImplementation(id =>
+      id === REPORT_ID
+        ? new Promise(resolve => { resolveA = resolve })
+        : Promise.resolve(savedReport(id, 'Draft B'))
+    )
+    const user = userEvent.setup()
+    renderPage(draftUrl)
+    await user.click(screen.getByRole('button', { name: /go to other draft/i }))
+    await screen.findByDisplayValue('Draft B')
+
+    resolveA(savedReport(REPORT_ID, 'Draft A'))
+    await new Promise(r => setTimeout(r, 0))
+    expect(screen.getByDisplayValue('Draft B')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Draft A')).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// New report: report_id goes into the URL on first save
+// ---------------------------------------------------------------------------
+
+describe('first save of a new report', () => {
+  it('puts the new report_id in the URL', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(saveButton())
+    await screen.findByText(SAVED_TEXT)
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/report/general?report_id=${REPORT_ID}`)
+  })
+
+  it('does not reload the report it just created, so typing during the save is kept', async () => {
+    let finishSave
+    api.saveGeneralForm.mockReturnValue(new Promise(resolve => { finishSave = resolve }))
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(descriptionBox(), 'before save')
+    await user.click(saveButton())
+
+    // report created and URL updated while the form save is still in flight
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(`report_id=${REPORT_ID}`))
+    await user.type(descriptionBox(), ' + during save')
+
+    finishSave({ report_id: REPORT_ID, completed_form_id: 'cf-1', saved_at: SAVED_AT })
+    await screen.findByText(/unsaved changes/i)
+    expect(api.getReport).not.toHaveBeenCalled()
+    expect(descriptionBox()).toHaveValue('before save + during save')
   })
 })

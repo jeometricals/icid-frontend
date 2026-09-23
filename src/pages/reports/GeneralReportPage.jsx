@@ -1,33 +1,20 @@
 /**
  * General Inspector's Report form for one project (route param :projectId).
- * Save Draft creates the report on first save, then saves the whole form to it; Submit is still a placeholder.
+ * Opens a saved draft when the URL has ?report_id=; otherwise starts blank and puts the new report_id
+ * in the URL on first save. Save Draft saves the whole form; Submit is still a placeholder.
  */
-import { useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Send, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
 import { useAuth } from '../../contexts/AuthContext'
-import { createReport, saveGeneralForm } from '../../services/api'
+import { createReport, getReport, saveGeneralForm } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
 
-export default function GeneralReportPage() {
-  const { projectId } = useParams()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const project = PROJECTS[projectId]
-
-  // Draft save state. reportId is kept once created, even if the form save after it fails,
-  // so retries reuse the same report row.
-  const [reportId, setReportId] = useState(null)
-  const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
-  const [savedAt, setSavedAt] = useState(null)
-  const [saveError, setSaveError] = useState(null)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const savingRef = useRef(false)
-  const editCountRef = useRef(0) // bumps on every edit; lets a finished save tell if edits happened mid-flight
-
-  const [formData, setFormData] = useState({
+// A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
+function emptyFormData() {
+  return {
     date: format(new Date(), 'yyyy-MM-dd'),
     sheetNo: '',
     workActivityStart: '',
@@ -66,7 +53,62 @@ export default function GeneralReportPage() {
     },
     safetyRemarks: '',
     comments: ''
-  })
+  }
+}
+
+export default function GeneralReportPage() {
+  const { projectId } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const project = PROJECTS[projectId]
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlReportId = searchParams.get('report_id')
+
+  // Draft save state. reportId is kept once created, even if the form save after it fails,
+  // so retries reuse the same report row.
+  const [reportId, setReportId] = useState(null)
+  const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
+  const [savedAt, setSavedAt] = useState(null)
+  const [saveError, setSaveError] = useState(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const savingRef = useRef(false)
+  const editCountRef = useRef(0) // bumps on every edit; lets a finished save tell if edits happened mid-flight
+
+  // Loading a saved draft from ?report_id=. formReportIdRef is the report the form currently holds;
+  // it updates synchronously so our own URL update after a first save is never mistaken for "open a different draft".
+  const [loadStatus, setLoadStatus] = useState(urlReportId ? 'loading' : 'ready') // 'loading' | 'ready' | 'error'
+  const [loadError, setLoadError] = useState(null)
+  const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
+  const [reportStatus, setReportStatus] = useState('draft')
+  const formReportIdRef = useRef(null)
+
+  const [formData, setFormData] = useState(emptyFormData)
+
+  useEffect(() => {
+    if (!urlReportId || urlReportId === formReportIdRef.current) return
+    let ignore = false
+    setLoadStatus('loading')
+    setLoadError(null)
+    getReport(urlReportId)
+      .then(report => {
+        if (ignore) return
+        formReportIdRef.current = report.report_id
+        setReportId(report.report_id)
+        setReportStatus(report.status)
+        setFormData({ ...emptyFormData(), ...(report.general_form || {}) })
+        setHasUnsavedChanges(false)
+        setSaveStatus('idle')
+        setSavedAt(null)
+        setSaveError(null)
+        setLoadStatus('ready')
+      })
+      .catch(err => {
+        if (ignore) return
+        setLoadError(err.message)
+        setLoadStatus('error')
+      })
+    return () => { ignore = true }
+  }, [urlReportId, loadAttempt])
 
   // Every form edit goes through here so unsaved-change tracking can't be skipped.
   const updateForm = (updater) => {
@@ -128,7 +170,10 @@ export default function GeneralReportPage() {
           reportDate: formData.date
         })
         id = report.report_id
+        formReportIdRef.current = id
         setReportId(id)
+        // Refresh-safe from here on; replace so Back doesn't return to the blank-form URL
+        setSearchParams({ report_id: id }, { replace: true })
       }
       const saved = await saveGeneralForm(id, formData)
       setSavedAt(saved.saved_at)
@@ -153,6 +198,35 @@ export default function GeneralReportPage() {
     return <div>Project not found</div>
   }
 
+  if (loadStatus === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
+      </div>
+    )
+  }
+
+  if (loadStatus === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't open this draft</h2>
+          <p className="text-red-600 mb-6">{loadError}</p>
+          <div className="flex justify-center space-x-3">
+            <button onClick={() => setLoadAttempt(a => a + 1)} className="btn-primary">
+              Retry
+            </button>
+            <button onClick={() => navigate(`/project/${projectId}/drafts`)} className="btn-secondary">
+              Back to Drafts
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const isLocked = reportStatus !== 'draft'
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -173,7 +247,7 @@ export default function GeneralReportPage() {
                 error={saveError}
                 hasUnsavedChanges={hasUnsavedChanges}
               />
-              <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} />
+              <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={isLocked} />
               <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
                 <Send className="h-4 w-4" />
                 <span>Submit Report</span>
@@ -185,6 +259,12 @@ export default function GeneralReportPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {isLocked && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
+            This report has been submitted and can no longer be edited.
+          </div>
+        )}
+
         {/* Project Info Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">General Inspector's Report</h1>
@@ -575,7 +655,7 @@ export default function GeneralReportPage() {
             Cancel
           </button>
           <div className="flex space-x-3">
-            <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} />
+            <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={isLocked} />
             <button onClick={handleSubmit} className="btn-primary flex items-center space-x-2">
               <Send className="h-4 w-4" />
               <span>Submit Report</span>
