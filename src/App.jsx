@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 // Pages
@@ -12,6 +12,7 @@ import CurbSidewalkPage from './pages/reports/CurbSidewalkPage'
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -25,7 +26,8 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />
+    // Remember where the user was headed (incl. ?report_id=) so login can send them back
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
   return children

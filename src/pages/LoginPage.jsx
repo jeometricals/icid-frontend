@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { HardHat } from 'lucide-react'
 
@@ -10,13 +10,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const { signIn, enterDemoMode, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  // Page the user was sent here from by ProtectedRoute, else the project list
+  const from = location.state?.from
+  const redirectTo = from ? `${from.pathname}${from.search}` : '/projects'
 
   useEffect(() => {
     // Redirect if already logged in
     if (user) {
-      navigate('/projects')
+      navigate(redirectTo, { replace: true })
     }
-  }, [user, navigate])
+  }, [user, navigate, redirectTo])
 
   const handleSignIn = async (e) => {
     e.preventDefault()
@@ -29,13 +33,13 @@ export default function LoginPage() {
       setError(error.message || 'Failed to sign in')
       setLoading(false)
     } else {
-      navigate('/projects')
+      navigate(redirectTo, { replace: true })
     }
   }
 
   const handleDemoMode = () => {
     enterDemoMode()
-    navigate('/projects')
+    navigate(redirectTo, { replace: true })
   }
 
   return (
