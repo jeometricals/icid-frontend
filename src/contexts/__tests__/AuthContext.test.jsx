@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, act, renderHook } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider, useAuth } from '../AuthContext'
+import { GENGHIS_UUID } from '../../constants/devUser'
 
 // ---------------------------------------------------------------------------
 // Helper — renders a component that exposes AuthContext values via the DOM
@@ -59,7 +60,7 @@ describe('signIn', () => {
     renderAuth()
     await userEvent.click(screen.getByText('sign-in'))
     const user = JSON.parse(screen.getByTestId('user').textContent)
-    expect(user.id).toBe(28)
+    expect(user.id).toBe(GENGHIS_UUID)
     expect(user.email).toBe('KhanG@magnoleng.pc')
     expect(user.user_metadata.full_name).toBe('Genghis Khan')
   })
@@ -128,7 +129,7 @@ describe('enterDemoMode', () => {
     renderAuth()
     await userEvent.click(screen.getByText('demo'))
     const user = JSON.parse(screen.getByTestId('user').textContent)
-    expect(user.id).toBe(28)
+    expect(user.id).toBe(GENGHIS_UUID)
   })
 
   it('sets isDemoMode to true', async () => {

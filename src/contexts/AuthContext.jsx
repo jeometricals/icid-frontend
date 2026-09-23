@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react'
+import { DEV_USER } from '../constants/devUser'
 
 const AuthContext = createContext(null)
 
@@ -8,16 +9,6 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-}
-
-// Dev user — hardcoded for development (user_id=28 in the DB)
-const DEV_USER = {
-  id: 28,
-  email: 'KhanG@magnoleng.pc',
-  user_metadata: {
-    full_name: 'Genghis Khan',
-    role: 'inspector'
-  }
 }
 
 export const AuthProvider = ({ children }) => {

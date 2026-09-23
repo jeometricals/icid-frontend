@@ -11,7 +11,7 @@ import * as AuthContext from '../../contexts/AuthContext'
 // ---------------------------------------------------------------------------
 
 const DEV_USER = {
-  id: 28,
+  id: '327d3ed2-a3d6-4235-9408-7fe721b12bed',
   email: 'KhanG@magnoleng.pc',
   user_metadata: { full_name: 'Genghis Khan' }
 }
@@ -94,7 +94,7 @@ describe('ProjectSelectionPage with projects', () => {
 
   it('calls getProjectsForUser with the dev user id', async () => {
     renderPage()
-    await waitFor(() => expect(api.getProjectsForUser).toHaveBeenCalledWith(28))
+    await waitFor(() => expect(api.getProjectsForUser).toHaveBeenCalledWith(DEV_USER.id))
   })
 
   it('navigates to the project dashboard when a project is clicked', async () => {
