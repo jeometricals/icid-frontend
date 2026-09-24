@@ -13,7 +13,6 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
     "date-fns": "^3.0.6",
     "lucide-react": "^0.303.0",
     "react": "^18.2.0",
