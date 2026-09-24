@@ -211,3 +211,17 @@ describe('ProjectDashboard drafts button', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/drafts')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Report Archive entry point
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard report archive button', () => {
+  it("navigates to this project's report archive", async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByRole('button', { name: 'Report Archive' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/archive')
+  })
+})

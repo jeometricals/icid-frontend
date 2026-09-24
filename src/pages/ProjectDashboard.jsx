@@ -188,7 +188,10 @@ export default function ProjectDashboard() {
           >
             <h3 className="font-bold text-lg">Drafts</h3>
           </button>
-          <button className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center">
+          <button
+            onClick={() => navigate(`/project/${projectId}/archive`)}
+            className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
+          >
             <h3 className="font-bold text-lg">Report Archive</h3>
           </button>
         </div>

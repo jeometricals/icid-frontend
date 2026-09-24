@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
+import ReportArchivePage from './pages/ReportArchivePage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import DailySitePatrolPage from './pages/reports/DailySitePatrolPage'
 import CurbSidewalkPage from './pages/reports/CurbSidewalkPage'
@@ -59,6 +60,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DraftsListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project/:projectId/archive"
+        element={
+          <ProtectedRoute>
+            <ReportArchivePage />
           </ProtectedRoute>
         }
       />
