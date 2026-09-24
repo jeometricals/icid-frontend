@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut, Cloud, ArrowLeft, FileText, ClipboardCheck, Building } from 'lucide-react'
-import { format } from 'date-fns'
+import { HardHat, LogOut, ArrowLeft, FileText, ClipboardCheck, Building } from 'lucide-react'
 import { REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
 import { getProjectById } from '../services/api'
 
@@ -81,29 +80,8 @@ export default function ProjectDashboard() {
               </div>
             </div>
 
-            {/* Weather & User Info */}
+            {/* User Info */}
             <div className="flex items-center space-x-6">
-              <div className="hidden sm:flex items-center space-x-4 text-sm">
-                <div className="text-right">
-                  <div className="font-semibold text-2xl text-gray-900">52°F</div>
-                  <div className="text-xs text-gray-500">{format(new Date(), 'EEEE MMM dd, yyyy')}</div>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center space-x-1">
-                    <Cloud className="h-6 w-6 text-gray-400" />
-                    <span className="text-xs">AM</span>
-                  </div>
-                  <div className="text-xs text-gray-600">Low 48°</div>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center space-x-1">
-                    <Cloud className="h-6 w-6 text-gray-400" />
-                    <span className="text-xs">PM</span>
-                  </div>
-                  <div className="text-xs text-gray-600">High 59°</div>
-                </div>
-              </div>
-
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
                   <div className="text-sm font-medium text-gray-900">

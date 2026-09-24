@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut, Cloud, Sun, CloudRain } from 'lucide-react'
-import { format } from 'date-fns'
+import { HardHat, LogOut } from 'lucide-react'
 import { getProjectsForUser } from '../services/api'
 
 export default function ProjectSelectionPage() {
@@ -11,12 +10,6 @@ export default function ProjectSelectionPage() {
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
   const [fetchError, setFetchError] = useState(null)
-  const [weather] = useState({
-    temp: 52,
-    low: 48,
-    high: 59,
-    condition: 'Partly Cloudy'
-  })
 
   useEffect(() => {
     if (!user) return
@@ -33,19 +26,6 @@ export default function ProjectSelectionPage() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
-  }
-
-  const getWeatherIcon = (condition) => {
-    switch (condition) {
-      case 'Sunny':
-        return <Sun className="h-6 w-6 text-yellow-500" />
-      case 'Cloudy':
-        return <Cloud className="h-6 w-6 text-gray-400" />
-      case 'Rainy':
-        return <CloudRain className="h-6 w-6 text-blue-500" />
-      default:
-        return <Cloud className="h-6 w-6 text-gray-400" />
-    }
   }
 
   return (
@@ -65,30 +45,8 @@ export default function ProjectSelectionPage() {
               </div>
             </div>
 
-            {/* Weather & User Info */}
+            {/* User Info */}
             <div className="flex items-center space-x-6">
-              {/* Weather */}
-              <div className="hidden sm:flex items-center space-x-4 text-sm">
-                <div className="text-right">
-                  <div className="font-semibold text-2xl text-gray-900">{weather.temp}°F</div>
-                  <div className="text-xs text-gray-500">{format(new Date(), 'EEEE MMM dd, yyyy')}</div>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center space-x-1">
-                    {getWeatherIcon(weather.condition)}
-                    <span className="text-xs">AM</span>
-                  </div>
-                  <div className="text-xs text-gray-600">Low {weather.low}°</div>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center space-x-1">
-                    {getWeatherIcon(weather.condition)}
-                    <span className="text-xs">PM</span>
-                  </div>
-                  <div className="text-xs text-gray-600">High {weather.high}°</div>
-                </div>
-              </div>
-
               {/* User Menu */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
