@@ -112,6 +112,19 @@ describe('getProjectById', () => {
 // Error message formatting
 // ---------------------------------------------------------------------------
 
+describe('error status', () => {
+  it('attaches the HTTP status to thrown errors so callers can tell 404 from other failures', async () => {
+    mockFetch(404, { detail: 'Project not found' })
+    await expect(getProjectById('NOPE')).rejects.toMatchObject({ message: 'Project not found', status: 404 })
+  })
+
+  it('leaves status undefined for network failures', async () => {
+    mockFetchFailure('Failed to fetch')
+    const err = await getProjectById('HWS0023').catch(e => e)
+    expect(err.status).toBeUndefined()
+  })
+})
+
 describe('error messages', () => {
   it('joins FastAPI 422 validation messages instead of throwing [object Object]', async () => {
     mockFetch(422, {

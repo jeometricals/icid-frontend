@@ -12,7 +12,8 @@ function errorMessage(body, status) {
 
 /**
  * Calls the ICID backend and returns the parsed JSON response.
- * Takes a path plus optional {method, body}; a body is sent as JSON. Throws on non-2xx responses.
+ * Takes a path plus optional {method, body}; a body is sent as JSON. Throws on non-2xx responses,
+ * with the HTTP code on `error.status` (network failures throw without one).
  */
 async function apiFetch(path, { method = 'GET', body } = {}) {
   const init = { method }
@@ -23,7 +24,9 @@ async function apiFetch(path, { method = 'GET', body } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, init)
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}))
-    throw new Error(errorMessage(errorBody, res.status))
+    const error = new Error(errorMessage(errorBody, res.status))
+    error.status = res.status
+    throw error
   }
   return res.json()
 }

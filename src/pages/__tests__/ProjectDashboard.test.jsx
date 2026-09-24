@@ -141,10 +141,17 @@ describe('ProjectDashboard with project data', () => {
 // Project not found
 // ---------------------------------------------------------------------------
 
+// Mimics apiFetch: HTTP errors carry .status, network errors don't
+function apiError(message, status) {
+  const err = new Error(message)
+  if (status) err.status = status
+  return err
+}
+
 describe('ProjectDashboard project not found', () => {
-  it('shows the not-found message when API throws', async () => {
+  it('shows the not-found message on a 404', async () => {
     mockAuth()
-    vi.spyOn(api, 'getProjectById').mockRejectedValue(new Error('Project not found'))
+    vi.spyOn(api, 'getProjectById').mockRejectedValue(apiError('Project not found', 404))
     renderDashboard('DOESNOTEXIST')
     await waitFor(() => screen.getByText('Project not found'))
     expect(screen.getByText('Project not found')).toBeInTheDocument()
@@ -152,11 +159,39 @@ describe('ProjectDashboard project not found', () => {
 
   it('offers a back button on the not-found screen', async () => {
     mockAuth()
-    vi.spyOn(api, 'getProjectById').mockRejectedValue(new Error('Not found'))
+    vi.spyOn(api, 'getProjectById').mockRejectedValue(apiError('Not found', 404))
     renderDashboard('DOESNOTEXIST')
     await waitFor(() => screen.getByText('Back to Projects'))
     await userEvent.click(screen.getByText('Back to Projects'))
     expect(mockNavigate).toHaveBeenCalledWith('/projects')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Load failures other than not-found
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard load failure', () => {
+  it('shows the server error (not "not found") on a 500, and Retry loads again', async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById')
+      .mockRejectedValueOnce(apiError('Internal Server Error', 500))
+      .mockResolvedValueOnce(MOCK_PROJECT)
+    renderDashboard()
+    expect(await screen.findByText("Couldn't load this project")).toBeInTheDocument()
+    expect(screen.getByText('Internal Server Error')).toBeInTheDocument()
+    expect(screen.queryByText('Project not found')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText(MOCK_PROJECT.project_name)).toBeInTheDocument()
+  })
+
+  it('shows a network failure as a load error, not "not found"', async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockRejectedValue(apiError('Failed to fetch'))
+    renderDashboard()
+    expect(await screen.findByText('Failed to fetch')).toBeInTheDocument()
+    expect(screen.queryByText('Project not found')).not.toBeInTheDocument()
   })
 })
 

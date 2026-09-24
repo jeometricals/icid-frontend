@@ -24,14 +24,19 @@ export default function ProjectDashboard() {
   const { signOut, user, isDemoMode } = useAuth()
   const [project, setProject] = useState(null)
   const [loadingProject, setLoadingProject] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const [loadError, setLoadError] = useState(null) // the thrown Error; status 404 means the project doesn't exist
+  const [attempt, setAttempt] = useState(0) // bump to retry
 
   useEffect(() => {
+    let ignore = false
+    setLoadingProject(true)
+    setLoadError(null)
     getProjectById(projectId)
-      .then(data => setProject(data))
-      .catch(() => setNotFound(true))
-      .finally(() => setLoadingProject(false))
-  }, [projectId])
+      .then(data => { if (!ignore) setProject(data) })
+      .catch(err => { if (!ignore) setLoadError(err) })
+      .finally(() => { if (!ignore) setLoadingProject(false) })
+    return () => { ignore = true }
+  }, [projectId, attempt])
 
   const handleSignOut = async () => {
     await signOut()
@@ -50,7 +55,7 @@ export default function ProjectDashboard() {
     )
   }
 
-  if (notFound || !project) {
+  if (loadError?.status === 404) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -58,6 +63,25 @@ export default function ProjectDashboard() {
           <button onClick={() => navigate('/projects')} className="mt-4 btn-primary">
             Back to Projects
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError || !project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't load this project</h2>
+          <p className="text-red-600 mb-6">{loadError?.message || 'No project data returned'}</p>
+          <div className="flex justify-center space-x-3">
+            <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">
+              Retry
+            </button>
+            <button onClick={() => navigate('/projects')} className="btn-secondary">
+              Back to Projects
+            </button>
+          </div>
         </div>
       </div>
     )
