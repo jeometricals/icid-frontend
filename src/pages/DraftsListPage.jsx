@@ -30,7 +30,7 @@ export default function DraftsListPage() {
   }, [projectId, user.id, attempt])
 
   const openDraft = (reportId) => {
-    navigate(`/project/${projectId}/report/general?report_id=${reportId}`)
+    navigate(`/project/${projectId}/report/general?report_id=${reportId}`, { state: { from: 'drafts' } })
   }
 
   return (

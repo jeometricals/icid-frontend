@@ -5,7 +5,7 @@
  * A submitted report (however it was reached) renders read-only with a "Submitted at" banner.
  */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Lock, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
@@ -16,6 +16,13 @@ import SubmitReportButton from '../../components/SubmitReportButton'
 
 const SUBMIT_CONFIRM = "Submit this report? You won't be able to edit it after."
 const SAVE_BEFORE_SUBMIT = 'Please save your changes before submitting.'
+
+// Where the load-error "Back" button goes, keyed by the list page that opened the report (router state.from)
+const BACK_TARGETS = {
+  drafts: { path: '/drafts', label: 'Back to Drafts' },
+  archive: { path: '/archive', label: 'Back to Report Archive' },
+}
+const BACK_TO_PROJECT = { path: '', label: 'Back to Project Page' }
 
 // A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
 function emptyFormData() {
@@ -64,6 +71,7 @@ function emptyFormData() {
 export default function GeneralReportPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const project = PROJECTS[projectId]
   const [searchParams, setSearchParams] = useSearchParams()
@@ -238,17 +246,18 @@ export default function GeneralReportPage() {
   }
 
   if (loadStatus === 'error') {
+    const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't open this draft</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't open this report</h2>
           <p className="text-red-600 mb-6">{loadError}</p>
           <div className="flex justify-center space-x-3">
             <button onClick={() => setLoadAttempt(a => a + 1)} className="btn-primary">
               Retry
             </button>
-            <button onClick={() => navigate(`/project/${projectId}/drafts`)} className="btn-secondary">
-              Back to Drafts
+            <button onClick={() => navigate(`/project/${projectId}${back.path}`)} className="btn-secondary">
+              {back.label}
             </button>
           </div>
         </div>

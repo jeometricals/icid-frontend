@@ -81,9 +81,12 @@ function RouterProbe() {
   )
 }
 
-function renderPage(url = '/project/HWS0023/report/general') {
+// `from` mimics the router state the Drafts / Archive lists pass when opening a report
+function renderPage(url = '/project/HWS0023/report/general', from) {
+  const [pathname, search = ''] = url.split('?')
+  const entry = { pathname, search: search && `?${search}`, state: from ? { from } : null }
   return render(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/project/:projectId/report/general" element={<GeneralReportPage />} />
         <Route path="*" element={<div>other page</div>} />
@@ -315,12 +318,28 @@ describe('reopening a draft', () => {
     expect(api.getReport).toHaveBeenCalledTimes(2)
   })
 
-  it('Back to Drafts goes to the project drafts list', async () => {
+  it('on load failure, Back goes to the drafts list when opened from Drafts', async () => {
+    api.getReport.mockRejectedValue(new Error('Network error'))
+    const user = userEvent.setup()
+    renderPage(draftUrl, 'drafts')
+    await user.click(await screen.findByRole('button', { name: 'Back to Drafts' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/drafts')
+  })
+
+  it('on load failure, Back goes to the archive when opened from the Report Archive', async () => {
+    api.getReport.mockRejectedValue(new Error('Network error'))
+    const user = userEvent.setup()
+    renderPage(draftUrl, 'archive')
+    await user.click(await screen.findByRole('button', { name: 'Back to Report Archive' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/archive')
+  })
+
+  it('on load failure, Back goes to the project page when opened directly (e.g. pasted URL)', async () => {
     api.getReport.mockRejectedValue(new Error('Network error'))
     const user = userEvent.setup()
     renderPage(draftUrl)
-    await user.click(await screen.findByRole('button', { name: /back to drafts/i }))
-    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/drafts')
+    await user.click(await screen.findByRole('button', { name: 'Back to Project Page' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/\/project\/HWS0023$/)
   })
 
   it('switching to another report_id loads that draft', async () => {

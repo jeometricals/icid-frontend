@@ -32,7 +32,7 @@ export default function ReportArchivePage() {
   }, [projectId, attempt])
 
   const openReport = (reportId) => {
-    navigate(`/project/${projectId}/report/general?report_id=${reportId}`)
+    navigate(`/project/${projectId}/report/general?report_id=${reportId}`, { state: { from: 'archive' } })
   }
 
   return (

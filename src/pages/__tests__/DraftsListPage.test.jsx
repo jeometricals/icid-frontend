@@ -38,7 +38,12 @@ beforeEach(() => {
 
 function CurrentUrl() {
   const location = useLocation()
-  return <div data-testid="url">{location.pathname + location.search}</div>
+  return (
+    <>
+      <div data-testid="url">{location.pathname + location.search}</div>
+      <div data-testid="from">{location.state?.from}</div>
+    </>
+  )
 }
 
 function renderPage() {
@@ -82,6 +87,7 @@ describe('DraftsListPage', () => {
     renderPage()
     await user.click(await screen.findByText('Poured curb on 5th Ave'))
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/report/general?report_id=aaaa-1111')
+    expect(screen.getByTestId('from')).toHaveTextContent('drafts') // drives the report page's error-state Back link
   })
 
   it('shows an empty state when there are no drafts', async () => {
