@@ -20,9 +20,9 @@ const SAVE_BEFORE_SUBMIT = 'Please save your changes before submitting.'
 // Where the load-error "Back" button goes, keyed by the list page that opened the report (router state.from)
 const BACK_TARGETS = {
   drafts: { path: '/drafts', label: 'Back to Drafts' },
-  archive: { path: '/archive', label: 'Back to Report Archive' },
+  archive: { path: '/archive', label: 'Back to Archive' },
 }
-const BACK_TO_PROJECT = { path: '', label: 'Back to Project Page' }
+const BACK_TO_PROJECT = { path: '', label: 'Back to Project Dashboard' }
 
 // A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
 function emptyFormData() {

@@ -330,7 +330,7 @@ describe('reopening a draft', () => {
     api.getReport.mockRejectedValue(new Error('Network error'))
     const user = userEvent.setup()
     renderPage(draftUrl, 'archive')
-    await user.click(await screen.findByRole('button', { name: 'Back to Report Archive' }))
+    await user.click(await screen.findByRole('button', { name: 'Back to Archive' }))
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/archive')
   })
 
@@ -338,7 +338,7 @@ describe('reopening a draft', () => {
     api.getReport.mockRejectedValue(new Error('Network error'))
     const user = userEvent.setup()
     renderPage(draftUrl)
-    await user.click(await screen.findByRole('button', { name: 'Back to Project Page' }))
+    await user.click(await screen.findByRole('button', { name: 'Back to Project Dashboard' }))
     expect(screen.getByTestId('url')).toHaveTextContent(/\/project\/HWS0023$/)
   })
 
