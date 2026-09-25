@@ -7,6 +7,7 @@ import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
+import IDRPage from './pages/IDRPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import DailySitePatrolPage from './pages/reports/DailySitePatrolPage'
 import CurbSidewalkPage from './pages/reports/CurbSidewalkPage'
@@ -68,6 +69,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ReportArchivePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project/:projectId/idr/:idrId"
+        element={
+          <ProtectedRoute>
+            <IDRPage />
           </ProtectedRoute>
         }
       />

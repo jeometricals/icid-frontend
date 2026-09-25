@@ -6,13 +6,15 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Lock, Paperclip } from 'lucide-react'
+import { ArrowLeft, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
 import { useAuth } from '../../contexts/AuthContext'
 import { createReport, getReport, saveGeneralForm, submitReport } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
 import SubmitReportButton from '../../components/SubmitReportButton'
+import SubmittedBanner from '../../components/SubmittedBanner'
+import SaveStatusText from '../../components/SaveStatusText'
 
 const SUBMIT_CONFIRM = "Submit this report? You won't be able to edit it after."
 const SAVE_BEFORE_SUBMIT = 'Please save your changes before submitting.'
@@ -713,38 +715,4 @@ export default function GeneralReportPage() {
       </main>
     </div>
   )
-}
-
-/**
- * Lock notice shown in the header in place of the Save/Submit controls once a report is submitted.
- * Props: submittedAt (ISO string, or null for a report submitted before submit times were recorded).
- */
-function SubmittedBanner({ submittedAt }) {
-  const when = submittedAt ? ` at ${format(new Date(submittedAt), "HH:mm 'on' MMMM d, yyyy")}` : ''
-  return (
-    <div className="flex items-center space-x-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2 text-sm font-medium">
-      <Lock className="h-4 w-4" />
-      <span>Submitted{when}</span>
-    </div>
-  )
-}
-
-/**
- * One-line save status shown next to the Save Draft button: error, last saved time, or unsaved changes.
- * Props: status, savedAt (ISO string or null), error (message or null), hasUnsavedChanges.
- */
-function SaveStatusText({ status, savedAt, error, hasUnsavedChanges }) {
-  if (status === 'error') {
-    return <span className="text-sm text-red-600">Save failed: {error}. Click Save Draft to retry.</span>
-  }
-  if (status === 'saving') return null
-  const savedText = savedAt ? `Saved at ${format(new Date(savedAt), 'HH:mm')}` : null
-  if (hasUnsavedChanges) {
-    return (
-      <span className="text-sm text-gray-500">
-        Unsaved changes{savedText ? ` (last ${savedText.toLowerCase()})` : ''}
-      </span>
-    )
-  }
-  return savedText ? <span className="text-sm text-green-700">{savedText}</span> : null
 }
