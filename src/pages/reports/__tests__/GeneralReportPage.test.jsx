@@ -20,7 +20,13 @@ const SUBMITTED_AT = '2026-09-25T15:10:00Z'
 const SUBMITTED_TEXT =
   `This report belongs to an IDR that was submitted at ${format(new Date(SUBMITTED_AT), "HH:mm 'on' MMMM d, yyyy")}`
 
-// A General report's saved report_data (camelCase, every key)
+// Keys older reports stored in report_data that now live on the IDR; the page must neither show nor save them
+const IDR_LEVEL_KEYS = [
+  'date', 'sheetNo', 'dayOfWeek', 'workActivityStart', 'workActivityEnd', 'inspectorTimeStart', 'inspectorTimeEnd',
+  'dailyTempLow', 'dailyTempHigh', 'weatherAM', 'weatherPM',
+]
+
+// A General report's saved report_data as a pre-refactor report stored it: report fields plus the legacy IDR-level keys
 function generalData(description) {
   return {
     date: '2026-09-20', sheetNo: 'S-7', workActivityStart: '07:00', workActivityEnd: '', inspectorTimeStart: '',
@@ -44,7 +50,13 @@ function parentIdr({ reportData = generalData('Poured curb'), ...overrides } = {
   return {
     idr_id: IDR_ID,
     project_id: 'HWS0023',
-    report_date: '2026-09-20',
+    report_date: '2026-09-27',
+    work_start_time: '07:30:00',
+    work_end_time: '16:00:00',
+    temp_low: 42.0,
+    temp_high: 61.0,
+    weather_am: 'Clear',
+    weather_pm: 'Cloudy',
     status: 'draft',
     submitted_at: null,
     total_pages: null,
@@ -119,11 +131,29 @@ describe('loading', () => {
     renderPage()
     expect(await loaded()).toBeInTheDocument()
     expect(api.getIdr).toHaveBeenCalledWith(IDR_ID)
-    expect(screen.getByDisplayValue('S-7')).toBeInTheDocument()
     expect(screen.getByDisplayValue('4.01')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2026-09-20')).toBeInTheDocument()
     // Loading is not an edit
     expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the IDR date, weather, temps and work hours as a read-only context line', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByText(/Set on the IDR page/).parentElement).toHaveTextContent(
+      'Date: Sep 27, 2026 · Weather: Clear / Cloudy · Temp: 42 / 61 °F · Work: 07:30 - 16:00'
+    )
+  })
+
+  it('has no editable date, sheet, time, temperature or weather fields (they live on the IDR)', async () => {
+    renderPage()
+    await loaded()
+    for (const label of ['Date', 'Sheet No.', 'Day of Week', 'Work Activity Start', 'Inspector Time End',
+      'Daily Temp Low (°F)', 'Weather AM', 'Weather PM']) {
+      expect(screen.queryByText(label, { selector: 'label' })).not.toBeInTheDocument()
+    }
+    // Legacy values stored in report_data are not shown anywhere
+    expect(screen.queryByDisplayValue('S-7')).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue('2026-09-20')).not.toBeInTheDocument()
   })
 
   it('opens a never-edited report (empty report_data) as a blank form', async () => {
@@ -200,8 +230,41 @@ describe('Save Draft', () => {
     expect(api.saveReport).toHaveBeenCalledWith(
       IDR_ID,
       REPORT_ID,
-      expect.objectContaining({ description: 'Poured curb - day 2', sheetNo: 'S-7', payItems: expect.any(Array) })
+      expect.objectContaining({ description: 'Poured curb - day 2', payItems: expect.any(Array) })
     )
+  })
+
+  it('never saves the IDR-level keys, even when the loaded report_data still had them', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(saveButton())
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+
+    const saved = api.saveReport.mock.calls[0][2]
+    for (const key of IDR_LEVEL_KEYS) expect(saved).not.toHaveProperty(key)
+    expect(saved).toMatchObject({ workforce: { foreman: '2' }, safetyChecks: { plasticBarrels: true } })
+  })
+
+  it('a blank report saves no IDR-level keys either', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({ reportData: {} }))
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await screen.findByPlaceholderText(/detailed description of work/i), 'First words')
+    await user.click(saveButton())
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    for (const key of IDR_LEVEL_KEYS) expect(api.saveReport.mock.calls[0][2]).not.toHaveProperty(key)
+  })
+
+  it('the context line follows the IDR after the post-save refetch', async () => {
+    api.getIdr
+      .mockResolvedValueOnce(parentIdr())
+      .mockResolvedValue(parentIdr({ weather_pm: 'Rainy' }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(saveButton())
+    expect(await screen.findByText(/Clear \/ Rainy/)).toBeInTheDocument()
   })
 
   it('silently refetches the parent IDR after a successful save', async () => {

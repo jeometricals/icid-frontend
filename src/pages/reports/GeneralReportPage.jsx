@@ -1,18 +1,19 @@
 /**
  * General report inside an IDR, at /project/:projectId/idr/:idrId/report/:reportId.
- * Loads the parent IDR, uses this report's report_data as the form, and Save Draft PUTs the whole form back
+ * Loads the parent IDR, uses this report's report_data as the form (report-specific fields only; the IDR's date,
+ * times and weather show as a read-only context line), and Save Draft PUTs the whole form back
  * and then silently refetches the IDR. Submitting happens on the IDR page; once the IDR is submitted
  * (including mid-edit, detected by a 409 on save) the form renders read-only with a banner.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Paperclip } from 'lucide-react'
-import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
 import { getIdr, saveReport } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
 import SubmittedBanner from '../../components/SubmittedBanner'
 import SaveStatusText from '../../components/SaveStatusText'
+import IdrContextLine from '../../components/IdrContextLine'
 
 const SUBMITTED_MID_EDIT =
   'This IDR was submitted while you were editing. Your unsaved changes could not be saved. Reloading...'
@@ -27,19 +28,24 @@ function findGeneralReport(idr, projectId, reportId) {
   return report
 }
 
-// A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
+// Keys older General reports stored in report_data that now live on the IDR (date, sheet, times, temps, weather).
+// Dropped when a report loads, so they're never shown or saved again.
+const IDR_LEVEL_KEYS = [
+  'date', 'sheetNo', 'dayOfWeek',
+  'workActivityStart', 'workActivityEnd', 'inspectorTimeStart', 'inspectorTimeEnd',
+  'dailyTempLow', 'dailyTempHigh', 'weatherAM', 'weatherPM',
+]
+
+// This report's saved report_data as form state: defaults for missing keys, IDR-level keys removed
+function formDataFromReport(reportData) {
+  const data = { ...emptyFormData(), ...reportData }
+  for (const key of IDR_LEVEL_KEYS) delete data[key]
+  return data
+}
+
+// A blank General report. Only report-specific fields: date, times and weather come from the IDR.
 function emptyFormData() {
   return {
-    date: format(new Date(), 'yyyy-MM-dd'),
-    sheetNo: '',
-    workActivityStart: '',
-    workActivityEnd: '',
-    inspectorTimeStart: '',
-    inspectorTimeEnd: '',
-    dailyTempLow: '',
-    dailyTempHigh: '',
-    weatherAM: '',
-    weatherPM: '',
     description: '',
     payItems: [],
     workforce: {
@@ -91,6 +97,7 @@ export default function GeneralReportPage() {
   const [loadStatus, setLoadStatus] = useState('loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
+  const [idr, setIdr] = useState(null) // the parent IDR without its reports (status, date, weather, times)
   const [idrStatus, setIdrStatus] = useState('draft')
   const [submittedAt, setSubmittedAt] = useState(null)
   const [refreshError, setRefreshError] = useState(null)
@@ -99,16 +106,17 @@ export default function GeneralReportPage() {
   const [formData, setFormData] = useState(emptyFormData)
 
   // IDR-level state only. A refetch never touches the form, so it can't overwrite typing.
-  const applyIdr = useCallback((idr) => {
-    setIdrStatus(idr.status)
-    setSubmittedAt(idr.submitted_at ?? null)
+  const applyIdr = useCallback(({ reports, ...idrFields }) => {
+    setIdr(idrFields)
+    setIdrStatus(idrFields.status)
+    setSubmittedAt(idrFields.submitted_at ?? null)
   }, [])
 
   // Replaces the form with this report's saved data (first load, retry, and the reload after a 409)
   const loadForm = useCallback((idr) => {
     const report = findGeneralReport(idr, projectId, reportId)
     applyIdr(idr)
-    setFormData({ ...emptyFormData(), ...report.report_data })
+    setFormData(formDataFromReport(report.report_data))
     setHasUnsavedChanges(false)
     setSaveStatus('idle')
     setSavedAt(null)
@@ -331,137 +339,12 @@ export default function GeneralReportPage() {
           </div>
         </div>
 
+        <IdrContextLine idr={idr} />
+
         {/* Every form control below is disabled in one place once the parent IDR is submitted */}
         <fieldset disabled={isLocked} className="min-w-0 border-0 p-0 m-0">
         {/* Report Details Form */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="form-section">
-            <h3 className="form-section-title">Report Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="input-label">Date</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={formData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="input-label">Sheet No.</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={formData.sheetNo}
-                  onChange={(e) => handleInputChange('sheetNo', e.target.value)}
-                  placeholder="Sheet number"
-                />
-              </div>
-              <div>
-                <label className="input-label">Day of Week</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={format(new Date(formData.date), 'EEEE')}
-                  disabled
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h3 className="form-section-title">Time & Weather</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="input-label">Work Activity Start</label>
-                <input
-                  type="time"
-                  className="input-field"
-                  value={formData.workActivityStart}
-                  onChange={(e) => handleInputChange('workActivityStart', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="input-label">Work Activity End</label>
-                <input
-                  type="time"
-                  className="input-field"
-                  value={formData.workActivityEnd}
-                  onChange={(e) => handleInputChange('workActivityEnd', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="input-label">Inspector Time Start</label>
-                <input
-                  type="time"
-                  className="input-field"
-                  value={formData.inspectorTimeStart}
-                  onChange={(e) => handleInputChange('inspectorTimeStart', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="input-label">Inspector Time End</label>
-                <input
-                  type="time"
-                  className="input-field"
-                  value={formData.inspectorTimeEnd}
-                  onChange={(e) => handleInputChange('inspectorTimeEnd', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-              <div>
-                <label className="input-label">Daily Temp Low (°F)</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  value={formData.dailyTempLow}
-                  onChange={(e) => handleInputChange('dailyTempLow', e.target.value)}
-                  placeholder="48"
-                />
-              </div>
-              <div>
-                <label className="input-label">Daily Temp High (°F)</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  value={formData.dailyTempHigh}
-                  onChange={(e) => handleInputChange('dailyTempHigh', e.target.value)}
-                  placeholder="59"
-                />
-              </div>
-              <div>
-                <label className="input-label">Weather AM</label>
-                <select
-                  className="input-field"
-                  value={formData.weatherAM}
-                  onChange={(e) => handleInputChange('weatherAM', e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  <option value="Clear">Clear</option>
-                  <option value="Cloudy">Cloudy</option>
-                  <option value="Rainy">Rainy</option>
-                  <option value="Snowy">Snowy</option>
-                </select>
-              </div>
-              <div>
-                <label className="input-label">Weather PM</label>
-                <select
-                  className="input-field"
-                  value={formData.weatherPM}
-                  onChange={(e) => handleInputChange('weatherPM', e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  <option value="Clear">Clear</option>
-                  <option value="Cloudy">Cloudy</option>
-                  <option value="Rainy">Rainy</option>
-                  <option value="Snowy">Snowy</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
           <div className="form-section">
             <h3 className="form-section-title">Description of Work Performed and Inspected</h3>
             <p className="text-sm text-gray-600 mb-2">
