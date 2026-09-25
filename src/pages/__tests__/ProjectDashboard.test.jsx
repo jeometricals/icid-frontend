@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { format } from 'date-fns'
 import ProjectDashboard from '../ProjectDashboard'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
@@ -114,18 +115,12 @@ describe('ProjectDashboard with project data', () => {
     expect(screen.getByText('Queens')).toBeInTheDocument()
   })
 
-  it('renders the legacy report type cards, without General (General reports live inside an IDR)', async () => {
+  it('has no Report Types section (reports are added from inside an IDR)', async () => {
     renderDashboard()
-    await waitFor(() => screen.getByText('Daily Site Patrol'))
-    expect(screen.getByText(/Curb, Sidewalk/)).toBeInTheDocument()
-    expect(screen.queryByText('General')).not.toBeInTheDocument()
-  })
-
-  it('navigates to the correct report path when a report card is clicked', async () => {
-    renderDashboard()
-    await waitFor(() => screen.getByText('Daily Site Patrol'))
-    await userEvent.click(screen.getByText('Daily Site Patrol').closest('button'))
-    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/report/daily-patrol')
+    await screen.findByText('Curb & Sidewalk Installation')
+    expect(screen.queryByText('Report Types')).not.toBeInTheDocument()
+    expect(screen.queryByText('Daily Site Patrol')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Curb, Sidewalk/)).not.toBeInTheDocument()
   })
 
   it('navigates back to /projects when back button is clicked', async () => {
@@ -229,6 +224,65 @@ describe('ProjectDashboard sign out', () => {
     await userEvent.click(screen.getByText('Sign Out'))
     expect(signOut).toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith('/login')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// New Inspector Daily Diary
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard new IDR button', () => {
+  const newIdrButton = () => screen.findByRole('button', { name: 'New Inspector Daily Diary' })
+
+  beforeEach(() => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+  })
+
+  it("creates today's IDR for the signed-in inspector and opens it", async () => {
+    vi.spyOn(api, 'createIdr').mockResolvedValue({ idr_id: 'idr-new', status: 'draft' })
+    renderDashboard()
+    await userEvent.click(await newIdrButton())
+
+    expect(api.createIdr).toHaveBeenCalledWith({
+      projectId: 'HWS0023',
+      reporterUuid: DEV_USER.id,
+      reportDate: format(new Date(), 'yyyy-MM-dd'), // local date, not UTC
+    })
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/idr/idr-new'))
+  })
+
+  it("opens the existing IDR on a 409 (today's IDR already exists), with no error shown", async () => {
+    vi.spyOn(api, 'createIdr').mockRejectedValue(
+      Object.assign(apiError('An IDR already exists for this date', 409), { body: { existing_idr_id: 'idr-today' } })
+    )
+    renderDashboard()
+    await userEvent.click(await newIdrButton())
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/idr/idr-today'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows any other failure under the button and stays on the dashboard', async () => {
+    vi.spyOn(api, 'createIdr').mockRejectedValue(apiError('Reporter is not assigned to this project', 403))
+    renderDashboard()
+    await userEvent.click(await newIdrButton())
+
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent("Couldn't start today's IDR: Reporter is not assigned to this project")
+    expect(mockNavigate).not.toHaveBeenCalled()
+    expect(await newIdrButton()).toBeEnabled()
+  })
+
+  it('shows "Opening..." and ignores extra clicks while the request is running', async () => {
+    vi.spyOn(api, 'createIdr').mockReturnValue(new Promise(() => {}))
+    renderDashboard()
+    await userEvent.click(await newIdrButton())
+
+    const busy = screen.getByRole('button', { name: 'Opening...' })
+    expect(busy).toBeDisabled()
+    await userEvent.click(busy)
+    expect(api.createIdr).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,29 +1,33 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { ADDABLE_REPORT_TYPES, reportTypeLabel } from '../data/reportTypes'
+import { REPORT_TYPES, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
- * Report-type dropdown plus Add button for adding a report to a draft IDR.
+ * Report-type dropdown (all types; ones without a form page yet are "coming soon") plus Add button.
  * Props: onAdd(reportType), adding (an add is running), disabled (another action is running),
  * generalExists (the IDR already has its one main General, so that option is unavailable).
  */
 export default function AddReportControl({ onAdd, adding, disabled, generalExists }) {
-  const [reportType, setReportType] = useState(ADDABLE_REPORT_TYPES[0])
-  const unavailable = type => type === 'GEN' && generalExists
-  const canAdd = !unavailable(reportType) && !adding && !disabled
+  const [reportType, setReportType] = useState('GEN')
+  const optionSuffix = code => {
+    if (!isReportTypeAvailable(code)) return ' (coming soon)'
+    if (code === 'GEN' && generalExists) return ' (already added)'
+    return ''
+  }
+  const canAdd = optionSuffix(reportType) === '' && !adding && !disabled
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
       <label htmlFor="add-report-type" className="text-sm font-medium text-gray-700">Add report</label>
       <select
         id="add-report-type"
-        className="input-field sm:w-64"
+        className="input-field sm:w-72"
         value={reportType}
         onChange={e => setReportType(e.target.value)}
       >
-        {ADDABLE_REPORT_TYPES.map(type => (
-          <option key={type} value={type} disabled={unavailable(type)}>
-            {reportTypeLabel(type)}{unavailable(type) ? ' (already added)' : ''}
+        {REPORT_TYPES.map(({ code, label }) => (
+          <option key={code} value={code} disabled={optionSuffix(code) !== ''}>
+            {label}{optionSuffix(code)}
           </option>
         ))}
       </select>

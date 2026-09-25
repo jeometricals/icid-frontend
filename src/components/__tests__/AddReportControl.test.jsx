@@ -10,9 +10,23 @@ function renderControl(props = {}) {
 }
 
 describe('AddReportControl', () => {
-  it('offers only General for now', () => {
+  it('lists all 21 report types, with only General enabled and the rest "coming soon"', () => {
     renderControl()
-    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual(['General'])
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(21)
+    expect(options[0]).toHaveTextContent(/^General$/)
+    expect(options[0]).toBeEnabled()
+    for (const option of options.slice(1)) {
+      expect(option.textContent).toMatch(/ \(coming soon\)$/)
+      expect(option).toBeDisabled()
+    }
+    expect(screen.getByRole('option', { name: 'Sewer (coming soon)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Field Order (coming soon)' })).toBeInTheDocument()
+  })
+
+  it('starts on General', () => {
+    renderControl()
+    expect(screen.getByLabelText('Add report')).toHaveValue('GEN')
   })
 
   it('adds the selected type', async () => {

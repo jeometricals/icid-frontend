@@ -1,21 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut, ArrowLeft, ClipboardCheck, Building } from 'lucide-react'
-import { REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
-import { getProjectById } from '../services/api'
-
-// Add icons to report types
-const REPORT_TYPES = REPORT_TYPES_DATA.map(type => {
-  const iconMap = {
-    'daily-patrol': ClipboardCheck,
-    'curb-sidewalk': Building
-  }
-  return {
-    ...type,
-    icon: iconMap[type.id]
-  }
-})
+import { HardHat, LogOut, ArrowLeft } from 'lucide-react'
+import { format } from 'date-fns'
+import { getProjectById, createIdr } from '../services/api'
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()
@@ -25,6 +13,8 @@ export default function ProjectDashboard() {
   const [loadingProject, setLoadingProject] = useState(true)
   const [loadError, setLoadError] = useState(null) // the thrown Error; status 404 means the project doesn't exist
   const [attempt, setAttempt] = useState(0) // bump to retry
+  const [creatingIdr, setCreatingIdr] = useState(false)
+  const [createIdrError, setCreateIdrError] = useState(null)
 
   useEffect(() => {
     let ignore = false
@@ -42,8 +32,24 @@ export default function ProjectDashboard() {
     navigate('/login')
   }
 
-  const handleReportSelect = (reportPath) => {
-    navigate(`/project/${projectId}${reportPath}`)
+  // Opens today's IDR: creates it, or on 409 (one already exists for today) opens that one instead.
+  // Either way the inspector just lands on their IDR; any other failure is shown under the button.
+  const handleNewIdr = async () => {
+    if (creatingIdr) return
+    setCreatingIdr(true)
+    setCreateIdrError(null)
+    try {
+      const idr = await createIdr({ projectId, reporterUuid: user.id, reportDate: format(new Date(), 'yyyy-MM-dd') })
+      navigate(`/project/${projectId}/idr/${idr.idr_id}`)
+    } catch (err) {
+      if (err.status === 409 && err.body?.existing_idr_id) {
+        navigate(`/project/${projectId}/idr/${err.body.existing_idr_id}`)
+      } else {
+        setCreateIdrError(err.message)
+      }
+    } finally {
+      setCreatingIdr(false)
+    }
   }
 
   if (loadingProject) {
@@ -180,9 +186,18 @@ export default function ProjectDashboard() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <button className="bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center">
-            <h3 className="font-bold text-lg">New Inspector Daily Diary</h3>
-          </button>
+          <div>
+            <button
+              onClick={handleNewIdr}
+              disabled={creatingIdr}
+              className="w-full h-full bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center disabled:opacity-60 disabled:cursor-wait"
+            >
+              <h3 className="font-bold text-lg">{creatingIdr ? 'Opening...' : 'New Inspector Daily Diary'}</h3>
+            </button>
+            {createIdrError && (
+              <p role="alert" className="mt-2 text-sm text-red-600">Couldn't start today's IDR: {createIdrError}</p>
+            )}
+          </div>
           <button
             onClick={() => navigate(`/project/${projectId}/drafts`)}
             className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
@@ -195,33 +210,6 @@ export default function ProjectDashboard() {
           >
             <h3 className="font-bold text-lg">Report Archive</h3>
           </button>
-        </div>
-
-        {/* Report Types */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Report Types</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {REPORT_TYPES.map((reportType) => {
-              const Icon = reportType.icon
-              return (
-                <button
-                  key={reportType.id}
-                  onClick={() => handleReportSelect(reportType.path)}
-                  className="bg-white hover:bg-construction-50 border-2 border-transparent hover:border-construction-300 rounded-lg p-6 transition-all duration-200 shadow-sm hover:shadow-md text-left"
-                >
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-construction-100 p-3 rounded-lg">
-                      <Icon className="h-6 w-6 text-construction-700" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-gray-900 mb-1">{reportType.title}</h3>
-                      <p className="text-sm text-gray-600">{reportType.description}</p>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         {/* Back Button (bottom) */}

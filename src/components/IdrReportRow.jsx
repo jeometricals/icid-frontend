@@ -1,6 +1,6 @@
 import { FileText, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
-import { reportTypeLabel, hasReportPage } from '../data/reportTypes'
+import { reportTypeLabel, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
  * One report inside an IDR: type name, addendum chip, saved/not-edited state, "Page X of Y" once submitted,
@@ -9,7 +9,7 @@ import { reportTypeLabel, hasReportPage } from '../data/reportTypes'
  * is running), deleting (this row's delete is running), onOpen(), onDelete().
  */
 export default function IdrReportRow({ report, totalPages, readOnly, disabled, deleting, onOpen, onDelete }) {
-  const canOpen = hasReportPage(report.report_type)
+  const canOpen = isReportTypeAvailable(report.report_type)
   const showPage = readOnly && report.page_number != null && totalPages != null
 
   return (

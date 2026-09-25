@@ -33,9 +33,14 @@ describe('IdrReportRow', () => {
     expect(screen.getByText('General')).toBeInTheDocument()
   })
 
-  it('falls back to the raw code for types without a label', () => {
-    renderRow({ report: { ...REPORT, report_type: 'SWR' } })
-    expect(screen.getByText('SWR')).toBeInTheDocument()
+  it('shows the display name for other types too', () => {
+    renderRow({ report: { ...REPORT, report_type: 'SKETCH', is_addendum: true } })
+    expect(screen.getByText('Sketch Sheet')).toBeInTheDocument()
+  })
+
+  it('falls back to the raw code for an unknown type', () => {
+    renderRow({ report: { ...REPORT, report_type: 'NEW_TYPE' } })
+    expect(screen.getByText('NEW_TYPE')).toBeInTheDocument()
   })
 
   it('shows an addendum chip only for addendums', () => {
