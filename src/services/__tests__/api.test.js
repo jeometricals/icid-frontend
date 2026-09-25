@@ -6,11 +6,12 @@ import {
 import * as api from '../api'
 import * as idrs from '../idrs'
 import * as idrReports from '../idrReports'
+import * as users from '../users'
 import { mockFetch, mockFetchFailure } from '../../test/mockFetch'
 
 describe('barrel exports', () => {
-  it('re-exports every IDR and IDR-report call so components import from api.js alone', () => {
-    for (const [name, fn] of Object.entries({ ...idrs, ...idrReports })) {
+  it('re-exports every IDR, IDR-report and user call so components import from api.js alone', () => {
+    for (const [name, fn] of Object.entries({ ...idrs, ...idrReports, ...users })) {
       expect(api[name]).toBe(fn)
     }
   })

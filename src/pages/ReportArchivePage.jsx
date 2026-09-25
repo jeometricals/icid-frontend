@@ -1,21 +1,28 @@
 /**
- * Lists every submitted report for one project (route param :projectId), newest submission first.
- * Project-wide on purpose: submitted reports are shared project records, not per-inspector.
- * Clicking a report opens it read-only in the General Form via ?report_id=.
+ * Lists every submitted IDR for one project (route param :projectId), most recently edited first
+ * (for a submitted IDR that is its submission time), with the inspector who submitted it.
+ * Project-wide on purpose: submitted IDRs are shared project records, not per-inspector.
+ * Clicking an IDR opens its IDR page read-only.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
-import { listReports } from '../services/api'
+import { ArrowLeft } from 'lucide-react'
+import { listIdrs, listUsers } from '../services/api'
+import IdrCard from '../components/IdrCard'
 
-// Newest submission first; reports missing submitted_at sink to the bottom
-const bySubmittedAtDesc = (a, b) => (b.submitted_at || '').localeCompare(a.submitted_at || '')
+// Maps user_id (= an IDR's reporter_uuid) to a display name, falling back to email when a name is missing
+function namesById(users) {
+  return Object.fromEntries(users.map(u => [
+    u.user_id,
+    [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email,
+  ]))
+}
 
 export default function ReportArchivePage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const [reports, setReports] = useState([])
+  const [idrs, setIdrs] = useState([])
+  const [reporterNames, setReporterNames] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
@@ -24,15 +31,19 @@ export default function ReportArchivePage() {
     let ignore = false
     setLoading(true)
     setError(null)
-    listReports({ projectId, status: 'submitted' })
-      .then(data => { if (!ignore) setReports([...data].sort(bySubmittedAtDesc)) })
+    Promise.all([listIdrs({ projectId, status: 'submitted' }), listUsers()])
+      .then(([idrData, users]) => {
+        if (ignore) return
+        setIdrs(idrData)
+        setReporterNames(namesById(users))
+      })
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
   }, [projectId, attempt])
 
-  const openReport = (reportId) => {
-    navigate(`/project/${projectId}/report/general?report_id=${reportId}`, { state: { from: 'archive' } })
+  const openIdr = (idrId) => {
+    navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: 'archive' } })
   }
 
   return (
@@ -54,44 +65,24 @@ export default function ReportArchivePage() {
           </div>
         ) : error ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-red-600 mb-4">Couldn't load submitted reports: {error}</p>
+            <p className="text-red-600 mb-4">Couldn't load submitted IDRs: {error}</p>
             <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">
               Retry
             </button>
           </div>
-        ) : reports.length === 0 ? (
+        ) : idrs.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-            No submitted reports for this project yet. Submitted General reports will appear here.
+            No submitted IDRs for this project yet. Submitted IDRs will appear here.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {reports.map(report => (
-              <button
-                key={report.report_id}
-                onClick={() => openReport(report.report_id)}
-                className="bg-white hover:bg-construction-50 border-2 border-transparent hover:border-construction-300 rounded-lg p-6 transition-all duration-200 shadow-sm hover:shadow-md text-left"
-              >
-                <div className="flex items-start space-x-4">
-                  <div className="bg-construction-100 p-3 rounded-lg">
-                    <FileText className="h-6 w-6 text-construction-700" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-gray-900 mb-1">
-                      {/* parseISO keeps a date-only string in local time (new Date() would shift it a day in US zones) */}
-                      {report.report_date ? format(parseISO(report.report_date), 'EEE, MMM d, yyyy') : 'No date'}
-                    </h3>
-                    <p className={`text-sm mb-2 truncate ${report.description_preview ? 'text-gray-600' : 'text-gray-400 italic'}`}>
-                      {report.description_preview || 'No description'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {/* No DB constraint guarantees submitted_at is set, so don't let a null crash the list */}
-                      {report.submitted_at
-                        ? `Submitted ${format(parseISO(report.submitted_at), 'MMM d, h:mm a')}`
-                        : 'Submitted (date unknown)'}
-                    </p>
-                  </div>
-                </div>
-              </button>
+            {idrs.map(idr => (
+              <IdrCard
+                key={idr.idr_id}
+                idr={idr}
+                reporterName={reporterNames[idr.reporter_uuid] || 'Unknown inspector'}
+                onOpen={() => openIdr(idr.idr_id)}
+              />
             ))}
           </div>
         )}

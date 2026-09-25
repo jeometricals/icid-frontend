@@ -14,22 +14,28 @@ const DEV_USER = { id: '327d3ed2-a3d6-4235-9408-7fe721b12bed', email: 'KhanG@mag
 
 const DRAFTS = [
   {
-    report_id: 'aaaa-1111',
+    idr_id: 'idr-aaaa',
+    reporter_uuid: DEV_USER.id,
     report_date: '2026-09-23',
     status: 'draft',
+    report_count: 3,
+    has_general: true,
+    submitted_at: null,
     updated_at: '2026-09-23T17:45:04Z',
-    description_preview: 'Poured curb on 5th Ave',
   },
   {
-    report_id: 'bbbb-2222',
+    idr_id: 'idr-bbbb',
+    reporter_uuid: DEV_USER.id,
     report_date: '2025-09-16',
     status: 'draft',
+    report_count: 0,
+    has_general: false,
+    submitted_at: null,
     updated_at: '2026-09-18T15:23:39Z',
-    description_preview: null,
   },
 ]
 
-vi.mock('../../services/api', () => ({ listReports: vi.fn() }))
+vi.mock('../../services/api', () => ({ listIdrs: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -62,48 +68,62 @@ function renderPage() {
 // ---------------------------------------------------------------------------
 
 describe('DraftsListPage', () => {
-  it("asks for this inspector's drafts on this project", async () => {
-    api.listReports.mockResolvedValue(DRAFTS)
+  it("asks for this inspector's draft IDRs on this project", async () => {
+    api.listIdrs.mockResolvedValue(DRAFTS)
     renderPage()
-    await screen.findByText('Poured curb on 5th Ave')
-    expect(api.listReports).toHaveBeenCalledWith({
+    await screen.findByText('Sep 23, 2026')
+    expect(api.listIdrs).toHaveBeenCalledWith({
       projectId: 'HWS0023',
       reporterUuid: DEV_USER.id,
       status: 'draft',
     })
   })
 
-  it('shows report date in local time (no off-by-one day) and a placeholder for missing descriptions', async () => {
-    api.listReports.mockResolvedValue(DRAFTS)
+  it('shows each draft as date, report count and General flag, in backend order', async () => {
+    api.listIdrs.mockResolvedValue(DRAFTS)
     renderPage()
-    expect(await screen.findByText('Wed, Sep 23, 2026')).toBeInTheDocument()
-    expect(screen.getByText('Tue, Sep 16, 2025')).toBeInTheDocument()
-    expect(screen.getByText('No description yet')).toBeInTheDocument()
+    const cards = await screen.findAllByRole('button', { name: /reports/i })
+    expect(cards).toHaveLength(2)
+    expect(cards[0]).toHaveTextContent('Sep 23, 2026')
+    expect(cards[0]).toHaveTextContent('3 reports · With General')
+    expect(cards[1]).toHaveTextContent('Sep 16, 2025')
+    expect(cards[1]).toHaveTextContent('No reports yet')
   })
 
-  it('opens the draft in the General Form with its report_id in the URL', async () => {
-    api.listReports.mockResolvedValue(DRAFTS)
+  it('does not show the inspector name (every draft here is your own)', async () => {
+    api.listIdrs.mockResolvedValue(DRAFTS)
+    renderPage()
+    await screen.findByText('Sep 23, 2026')
+    expect(screen.queryByText(/inspector:/i)).not.toBeInTheDocument()
+  })
+
+  it('opens the IDR page for the clicked draft', async () => {
+    api.listIdrs.mockResolvedValue(DRAFTS)
     const user = userEvent.setup()
     renderPage()
-    await user.click(await screen.findByText('Poured curb on 5th Ave'))
-    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/report/general?report_id=aaaa-1111')
-    expect(screen.getByTestId('from')).toHaveTextContent('drafts') // drives the report page's error-state Back link
+    await user.click(await screen.findByText('Sep 23, 2026'))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-aaaa')
+    expect(screen.getByTestId('from')).toHaveTextContent('drafts') // drives the IDR page's Back link
   })
 
-  it('shows an empty state when there are no drafts', async () => {
-    api.listReports.mockResolvedValue([])
+  it('shows an empty state that links back to the project page', async () => {
+    api.listIdrs.mockResolvedValue([])
+    const user = userEvent.setup()
     renderPage()
-    expect(await screen.findByText(/no drafts for this project yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no draft idrs for this project yet/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /start a new idr/i }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023$/)
   })
 
   it('shows the error and retries on click', async () => {
-    api.listReports.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce(DRAFTS)
+    api.listIdrs.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce(DRAFTS)
     const user = userEvent.setup()
     renderPage()
     expect(await screen.findByText(/couldn't load drafts: network error/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /retry/i }))
-    expect(await screen.findByText('Poured curb on 5th Ave')).toBeInTheDocument()
-    expect(api.listReports).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('Sep 23, 2026')).toBeInTheDocument()
+    expect(api.listIdrs).toHaveBeenCalledTimes(2)
   })
 })
