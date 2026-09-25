@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  getProjectsForUser, getProjectById,
-  createReport, saveGeneralForm, getReport, listReports, submitReport,
-} from '../api'
+import { getProjectsForUser, getProjectById } from '../api'
 import * as api from '../api'
 import * as idrs from '../idrs'
 import * as idrReports from '../idrReports'
@@ -136,23 +133,5 @@ describe('error messages', () => {
     await expect(getProjectById('P001')).rejects.toThrow(
       'Extra inputs are not permitted; Input should be a valid string'
     )
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Removed report-level calls (stubs until R3 Pass 4)
-// ---------------------------------------------------------------------------
-
-describe('removed report-level calls', () => {
-  it.each([
-    ['createReport', createReport],
-    ['saveGeneralForm', saveGeneralForm],
-    ['getReport', getReport],
-    ['listReports', listReports],
-    ['submitReport', submitReport],
-  ])('%s rejects without calling the backend', async (name, fn) => {
-    global.fetch = vi.fn()
-    await expect(fn()).rejects.toThrow(`${name} was removed in the IDR refactor (R3)`)
-    expect(fetch).not.toHaveBeenCalled()
   })
 })

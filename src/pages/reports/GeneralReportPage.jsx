@@ -1,30 +1,31 @@
 /**
- * General Inspector's Report form for one project (route param :projectId).
- * Opens a saved draft when the URL has ?report_id=; otherwise starts blank and puts the new report_id
- * in the URL on first save. Save Draft saves the whole form; Submit locks a saved draft.
- * A submitted report (however it was reached) renders read-only with a "Submitted at" banner.
+ * General report inside an IDR, at /project/:projectId/idr/:idrId/report/:reportId.
+ * Loads the parent IDR, uses this report's report_data as the form, and Save Draft PUTs the whole form back
+ * and then silently refetches the IDR. Submitting happens on the IDR page; once the IDR is submitted
+ * (including mid-edit, detected by a 409 on save) the form renders read-only with a banner.
  */
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Paperclip } from 'lucide-react'
 import { format } from 'date-fns'
 import { PROJECTS } from '../../data/mockData'
-import { useAuth } from '../../contexts/AuthContext'
-import { createReport, getReport, saveGeneralForm, submitReport } from '../../services/api'
+import { getIdr, saveReport } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
-import SubmitReportButton from '../../components/SubmitReportButton'
 import SubmittedBanner from '../../components/SubmittedBanner'
 import SaveStatusText from '../../components/SaveStatusText'
 
-const SUBMIT_CONFIRM = "Submit this report? You won't be able to edit it after."
-const SAVE_BEFORE_SUBMIT = 'Please save your changes before submitting.'
+const SUBMITTED_MID_EDIT =
+  'This IDR was submitted while you were editing. Your unsaved changes could not be saved. Reloading...'
+const SUBMITTED_LABEL = 'This report belongs to an IDR that was submitted'
 
-// Where the load-error "Back" button goes, keyed by the list page that opened the report (router state.from)
-const BACK_TARGETS = {
-  drafts: { path: '/drafts', label: 'Back to Drafts' },
-  archive: { path: '/archive', label: 'Back to Archive' },
+// Picks this page's report out of a getIdr response; throws the message to show when it can't be opened here
+function findGeneralReport(idr, projectId, reportId) {
+  if (idr.project_id !== projectId) throw new Error('IDR not found in this project')
+  const report = idr.reports.find(r => r.report_id === reportId)
+  if (!report) throw new Error('Report not found in this IDR')
+  if (report.report_type !== 'GEN') throw new Error('This report is not a General report')
+  return report
 }
-const BACK_TO_PROJECT = { path: '', label: 'Back to Project Dashboard' }
 
 // A blank General Form, dated today. Keys match the backend's GeneralFormData (camelCase).
 function emptyFormData() {
@@ -71,17 +72,14 @@ function emptyFormData() {
 }
 
 export default function GeneralReportPage() {
-  const { projectId } = useParams()
+  const { projectId, idrId, reportId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
   const project = PROJECTS[projectId]
-  const [searchParams, setSearchParams] = useSearchParams()
-  const urlReportId = searchParams.get('report_id')
+  // Carry the list the IDR was opened from, so the IDR page's own Back still goes there
+  const backToIdr = () => navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: location.state?.from } })
 
-  // Draft save state. reportId is kept once created, even if the form save after it fails,
-  // so retries reuse the same report row.
-  const [reportId, setReportId] = useState(null)
+  // Draft save state
   const [saveStatus, setSaveStatus] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
   const [savedAt, setSavedAt] = useState(null)
   const [saveError, setSaveError] = useState(null)
@@ -89,39 +87,42 @@ export default function GeneralReportPage() {
   const savingRef = useRef(false)
   const editCountRef = useRef(0) // bumps on every edit; lets a finished save tell if edits happened mid-flight
 
-  // Loading a saved draft from ?report_id=. formReportIdRef is the report the form currently holds;
-  // it updates synchronously so our own URL update after a first save is never mistaken for "open a different draft".
-  const [loadStatus, setLoadStatus] = useState(urlReportId ? 'loading' : 'ready') // 'loading' | 'ready' | 'error'
+  // Loading the parent IDR (spinner on first load only; refetches after a save are silent)
+  const [loadStatus, setLoadStatus] = useState('loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
-  const [reportStatus, setReportStatus] = useState('draft')
+  const [idrStatus, setIdrStatus] = useState('draft')
   const [submittedAt, setSubmittedAt] = useState(null)
-
-  // Submit state. submitMessage holds a failed-submit error (cleared by the next successful save or submit).
-  const [submitting, setSubmitting] = useState(false)
-  const [submitMessage, setSubmitMessage] = useState(null)
-  const formReportIdRef = useRef(null)
+  const [refreshError, setRefreshError] = useState(null)
+  const [conflictMessage, setConflictMessage] = useState(null) // set when a save hit an already-submitted IDR
 
   const [formData, setFormData] = useState(emptyFormData)
 
+  // IDR-level state only. A refetch never touches the form, so it can't overwrite typing.
+  const applyIdr = useCallback((idr) => {
+    setIdrStatus(idr.status)
+    setSubmittedAt(idr.submitted_at ?? null)
+  }, [])
+
+  // Replaces the form with this report's saved data (first load, retry, and the reload after a 409)
+  const loadForm = useCallback((idr) => {
+    const report = findGeneralReport(idr, projectId, reportId)
+    applyIdr(idr)
+    setFormData({ ...emptyFormData(), ...report.report_data })
+    setHasUnsavedChanges(false)
+    setSaveStatus('idle')
+    setSavedAt(null)
+    setSaveError(null)
+  }, [projectId, reportId, applyIdr])
+
   useEffect(() => {
-    if (!urlReportId || urlReportId === formReportIdRef.current) return
     let ignore = false
     setLoadStatus('loading')
     setLoadError(null)
-    getReport(urlReportId)
-      .then(report => {
+    getIdr(idrId)
+      .then(idr => {
         if (ignore) return
-        formReportIdRef.current = report.report_id
-        setReportId(report.report_id)
-        setReportStatus(report.status)
-        setSubmittedAt(report.submitted_at ?? null)
-        setSubmitMessage(null)
-        setFormData({ ...emptyFormData(), ...(report.general_form || {}) })
-        setHasUnsavedChanges(false)
-        setSaveStatus('idle')
-        setSavedAt(null)
-        setSaveError(null)
+        loadForm(idr)
         setLoadStatus('ready')
       })
       .catch(err => {
@@ -130,7 +131,7 @@ export default function GeneralReportPage() {
         setLoadStatus('error')
       })
     return () => { ignore = true }
-  }, [urlReportId, loadAttempt])
+  }, [idrId, loadAttempt, loadForm])
 
   // Every form edit goes through here so unsaved-change tracking can't be skipped.
   const updateForm = (updater) => {
@@ -177,62 +178,56 @@ export default function GeneralReportPage() {
     }))
   }
 
-  // First save creates the report, later saves (and retries after an error) reuse its id.
+
+  // Silent refetch: keeps the IDR's status fresh (and the drafts list order, via its updated_at bump)
+  const refresh = async () => {
+    try {
+      applyIdr(await getIdr(idrId))
+      setRefreshError(null)
+    } catch (err) {
+      setRefreshError(err.message)
+    }
+  }
+
+  // A 409 means the IDR was submitted elsewhere: say so, then reload the saved report read-only
+  const reloadAfterConflict = async () => {
+    setConflictMessage(SUBMITTED_MID_EDIT)
+    try {
+      loadForm(await getIdr(idrId))
+      setRefreshError(null)
+    } catch (err) {
+      setRefreshError(err.message)
+    }
+  }
+
+  // Saves the whole form, then refetches the IDR
   const handleSaveDraft = async () => {
     if (savingRef.current) return
     savingRef.current = true
     const editCountAtStart = editCountRef.current
     setSaveStatus('saving')
+    let saved = false
+    let conflict = false
     try {
-      let id = reportId
-      if (!id) {
-        const report = await createReport({
-          projectId,
-          reporterUuid: user.id,
-          reportDate: formData.date
-        })
-        id = report.report_id
-        formReportIdRef.current = id
-        setReportId(id)
-        // Refresh-safe from here on; replace so Back doesn't return to the blank-form URL
-        setSearchParams({ report_id: id }, { replace: true })
-      }
-      const saved = await saveGeneralForm(id, formData)
-      setSavedAt(saved.saved_at)
+      const report = await saveReport(idrId, reportId, formData)
+      setSavedAt(report.updated_at)
       setSaveError(null)
       setSaveStatus('saved')
-      if (editCountRef.current === editCountAtStart) {
-        setHasUnsavedChanges(false)
-        setSubmitMessage(null)
-      }
+      if (editCountRef.current === editCountAtStart) setHasUnsavedChanges(false)
+      saved = true
     } catch (err) {
-      setSaveError(err.message)
-      setSaveStatus('error')
+      if (err.status === 409) {
+        conflict = true
+        setSaveStatus('idle')
+      } else {
+        setSaveError(err.message)
+        setSaveStatus('error')
+      }
     } finally {
       savingRef.current = false
     }
-  }
-
-  // Blocks on unsaved edits so only what's on the server gets submitted; the response drives the lock.
-  const handleSubmit = async () => {
-    if (submitting || saveStatus === 'saving') return
-    // A never-saved report has nothing on the server to submit, so it gets the same message
-    if (hasUnsavedChanges || !reportId) {
-      window.alert(SAVE_BEFORE_SUBMIT)
-      return
-    }
-    if (!window.confirm(SUBMIT_CONFIRM)) return
-    setSubmitting(true)
-    setSubmitMessage(null)
-    try {
-      const report = await submitReport(reportId)
-      setReportStatus(report.status)
-      setSubmittedAt(report.submitted_at)
-    } catch (err) {
-      setSubmitMessage(`Submit failed: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+    if (conflict) await reloadAfterConflict()
+    else if (saved) await refresh()
   }
 
   if (!project) {
@@ -248,7 +243,6 @@ export default function GeneralReportPage() {
   }
 
   if (loadStatus === 'error') {
-    const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
@@ -258,8 +252,8 @@ export default function GeneralReportPage() {
             <button onClick={() => setLoadAttempt(a => a + 1)} className="btn-primary">
               Retry
             </button>
-            <button onClick={() => navigate(`/project/${projectId}${back.path}`)} className="btn-secondary">
-              {back.label}
+            <button onClick={backToIdr} className="btn-secondary">
+              Back to IDR
             </button>
           </div>
         </div>
@@ -267,18 +261,11 @@ export default function GeneralReportPage() {
     )
   }
 
-  const isLocked = reportStatus !== 'draft'
+  const isLocked = idrStatus !== 'draft'
 
-  // Save + Submit controls; rendered in the header and the footer, hidden once the report is locked.
+  // Rendered in the header and the footer, hidden once the IDR is submitted
   const reportActions = (
-    <>
-      <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} disabled={submitting} />
-      <SubmitReportButton
-        onClick={handleSubmit}
-        submitting={submitting}
-        disabled={saveStatus === 'saving'}
-      />
-    </>
+    <SaveDraftButton onClick={handleSaveDraft} saving={saveStatus === 'saving'} />
   )
 
   return (
@@ -288,26 +275,22 @@ export default function GeneralReportPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate(`/project/${projectId}`)}
+              onClick={backToIdr}
               className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium">Back to Project Page</span>
+              <span className="font-medium">Back to IDR</span>
             </button>
             {isLocked ? (
-              <SubmittedBanner submittedAt={submittedAt} />
+              <SubmittedBanner submittedAt={submittedAt} label={SUBMITTED_LABEL} />
             ) : (
               <div className="flex items-center space-x-3">
-                {submitMessage ? (
-                  <span role="alert" className="text-sm text-red-600">{submitMessage}</span>
-                ) : (
-                  <SaveStatusText
-                    status={saveStatus}
-                    savedAt={savedAt}
-                    error={saveError}
-                    hasUnsavedChanges={hasUnsavedChanges}
-                  />
-                )}
+                <SaveStatusText
+                  status={saveStatus}
+                  savedAt={savedAt}
+                  error={saveError}
+                  hasUnsavedChanges={hasUnsavedChanges}
+                />
                 {reportActions}
               </div>
             )}
@@ -318,6 +301,20 @@ export default function GeneralReportPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+        {conflictMessage && (
+          <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+            {conflictMessage}
+          </div>
+        )}
+
+        {refreshError && (
+          <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <span>Couldn't refresh this IDR: {refreshError}</span>
+            <button onClick={conflictMessage ? reloadAfterConflict : refresh} className="btn-secondary">
+              Retry
+            </button>
+          </div>
+        )}
         {/* Project Info Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">General Inspector's Report</h1>
@@ -334,7 +331,7 @@ export default function GeneralReportPage() {
           </div>
         </div>
 
-        {/* Every form control below is disabled in one place once the report is submitted */}
+        {/* Every form control below is disabled in one place once the parent IDR is submitted */}
         <fieldset disabled={isLocked} className="min-w-0 border-0 p-0 m-0">
         {/* Report Details Form */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

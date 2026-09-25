@@ -25,13 +25,8 @@ export const PROJECTS = {
   }
 }
 
+// Legacy standalone report pages. General is no longer here: it lives inside an IDR (see data/reportTypes.js).
 export const REPORT_TYPES = [
-  {
-    id: 'general',
-    title: 'General',
-    description: 'General Inspector\'s Daily Report',
-    path: '/report/general'
-  },
   {
     id: 'daily-patrol',
     title: 'Daily Site Patrol',

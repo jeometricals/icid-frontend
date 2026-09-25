@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut, ArrowLeft, FileText, ClipboardCheck, Building } from 'lucide-react'
+import { HardHat, LogOut, ArrowLeft, ClipboardCheck, Building } from 'lucide-react'
 import { REPORT_TYPES as REPORT_TYPES_DATA } from '../data/mockData'
 import { getProjectById } from '../services/api'
 
 // Add icons to report types
 const REPORT_TYPES = REPORT_TYPES_DATA.map(type => {
   const iconMap = {
-    'general': FileText,
     'daily-patrol': ClipboardCheck,
     'curb-sidewalk': Building
   }

@@ -7,18 +7,16 @@ import * as api from '../services/api'
 vi.mock('../services/api', () => ({
   getProjectsForUser: vi.fn(),
   getProjectById: vi.fn(),
-  getReport: vi.fn(),
-  createReport: vi.fn(),
-  saveGeneralForm: vi.fn(),
-  listReports: vi.fn(),
+  getIdr: vi.fn(),
+  listIdrs: vi.fn(),
 }))
 
 beforeEach(() => {
   vi.clearAllMocks()
   api.getProjectsForUser.mockResolvedValue([])
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens 2025' })
-  api.listReports.mockResolvedValue([])
-  api.getReport.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
+  api.listIdrs.mockResolvedValue([])
+  api.getIdr.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
 })
 
 async function signIn() {
@@ -34,7 +32,7 @@ async function signIn() {
 
 describe('redirect back after login', () => {
   it('returns to the original page, query string included', async () => {
-    window.history.pushState({}, '', '/project/HWS0023/report/general?report_id=abc-123')
+    window.history.pushState({}, '', '/project/HWS0023/idr/idr-1/report/rep-1?tab=pay')
     render(<App />)
     expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
 
@@ -42,7 +40,7 @@ describe('redirect back after login', () => {
 
     await vi.waitFor(() =>
       expect(window.location.pathname + window.location.search)
-        .toBe('/project/HWS0023/report/general?report_id=abc-123')
+        .toBe('/project/HWS0023/idr/idr-1/report/rep-1?tab=pay')
     )
   })
 

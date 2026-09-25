@@ -114,19 +114,18 @@ describe('ProjectDashboard with project data', () => {
     expect(screen.getByText('Queens')).toBeInTheDocument()
   })
 
-  it('renders all report type cards', async () => {
+  it('renders the legacy report type cards, without General (General reports live inside an IDR)', async () => {
     renderDashboard()
-    await waitFor(() => screen.getByText('General'))
-    expect(screen.getByText('General')).toBeInTheDocument()
-    expect(screen.getByText('Daily Site Patrol')).toBeInTheDocument()
+    await waitFor(() => screen.getByText('Daily Site Patrol'))
     expect(screen.getByText(/Curb, Sidewalk/)).toBeInTheDocument()
+    expect(screen.queryByText('General')).not.toBeInTheDocument()
   })
 
   it('navigates to the correct report path when a report card is clicked', async () => {
     renderDashboard()
-    await waitFor(() => screen.getByText('General'))
-    await userEvent.click(screen.getByText('General').closest('button'))
-    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/report/general')
+    await waitFor(() => screen.getByText('Daily Site Patrol'))
+    await userEvent.click(screen.getByText('Daily Site Patrol').closest('button'))
+    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/report/daily-patrol')
   })
 
   it('navigates back to /projects when back button is clicked', async () => {

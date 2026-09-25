@@ -29,7 +29,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    // Remember where the user was headed (incl. ?report_id=) so login can send them back
+    // Remember where the user was headed so login can send them back
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
@@ -81,7 +81,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/project/:projectId/report/general"
+        path="/project/:projectId/idr/:idrId/report/:reportId"
         element={
           <ProtectedRoute>
             <GeneralReportPage />
