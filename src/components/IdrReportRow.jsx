@@ -3,8 +3,8 @@ import { format } from 'date-fns'
 import { reportTypeLabel, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
- * One report inside an IDR: type name, addendum chip, saved/not-edited state, "Page X of Y" once submitted,
- * and Open/Delete buttons (Delete hidden when read-only).
+ * One report inside an IDR: type name, addendum chip, "Auto-generated" badge on a system-built General,
+ * saved/not-edited state, "Page X of Y" once submitted, and Open/Delete buttons (Delete hidden when read-only).
  * Props: report (an IDR report), totalPages (IDR total_pages or null), readOnly, disabled (another action
  * is running), deleting (this row's delete is running), onOpen(), onDelete().
  */
@@ -23,6 +23,14 @@ export default function IdrReportRow({ report, totalPages, readOnly, disabled, d
             <span className="font-semibold text-gray-900">{reportTypeLabel(report.report_type)}</span>
             {report.is_addendum && (
               <span className="text-xs font-medium bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">addendum</span>
+            )}
+            {report.is_auto_generated && (
+              <span
+                title="System-generated summary of your other reports. Edit those to change what appears here."
+                className="text-xs font-medium bg-construction-100 text-construction-700 rounded-full px-2 py-0.5 cursor-help"
+              >
+                Auto-generated
+              </span>
             )}
             {showPage && (
               <span className="text-xs text-gray-500">Page {report.page_number} of {totalPages}</span>

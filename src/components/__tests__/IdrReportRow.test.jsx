@@ -53,6 +53,18 @@ describe('IdrReportRow', () => {
     expect(screen.queryByText('addendum')).not.toBeInTheDocument()
   })
 
+  it('shows an "Auto-generated" badge with an explanatory tooltip when the report is system-built', () => {
+    renderRow({ report: { ...REPORT, is_auto_generated: true } })
+    const badge = screen.getByText('Auto-generated')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveAttribute('title', expect.stringMatching(/system-generated summary of your other reports/i))
+  })
+
+  it('has no "Auto-generated" badge for an ordinary report', () => {
+    renderRow()
+    expect(screen.queryByText('Auto-generated')).not.toBeInTheDocument()
+  })
+
   it('shows "Not yet edited" when report_data is empty', () => {
     renderRow()
     expect(screen.getByText('Not yet edited')).toBeInTheDocument()
