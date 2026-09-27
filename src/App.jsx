@@ -9,8 +9,6 @@ import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
 import IDRPage from './pages/IDRPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
-import DailySitePatrolPage from './pages/reports/DailySitePatrolPage'
-import CurbSidewalkPage from './pages/reports/CurbSidewalkPage'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -85,22 +83,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <GeneralReportPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/project/:projectId/report/daily-patrol"
-        element={
-          <ProtectedRoute>
-            <DailySitePatrolPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/project/:projectId/report/curb-sidewalk"
-        element={
-          <ProtectedRoute>
-            <CurbSidewalkPage />
           </ProtectedRoute>
         }
       />

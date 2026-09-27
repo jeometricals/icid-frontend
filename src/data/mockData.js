@@ -24,19 +24,3 @@ export const PROJECTS = {
     contractor: 'Metropolitan Water Solutions'
   }
 }
-
-// Legacy standalone report pages. General is no longer here: it lives inside an IDR (see data/reportTypes.js).
-export const REPORT_TYPES = [
-  {
-    id: 'daily-patrol',
-    title: 'Daily Site Patrol',
-    description: 'Maintenance and Safety Checklist',
-    path: '/report/daily-patrol'
-  },
-  {
-    id: 'curb-sidewalk',
-    title: 'Curb, Sidewalk, Concrete Base & Pedestrian Ramp',
-    description: 'Infrastructure Installation Report',
-    path: '/report/curb-sidewalk'
-  }
-]

@@ -13,7 +13,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 ## Folder structure
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard). One page per file.
-- `src/pages/reports/` — inspection report form pages (General, Daily Site Patrol, Curb/Sidewalk).
+- `src/pages/reports/` — inspection report form pages (currently General).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
 - `src/services/` — all backend access. `api.js` holds every backend call via the shared `apiFetch` helper.
 - `src/lib/` — third-party client setup and small utilities. (Contains legacy `supabase.js` — see Known technical debt.)
@@ -75,6 +75,6 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **README references files that don't exist** (`.env.example`, `src/components/`).
 - **`ProjectDashboard` swallows all errors as "not found"** — fix pending Slice 1 work.
 - **Fake hardcoded weather** (52°F / 48° / 59°) on multiple pages.
-- **`src/data/mockData.js` mixes real config** (`REPORT_TYPES`) **with dead mock data** (`PROJECTS`).
+- **`src/data/mockData.js` still holds mock `PROJECTS`**, read by `GeneralReportPage`'s project header.
 - **No ESLint config** — `npm run lint` will fail.
 - **Some pages lack tests** (`LoginPage`, all report pages).
