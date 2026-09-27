@@ -75,14 +75,26 @@ function parentIdr({ reportData = generalData('Poured curb'), ...overrides } = {
   }
 }
 
+// The project as GET /v1/projects/{id} returns it
+const PROJECT = {
+  project_id: 'HWS0023',
+  project_name: 'S/W Queens 2025',
+  project_description: 'Installation of Curb, Sidewalk and Ped-Ramp',
+  registration_code: '2024123457',
+  borough: 'Queens',
+  status: 'active',
+}
+
 vi.mock('../../../services/api', () => ({
   getIdr: vi.fn(),
+  getProjectById: vi.fn(),
   saveReport: vi.fn(),
 }))
 
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
+  api.getProjectById.mockResolvedValue(PROJECT)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_type: 'GEN', report_data: reportData, updated_at: SAVED_AT,
   }))
@@ -190,6 +202,18 @@ describe('loading', () => {
     expect(await screen.findByText(message)).toBeInTheDocument()
   })
 
+  it('on a project load failure shows the error, and Retry loads both again', async () => {
+    api.getProjectById.mockRejectedValueOnce(new Error('Project not found'))
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText('Project not found')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+    expect(await loaded()).toBeInTheDocument()
+    expect(api.getProjectById).toHaveBeenCalledTimes(2)
+    expect(api.getIdr).toHaveBeenCalledTimes(2)
+  })
+
   it('on load failure, Back to IDR goes to the parent IDR page', async () => {
     api.getIdr.mockRejectedValue(new Error('Network error'))
     const user = userEvent.setup()
@@ -197,6 +221,41 @@ describe('loading', () => {
     await user.click(await screen.findByRole('button', { name: 'Back to IDR' }))
     expect(screen.getByTestId('url')).toHaveTextContent(new RegExp(`^${IDR_PATH}$`))
     expect(screen.getByTestId('from')).toHaveTextContent('drafts')
+  })
+})
+
+describe('project card', () => {
+  it('fetches the project named in the route', async () => {
+    renderPage()
+    await loaded()
+    expect(api.getProjectById).toHaveBeenCalledWith('HWS0023')
+  })
+
+  it('shows the project details from the API', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByText('Contract No:').parentElement).toHaveTextContent('Contract No: HWS0023')
+    expect(screen.getByText('Reg. No:').parentElement).toHaveTextContent('Reg. No: 2024123457')
+    expect(screen.getByText('Project Description:').parentElement)
+      .toHaveTextContent('Project Description: Installation of Curb, Sidewalk and Ped-Ramp')
+    expect(screen.getByText('Borough:').parentElement).toHaveTextContent('Borough: Queens')
+  })
+
+  it('has no Contractor row (the backend stores no contractor)', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.queryByText('Contractor:')).not.toBeInTheDocument()
+  })
+
+  it('does not refetch the project after a save', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.type(descriptionBox(), ' more')
+    await user.click(saveButton())
+    await screen.findByText(SAVED_TEXT)
+    expect(api.getIdr).toHaveBeenCalledTimes(2)
+    expect(api.getProjectById).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -8,8 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Info, Paperclip } from 'lucide-react'
-import { PROJECTS } from '../../data/mockData'
-import { getIdr, saveReport } from '../../services/api'
+import { getIdr, getProjectById, saveReport } from '../../services/api'
 import SaveDraftButton from '../../components/SaveDraftButton'
 import SubmittedBanner from '../../components/SubmittedBanner'
 import SaveStatusText from '../../components/SaveStatusText'
@@ -83,7 +82,6 @@ export default function GeneralReportPage() {
   const { projectId, idrId, reportId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const project = PROJECTS[projectId]
   // Carry the list the IDR was opened from, so the IDR page's own Back still goes there
   const backToIdr = () => navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: location.state?.from } })
 
@@ -100,6 +98,7 @@ export default function GeneralReportPage() {
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
   const [idr, setIdr] = useState(null) // the parent IDR without its reports (status, date, weather, times)
+  const [project, setProject] = useState(null) // the project card's details, loaded with the IDR
   const [idrStatus, setIdrStatus] = useState('draft')
   const [submittedAt, setSubmittedAt] = useState(null)
   const [refreshError, setRefreshError] = useState(null)
@@ -131,10 +130,11 @@ export default function GeneralReportPage() {
     let ignore = false
     setLoadStatus('loading')
     setLoadError(null)
-    getIdr(idrId)
-      .then(idr => {
+    Promise.all([getIdr(idrId), getProjectById(projectId)])
+      .then(([idr, project]) => {
         if (ignore) return
         loadForm(idr)
+        setProject(project)
         setLoadStatus('ready')
       })
       .catch(err => {
@@ -143,7 +143,7 @@ export default function GeneralReportPage() {
         setLoadStatus('error')
       })
     return () => { ignore = true }
-  }, [idrId, loadAttempt, loadForm])
+  }, [idrId, projectId, loadAttempt, loadForm])
 
   // Every form edit goes through here so unsaved-change tracking can't be skipped.
   const updateForm = (updater) => {
@@ -242,10 +242,6 @@ export default function GeneralReportPage() {
     else if (saved) await refresh()
   }
 
-  if (!project) {
-    return <div>Project not found</div>
-  }
-
   if (loadStatus === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -334,13 +330,12 @@ export default function GeneralReportPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">General Inspector's Report</h1>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <p><span className="font-medium text-construction-700">Contract No:</span> {project.contractNo}</p>
-              <p><span className="font-medium text-construction-700">Reg. No:</span> {project.regNo}</p>
-              <p><span className="font-medium text-construction-700">Project Description:</span> {project.description}</p>
+              <p><span className="font-medium text-construction-700">Contract No:</span> {project.project_id}</p>
+              <p><span className="font-medium text-construction-700">Reg. No:</span> {project.registration_code}</p>
+              <p><span className="font-medium text-construction-700">Project Description:</span> {project.project_description}</p>
             </div>
             <div>
               <p><span className="font-medium text-construction-700">Borough:</span> {project.borough}</p>
-              <p><span className="font-medium text-construction-700">Contractor:</span> {project.contractor}</p>
             </div>
           </div>
         </div>

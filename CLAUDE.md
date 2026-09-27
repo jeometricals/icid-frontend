@@ -15,9 +15,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard). One page per file.
 - `src/pages/reports/` — inspection report form pages (currently General).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
-- `src/services/` — all backend access. `api.js` holds every backend call via the shared `apiFetch` helper.
+- `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
 - `src/lib/` — third-party client setup and small utilities. (Contains legacy `supabase.js` — see Known technical debt.)
-- `src/data/` — static/mock data (report type definitions, legacy mock `PROJECTS`).
+- `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`).
 - `src/components/` — shared UI components. Doesn't exist yet; create it the first time JSX needs sharing.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
@@ -75,6 +75,5 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **README references files that don't exist** (`.env.example`, `src/components/`).
 - **`ProjectDashboard` swallows all errors as "not found"** — fix pending Slice 1 work.
 - **Fake hardcoded weather** (52°F / 48° / 59°) on multiple pages.
-- **`src/data/mockData.js` still holds mock `PROJECTS`**, read by `GeneralReportPage`'s project header.
 - **No ESLint config** — `npm run lint` will fail.
 - **Some pages lack tests** (`LoginPage`, all report pages).
