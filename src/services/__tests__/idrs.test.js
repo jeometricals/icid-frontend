@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createIdr, listIdrs, getIdr, saveIdrHeader, submitIdr } from '../idrs'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { CURRENT_USER_ID } from '../session'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -8,7 +9,7 @@ beforeEach(() => {
 
 const IDR_ID = '5a0e8c1d-0000-4000-8000-00000000000a'
 const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
-const REPORTER_UUID = '327d3ed2-a3d6-4235-9408-7fe721b12bed'
+const REPORTER_UUID = CURRENT_USER_ID
 
 const MOCK_IDR = {
   idr_id: IDR_ID,

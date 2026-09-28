@@ -14,11 +14,12 @@ import {
   deleteAttachment,
 } from '../attachments'
 import { mockFetch, mockFetchNoContent, mockFetchSequence, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { CURRENT_USER_ID } from '../session'
 
 const IDR_ID = '5a0e8c1d-0000-4000-8000-00000000000a'
 const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
 const ATTACHMENT_ID = 'c3d4e5f6-0000-4000-8000-0000000000a1'
-const UPLOADER_UUID = '327d3ed2-a3d6-4235-9408-7fe721b12bed'
+const UPLOADER_UUID = CURRENT_USER_ID
 const BASE = `/v1/idrs/${IDR_ID}/reports/${REPORT_ID}/attachments`
 const UPLOAD_URL = 'https://storage.example.com/upload/sign/report-attachments/x?token=abc'
 

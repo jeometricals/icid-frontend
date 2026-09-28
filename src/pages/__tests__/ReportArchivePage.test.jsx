@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import ReportArchivePage from '../ReportArchivePage'
 import * as api from '../../services/api'
+import { CURRENT_USER_ID } from '../../services/session'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const KHAN = '327d3ed2-a3d6-4235-9408-7fe721b12bed'
+const KHAN = CURRENT_USER_ID
 const SHAH = '5246b39d-87fe-4e21-92a3-2804c899e8b3'
 
 const USERS = [

@@ -5,12 +5,13 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import DraftsListPage from '../DraftsListPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
+import { CURRENT_USER_ID } from '../../services/session'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const DEV_USER = { id: '327d3ed2-a3d6-4235-9408-7fe721b12bed', email: 'KhanG@magnoleng.pc' }
+const DEV_USER = { id: CURRENT_USER_ID, email: 'KhanG@magnoleng.pc' }
 
 const DRAFTS = [
   {

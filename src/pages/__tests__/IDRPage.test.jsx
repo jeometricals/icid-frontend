@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
+import { CURRENT_USER_ID } from '../../services/session'
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" so the refetch after each change sees that change
@@ -29,7 +30,7 @@ function draftIdr(overrides = {}) {
   return {
     idr_id: IDR_ID,
     project_id: 'HWS0023',
-    reporter_uuid: '327d3ed2-a3d6-4235-9408-7fe721b12bed',
+    reporter_uuid: CURRENT_USER_ID,
     report_date: '2026-09-27',
     work_start_time: '07:00:00',
     work_end_time: null,
