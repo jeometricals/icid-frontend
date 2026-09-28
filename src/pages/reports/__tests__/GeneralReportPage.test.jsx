@@ -91,6 +91,11 @@ vi.mock('../../../services/api', () => ({
   saveReport: vi.fn(),
 }))
 
+// AttachmentsSection fetches its own data and needs AuthProvider; this page's tests only check where it is placed
+vi.mock('../../../components/AttachmentsSection', () => ({
+  default: (props) => <div data-testid="attachments-section" data-submitted={String(props.isSubmitted)} />,
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())

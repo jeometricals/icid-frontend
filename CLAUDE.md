@@ -16,6 +16,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/reports/` — inspection report form pages (currently General).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
 - `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+  Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
+  still get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. (Contains legacy `supabase.js` — see Known technical debt.)
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`).
