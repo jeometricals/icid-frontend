@@ -63,6 +63,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` · `GET /v1/idrs/{id}`
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
+  - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·
+    `GET` (list) · `GET /{attachment_id}/download-url` · `PUT /{attachment_id}` · `DELETE /{attachment_id}`
+    (the file itself is PUT straight to the Storage signed URL from upload-request, not to the API)
 - **Follow the existing design language** (construction-orange palette, white cards on `bg-gray-50`, `max-w-7xl`
   layout, lucide-react icons) unless we're deliberately reworking it.
 - **Mention unrelated bugs you notice, but don't touch them.** Scope creep in fixes hurts more than it helps.

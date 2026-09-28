@@ -10,11 +10,21 @@ function errorMessage(body, status) {
   return `API error ${status}`
 }
 
+// Parses a response body as JSON; returns undefined when it isn't (e.g. an HTML error page from a proxy)
+function parseJson(text) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Calls the ICID backend and returns the parsed JSON response.
  * Takes a path plus optional {method, body}; a body is sent as JSON. Returns null for 204 No Content.
  * Throws on non-2xx responses, with the HTTP code on `error.status` and the parsed error body on `error.body`
- * (network failures throw without either).
+ * (network failures throw without either). A 2xx response that isn't JSON throws with the status and a
+ * preview of the body instead of a bare SyntaxError.
  */
 export async function apiFetch(path, { method = 'GET', body } = {}) {
   const init = { method }
@@ -24,12 +34,19 @@ export async function apiFetch(path, { method = 'GET', body } = {}) {
   }
   const res = await fetch(`${BASE_URL}${path}`, init)
   if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}))
+    const errorBody = parseJson(await res.text()) ?? {}
     const error = new Error(errorMessage(errorBody, res.status))
     error.status = res.status
     error.body = errorBody
     throw error
   }
   if (res.status === 204) return null
-  return res.json()
+  const text = await res.text()
+  const json = parseJson(text)
+  if (json === undefined) {
+    const error = new Error(`API error ${res.status}: expected JSON but got "${text.slice(0, 100)}"`)
+    error.status = res.status
+    throw error
+  }
+  return json
 }
