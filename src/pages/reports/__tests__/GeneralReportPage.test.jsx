@@ -589,6 +589,70 @@ describe('added trades and equipment', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Safety remarks and legacy report_data cleanup
+// ---------------------------------------------------------------------------
+
+describe('safety remarks and legacy cleanup', () => {
+  const EMPTY_REMARKS = {
+    plasticBarrels: '', pedestrianBarricades: '', timberCurbs: '', timberBreakawayBarricades: '', generalSafety: '',
+    localEmergencyAccess: '', fencing: '', plates: '', arrowBoard: '', siteCleaned: '',
+  }
+  const remarksBox = (item) => within(screen.getByText(item).closest('tr')).getByPlaceholderText('Remarks')
+  const savedData = () => api.saveReport.mock.calls[0][2]
+
+  it('saves the text typed into a safety item\'s Remarks, keyed by that item', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.type(remarksBox('Plastic Barrels'), 'Two knocked over at corner')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().safetyRemarks).toEqual({ ...EMPTY_REMARKS, plasticBarrels: 'Two knocked over at corner' })
+  })
+
+  it('loads saved remarks into their rows', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: { ...generalData('Poured curb'), safetyRemarks: { fencing: 'Gap on north side' } },
+    }))
+    renderPage()
+    await loaded()
+    expect(remarksBox('Fencing')).toHaveValue('Gap on north side')
+    expect(remarksBox('Plates')).toHaveValue('')
+  })
+
+  it('drops a legacy safetyRemarks string: every Remarks box starts empty and it saves as the per-item object', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: { ...generalData('Poured curb'), safetyRemarks: 'legacy string value' },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    for (const box of screen.getAllByPlaceholderText('Remarks')) expect(box).toHaveValue('')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().safetyRemarks).toEqual(EMPTY_REMARKS)
+  })
+
+  it('strips the retired quantityChk from saved pay items, keeping everything else', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: {
+        ...generalData('Poured curb'),
+        payItems: [{ itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', quantityChk: 'RM', description: 'Curb' }],
+      },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().payItems).toEqual([{ itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', description: 'Curb' }])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Read-only when the parent IDR is submitted
 // ---------------------------------------------------------------------------
 

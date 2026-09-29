@@ -63,14 +63,19 @@ function normalizeWorkforce(workforce) {
   return result
 }
 
-// This report's saved report_data as form state: defaults for missing keys (including missing workforce roles
-// and equipment types), IDR-level keys removed, legacy workforce keys renamed, boolean safety checks converted to 'Y' / 'N'
+// This report's saved report_data as form state: defaults for missing keys (including missing workforce roles,
+// equipment types and safety remarks), IDR-level keys removed, legacy workforce keys renamed, boolean safety checks
+// converted to 'Y' / 'N', and the retired pay item quantityChk dropped
 function formDataFromReport(reportData) {
   const defaults = emptyFormData()
   const data = { ...defaults, ...reportData }
   for (const key of IDR_LEVEL_KEYS) delete data[key]
   data.workforce = { ...defaults.workforce, ...normalizeWorkforce(data.workforce) }
   data.equipment = { ...defaults.equipment, ...data.equipment }
+  // Older reports stored one never-displayed safetyRemarks string; it's dropped for the per-item object
+  const savedRemarks = typeof data.safetyRemarks === 'object' && data.safetyRemarks !== null ? data.safetyRemarks : {}
+  data.safetyRemarks = { ...defaults.safetyRemarks, ...savedRemarks }
+  data.payItems = data.payItems.map(({ quantityChk, ...item }) => item)
   data.safetyChecks = Object.fromEntries(
     Object.entries(data.safetyChecks).map(([key, value]) => [key, normalizeSafetyCheck(value)])
   )
@@ -110,7 +115,18 @@ function emptyFormData() {
       arrowBoard: null,
       siteCleaned: null
     },
-    safetyRemarks: '',
+    safetyRemarks: {
+      plasticBarrels: '',
+      pedestrianBarricades: '',
+      timberCurbs: '',
+      timberBreakawayBarricades: '',
+      generalSafety: '',
+      localEmergencyAccess: '',
+      fencing: '',
+      plates: '',
+      arrowBoard: '',
+      siteCleaned: ''
+    },
     comments: ''
   }
 }
@@ -209,6 +225,16 @@ export default function GeneralReportPage() {
       safetyChecks: {
         ...prev.safetyChecks,
         [field]: value
+      }
+    }))
+  }
+
+  const handleSafetyRemarksChange = (key, value) => {
+    updateForm(prev => ({
+      ...prev,
+      safetyRemarks: {
+        ...prev.safetyRemarks,
+        [key]: value
       }
     }))
   }
@@ -465,7 +491,13 @@ export default function GeneralReportPage() {
         </div>
 
         {/* Safety Checks */}
-        <SafetyChecklistSection safetyChecks={formData.safetyChecks} onChange={handleSafetyCheckChange} disabled={isReadOnly} />
+        <SafetyChecklistSection
+          safetyChecks={formData.safetyChecks}
+          onChange={handleSafetyCheckChange}
+          remarks={formData.safetyRemarks}
+          onRemarksChange={handleSafetyRemarksChange}
+          disabled={isReadOnly}
+        />
 
         {/* Comments */}
         <CommentsSection value={formData.comments} onChange={(v) => handleInputChange('comments', v)} disabled={isReadOnly} />

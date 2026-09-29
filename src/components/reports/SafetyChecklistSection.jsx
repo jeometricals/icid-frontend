@@ -1,9 +1,9 @@
 /**
  * The "End of the Day MPT/Safety Check List" card: Y / N / N/A radios and a Remarks input per safety item. Stateless.
  * Props: safetyChecks ({ [key]: 'Y' | 'N' | 'NA' | null }), onChange(key, value) with 'Y', 'N' or 'NA',
- * disabled (makes the inputs natively disabled). The Remarks inputs aren't wired to any state yet.
+ * remarks ({ [key]: string }), onRemarksChange(key, value), disabled (makes the inputs natively disabled).
  */
-export default function SafetyChecklistSection({ safetyChecks, onChange, disabled = false }) {
+export default function SafetyChecklistSection({ safetyChecks, onChange, remarks, onRemarksChange, disabled = false }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
       <h3 className="form-section-title">End of the Day MPT/Safety Check List</h3>
@@ -46,7 +46,14 @@ export default function SafetyChecklistSection({ safetyChecks, onChange, disable
                   </td>
                 ))}
                 <td className="px-4 py-3">
-                  <input type="text" className="input-field" placeholder="Remarks" disabled={disabled} />
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Remarks"
+                    value={remarks[item.key] || ''}
+                    disabled={disabled}
+                    onChange={(e) => onRemarksChange(item.key, e.target.value)}
+                  />
                 </td>
               </tr>
             ))}
