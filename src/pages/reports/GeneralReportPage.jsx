@@ -50,11 +50,27 @@ function normalizeSafetyCheck(value) {
   return value
 }
 
-// This report's saved report_data as form state: defaults for missing keys, IDR-level keys removed,
-// boolean safety checks converted to 'Y' / 'N'
+// Older reports used singular workforce keys; renamed to plurals on load (the new key wins if both exist)
+const LEGACY_WORKFORCE_KEYS = { foreman: 'foremen', operator: 'operators', flagger: 'flaggers' }
+
+function normalizeWorkforce(workforce) {
+  const result = { ...workforce }
+  for (const [oldKey, newKey] of Object.entries(LEGACY_WORKFORCE_KEYS)) {
+    if (!(oldKey in result)) continue
+    if (!(newKey in result)) result[newKey] = result[oldKey]
+    delete result[oldKey]
+  }
+  return result
+}
+
+// This report's saved report_data as form state: defaults for missing keys (including missing workforce roles
+// and equipment types), IDR-level keys removed, legacy workforce keys renamed, boolean safety checks converted to 'Y' / 'N'
 function formDataFromReport(reportData) {
-  const data = { ...emptyFormData(), ...reportData }
+  const defaults = emptyFormData()
+  const data = { ...defaults, ...reportData }
   for (const key of IDR_LEVEL_KEYS) delete data[key]
+  data.workforce = { ...defaults.workforce, ...normalizeWorkforce(data.workforce) }
+  data.equipment = { ...defaults.equipment, ...data.equipment }
   data.safetyChecks = Object.fromEntries(
     Object.entries(data.safetyChecks).map(([key, value]) => [key, normalizeSafetyCheck(value)])
   )
@@ -68,14 +84,16 @@ function emptyFormData() {
     payItems: [],
     workforce: {
       superintendent: '',
-      foreman: '',
-      operator: '',
-      flagger: ''
+      foremen: '',
+      operators: '',
+      laborers: '',
+      flaggers: ''
     },
     equipment: {
       frontEndLoader: { model: '', number: '' },
       backhoe: { model: '', number: '' },
       truckDump: { model: '', number: '' },
+      compressor: { model: '', number: '' },
       excavator: { model: '', number: '' }
     },
     safetyChecks: {

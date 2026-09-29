@@ -1,6 +1,6 @@
 /**
- * The "Equipment" half of a report's workforce/equipment card: model/size and count inputs per equipment type.
- * Stateless. Props: equipment ({ [key]: { model, number } }), onChange(key, updatedEntry) with the whole
+ * The "Equipment" half of a report's workforce/equipment card: model/size and count inputs for Front End Loader,
+ * Backhoe, Truck (Dump), Compressor and Excavator. Stateless. Props: equipment ({ [key]: { model, number } }), onChange(key, updatedEntry) with the whole
  * updated { model, number } entry, disabled (makes the inputs natively disabled).
  */
 export default function EquipmentSection({ equipment, onChange, disabled = false }) {
@@ -12,6 +12,7 @@ export default function EquipmentSection({ equipment, onChange, disabled = false
           { label: 'Front End Loader', key: 'frontEndLoader' },
           { label: 'Backhoe', key: 'backhoe' },
           { label: 'Truck (Dump)', key: 'truckDump' },
+          { label: 'Compressor', key: 'compressor' },
           { label: 'Excavator', key: 'excavator' }
         ].map((equip) => (
           <div key={equip.key} className="grid grid-cols-3 gap-2">

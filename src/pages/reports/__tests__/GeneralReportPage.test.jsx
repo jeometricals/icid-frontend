@@ -314,7 +314,8 @@ describe('Save Draft', () => {
 
     const saved = api.saveReport.mock.calls[0][2]
     for (const key of IDR_LEVEL_KEYS) expect(saved).not.toHaveProperty(key)
-    expect(saved).toMatchObject({ workforce: { foreman: '2' }, safetyChecks: { plasticBarrels: 'Y' } })
+    expect(saved).toMatchObject({ workforce: { foremen: '2' }, safetyChecks: { plasticBarrels: 'Y' } })
+    expect(saved.workforce).not.toHaveProperty('foreman')
   })
 
   it('a blank report saves no IDR-level keys either', async () => {
@@ -558,7 +559,7 @@ describe('auto-generated General', () => {
     expect(descriptionBox()).toBeDisabled()
     expect(screen.getByDisplayValue('4.01')).toBeDisabled()       // pay item input
     expect(screen.getByRole('button', { name: /add item/i })).toBeDisabled()
-    expect(screen.getByDisplayValue('2')).toBeDisabled()          // workforce foreman
+    expect(screen.getByDisplayValue('2')).toBeDisabled()          // workforce foremen
     expect(commentsBox()).toBeDisabled()
     expect(screen.queryByRole('button', { name: /save draft|saving/i })).not.toBeInTheDocument()
   })
