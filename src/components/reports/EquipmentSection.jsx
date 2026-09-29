@@ -1,9 +1,27 @@
 /**
  * The "Equipment" half of a report's workforce/equipment card: model/size and count inputs for Front End Loader,
- * Backhoe, Truck (Dump), Compressor and Excavator. Stateless. Props: equipment ({ [key]: { model, number } }), onChange(key, updatedEntry) with the whole
- * updated { model, number } entry, disabled (makes the inputs natively disabled).
+ * Backhoe, Truck (Dump), Compressor and Excavator, then any added equipment (each removable) and an "Add equipment"
+ * picker. Stateless. Props: equipment ({ [key]: { model, number } }), onChange(key, updatedEntry),
+ * additionalEquipment ([{ label, model, number }]), onAddEquipment(label), onChangeAdditional(index, field, value),
+ * onRemoveAdditional(index), disabled (makes the inputs natively disabled).
  */
-export default function EquipmentSection({ equipment, onChange, disabled = false }) {
+import { X } from 'lucide-react'
+import AddRowPicker, { OTHER_OPTION } from './AddRowPicker'
+
+const EQUIPMENT_EXTRAS = [
+  'Crane', 'Paving Machine', 'AC Distributor', 'Sweepers', 'Trailers',
+  'Roller – Static', 'Roller – Dynamic', 'Hand Tamper', 'Pavement Cutter', OTHER_OPTION,
+]
+
+export default function EquipmentSection({
+  equipment,
+  onChange,
+  additionalEquipment,
+  onAddEquipment,
+  onChangeAdditional,
+  onRemoveAdditional,
+  disabled = false,
+}) {
   return (
     <div>
       <h4 className="text-md font-semibold text-gray-900 mb-3">Equipment</h4>
@@ -37,7 +55,48 @@ export default function EquipmentSection({ equipment, onChange, disabled = false
             />
           </div>
         ))}
+        {additionalEquipment.map((row, index) => (
+          <div key={index} className="grid grid-cols-3 gap-2">
+            <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
+              <span className="text-sm font-medium text-gray-700">{row.label}</span>
+            </div>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Model/Size"
+              value={row.model}
+              disabled={disabled}
+              onChange={(e) => onChangeAdditional(index, 'model', e.target.value)}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                className="input-field"
+                placeholder="No."
+                value={row.number}
+                disabled={disabled}
+                onChange={(e) => onChangeAdditional(index, 'number', e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => onRemoveAdditional(index)}
+                disabled={disabled}
+                aria-label={`Remove ${row.label}`}
+                className="text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
+      <AddRowPicker
+        options={EQUIPMENT_EXTRAS}
+        usedLabels={additionalEquipment.map(r => r.label)}
+        onPick={onAddEquipment}
+        placeholder="Add equipment"
+        disabled={disabled}
+      />
     </div>
   )
 }

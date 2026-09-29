@@ -89,6 +89,7 @@ function emptyFormData() {
       laborers: '',
       flaggers: ''
     },
+    additionalWorkforce: [],
     equipment: {
       frontEndLoader: { model: '', number: '' },
       backhoe: { model: '', number: '' },
@@ -96,6 +97,7 @@ function emptyFormData() {
       compressor: { model: '', number: '' },
       excavator: { model: '', number: '' }
     },
+    additionalEquipment: [],
     safetyChecks: {
       plasticBarrels: null,
       pedestrianBarricades: null,
@@ -223,6 +225,38 @@ export default function GeneralReportPage() {
       ...prev,
       payItems: prev.payItems.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     }))
+  }
+
+  // Trades added beyond the default workforce roles
+  const handleAddTrade = (label) => {
+    updateForm(prev => ({ ...prev, additionalWorkforce: [...prev.additionalWorkforce, { label, count: '' }] }))
+  }
+
+  const handleChangeAdditionalWorkforce = (index, field, value) => {
+    updateForm(prev => ({
+      ...prev,
+      additionalWorkforce: prev.additionalWorkforce.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    }))
+  }
+
+  const handleRemoveAdditionalWorkforce = (index) => {
+    updateForm(prev => ({ ...prev, additionalWorkforce: prev.additionalWorkforce.filter((_, i) => i !== index) }))
+  }
+
+  // Equipment added beyond the default types
+  const handleAddEquipment = (label) => {
+    updateForm(prev => ({ ...prev, additionalEquipment: [...prev.additionalEquipment, { label, model: '', number: '' }] }))
+  }
+
+  const handleChangeAdditionalEquipment = (index, field, value) => {
+    updateForm(prev => ({
+      ...prev,
+      additionalEquipment: prev.additionalEquipment.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    }))
+  }
+
+  const handleRemoveAdditionalEquipment = (index) => {
+    updateForm(prev => ({ ...prev, additionalEquipment: prev.additionalEquipment.filter((_, i) => i !== index) }))
   }
 
 
@@ -409,8 +443,24 @@ export default function GeneralReportPage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="form-section-title">Workforce and Equipment</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <WorkforceSection workforce={formData.workforce} onChange={(role, value) => handleNestedInputChange('workforce', role, value)} disabled={isReadOnly} />
-            <EquipmentSection equipment={formData.equipment} onChange={(key, updated) => handleNestedInputChange('equipment', key, updated)} disabled={isReadOnly} />
+            <WorkforceSection
+              workforce={formData.workforce}
+              onChange={(role, value) => handleNestedInputChange('workforce', role, value)}
+              additionalWorkforce={formData.additionalWorkforce}
+              onAddTrade={handleAddTrade}
+              onChangeAdditional={handleChangeAdditionalWorkforce}
+              onRemoveAdditional={handleRemoveAdditionalWorkforce}
+              disabled={isReadOnly}
+            />
+            <EquipmentSection
+              equipment={formData.equipment}
+              onChange={(key, updated) => handleNestedInputChange('equipment', key, updated)}
+              additionalEquipment={formData.additionalEquipment}
+              onAddEquipment={handleAddEquipment}
+              onChangeAdditional={handleChangeAdditionalEquipment}
+              onRemoveAdditional={handleRemoveAdditionalEquipment}
+              disabled={isReadOnly}
+            />
           </div>
         </div>
 
