@@ -118,6 +118,80 @@ describe('useReportForm — loading', () => {
   })
 })
 
+describe('useReportForm — navigateSafely', () => {
+  it('navigates straight away when there are no unsaved changes', async () => {
+    const { result } = renderForm()
+    await ready(result)
+    const action = vi.fn()
+    await act(() => result.current.navigateSafely(action))
+    expect(action).toHaveBeenCalledTimes(1)
+    expect(api.saveReport).not.toHaveBeenCalled()
+  })
+
+  it('saves unsaved changes first, then navigates', async () => {
+    const order = []
+    api.saveReport.mockImplementation(async (_, reportId, reportData) => {
+      order.push('save')
+      return { report_id: reportId, report_data: reportData, updated_at: '2026-09-25T14:05:00Z' }
+    })
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.handleInputChange('description', 'edited'))
+    await act(() => result.current.navigateSafely(async () => { order.push('navigate') }))
+
+    expect(api.saveReport).toHaveBeenCalledWith(IDR_ID, REPORT_ID, { description: 'edited', payItems: [] })
+    expect(order).toEqual(['save', 'navigate'])
+  })
+
+  it('stays put when the save fails, with the save error set', async () => {
+    api.saveReport.mockRejectedValueOnce(new Error('Network error'))
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.handleInputChange('description', 'edited'))
+    const action = vi.fn()
+    await act(() => result.current.navigateSafely(action))
+
+    expect(action).not.toHaveBeenCalled()
+    expect(result.current.saveError).toBe('Network error')
+    expect(result.current.hasUnsavedChanges).toBe(true)
+  })
+
+  it('stays put on a 409, with the conflict message set', async () => {
+    api.getIdr
+      .mockResolvedValueOnce(idrWith())
+      .mockResolvedValue(idrWith({ status: 'submitted', submitted_at: '2026-09-25T15:10:00Z' }))
+    api.saveReport.mockRejectedValueOnce(Object.assign(new Error('Only draft IDRs can be edited'), { status: 409 }))
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.handleInputChange('description', 'edited'))
+    const action = vi.fn()
+    await act(() => result.current.navigateSafely(action))
+
+    expect(action).not.toHaveBeenCalled()
+    expect(result.current.conflictMessage).toBe(SUBMITTED_MID_EDIT)
+  })
+
+  it('does not navigate (or save twice) while a save is already running', async () => {
+    let finishSave
+    api.saveReport.mockImplementationOnce((_, reportId, reportData) => new Promise(resolve => {
+      finishSave = () => resolve({ report_id: reportId, report_data: reportData, updated_at: '2026-09-25T14:05:00Z' })
+    }))
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.handleInputChange('description', 'edited'))
+
+    let firstSave
+    act(() => { firstSave = result.current.handleSaveDraft() })
+    const action = vi.fn()
+    await act(() => result.current.navigateSafely(action))
+    expect(action).not.toHaveBeenCalled()
+    expect(api.saveReport).toHaveBeenCalledTimes(1)
+
+    await act(async () => { finishSave(); await firstSave })
+    expect(result.current.hasUnsavedChanges).toBe(false)
+  })
+})
+
 describe("useReportForm — the IDR's reports", () => {
   const main = { report_id: REPORT_ID, report_type: 'GEN', report_data: {}, is_addendum: false, parent_report_id: null }
   const addendum = { report_id: 'rep-2', report_type: 'CONC_MIX', report_data: {}, is_addendum: true, parent_report_id: REPORT_ID }
@@ -219,6 +293,18 @@ describe('useReportForm — editing and saving', () => {
     expect(result.current.isReadOnly).toBe(true)
     expect(result.current.hasUnsavedChanges).toBe(false)
     expect(result.current.saveStatus).toBe('idle')
+  })
+
+  it('handleSaveDraft resolves true on success and false on failure', async () => {
+    const { result } = renderForm()
+    await ready(result)
+    let saved
+    await act(async () => { saved = await result.current.handleSaveDraft() })
+    expect(saved).toBe(true)
+
+    api.saveReport.mockRejectedValueOnce(new Error('Network error'))
+    await act(async () => { saved = await result.current.handleSaveDraft() })
+    expect(saved).toBe(false)
   })
 
   it('reports a failed refetch after a save, and refresh() clears it', async () => {

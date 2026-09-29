@@ -284,6 +284,48 @@ describe('Back to IDR', () => {
     expect(screen.getByTestId('url')).toHaveTextContent(new RegExp(`^${IDR_PATH}$`))
     expect(screen.getByTestId('from')).toHaveTextContent('archive') // so the IDR page's Back still goes to Archive
   })
+
+  it('saves unsaved edits before leaving', async () => {
+    const user = userEvent.setup()
+    renderPage('archive')
+    await user.type(await loaded(), ' - day 2')
+    await user.click(screen.getByRole('button', { name: 'Back to IDR' }))
+
+    expect(await screen.findByTestId('url')).toHaveTextContent(new RegExp(`^${IDR_PATH}$`))
+    expect(api.saveReport).toHaveBeenCalledTimes(1)
+    expect(api.saveReport.mock.calls[0][2].description).toBe('Poured curb - day 2')
+  })
+
+  it('stays on the report, edits kept, when that save fails', async () => {
+    api.saveReport.mockRejectedValueOnce(new Error('Network error'))
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await loaded(), ' - day 2')
+    await user.click(screen.getByRole('button', { name: 'Back to IDR' }))
+
+    expect(await screen.findByText(/save failed: network error/i)).toBeInTheDocument()
+    expect(descriptionBox()).toHaveValue('Poured curb - day 2')
+    expect(screen.queryByTestId('url')).not.toBeInTheDocument()
+  })
+
+  it('leaves without saving when nothing changed', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(screen.getByRole('button', { name: 'Back to IDR' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(new RegExp(`^${IDR_PATH}$`))
+    expect(api.saveReport).not.toHaveBeenCalled()
+  })
+
+  it('Cancel also saves unsaved edits, then goes to the project', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await loaded(), ' - day 2')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(await screen.findByTestId('url')).toHaveTextContent(/^\/project\/HWS0023$/)
+    expect(api.saveReport).toHaveBeenCalledTimes(1)
+  })
 })
 
 // ---------------------------------------------------------------------------

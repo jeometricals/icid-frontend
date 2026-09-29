@@ -72,6 +72,8 @@ vi.mock('../../../services/api', () => ({
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
+  addReport: vi.fn(),
+  deleteReport: vi.fn(),
 }))
 
 // AttachmentsSection fetches its own data and needs AuthProvider; these tests only check it is mounted
@@ -224,6 +226,42 @@ describe('SWCBReportPage — sections', () => {
     expect(screen.getByRole('heading', { name: 'Addendums' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Open Concrete Truck & Mix Info' })).toBeEnabled()
     expect(screen.getByRole('button', { name: /add addendum/i })).toBeInTheDocument()
+  })
+
+  it('Add addendum saves the SWCB edits first, then creates the addendum and opens it', async () => {
+    const order = []
+    api.saveReport.mockImplementation(async (_, reportId, reportData) => {
+      order.push('save')
+      return { report_id: reportId, report_type: 'SWCB', report_data: reportData, updated_at: SAVED_AT }
+    })
+    api.addReport.mockImplementation(async () => {
+      order.push('add')
+      return { report_id: 'rep-mix', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: REPORT_ID }
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await loaded(), ' - day 2')
+    await user.click(screen.getByRole('button', { name: /add addendum/i }))
+    await user.click(screen.getByRole('button', { name: 'Concrete Truck & Mix Info' }))
+
+    expect(await screen.findByTestId('url')).toHaveTextContent(`${IDR_PATH}/conc-mix/rep-mix`)
+    expect(order).toEqual(['save', 'add'])
+    expect(api.saveReport.mock.calls[0][2].description).toBe('Poured curb - day 2')
+    expect(api.addReport).toHaveBeenCalledWith(IDR_ID, { reportType: 'CONC_MIX', isAddendum: true, parentReportId: REPORT_ID })
+  })
+
+  it('Add addendum creates nothing when saving the SWCB edits fails', async () => {
+    api.saveReport.mockRejectedValueOnce(new Error('Network error'))
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(await loaded(), ' - day 2')
+    await user.click(screen.getByRole('button', { name: /add addendum/i }))
+    await user.click(screen.getByRole('button', { name: 'Concrete Truck & Mix Info' }))
+
+    expect(await screen.findByText(/save failed: network error/i)).toBeInTheDocument()
+    expect(api.addReport).not.toHaveBeenCalled()
+    expect(descriptionBox()).toHaveValue('Poured curb - day 2')
+    expect(screen.queryByTestId('url')).not.toBeInTheDocument()
   })
 })
 

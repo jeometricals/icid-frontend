@@ -113,6 +113,60 @@ describe('AddendumsSection — add', () => {
   })
 })
 
+describe('AddendumsSection — saving the parent before leaving', () => {
+  // Stands in for useReportForm's navigateSafely: records the parent save, then runs the navigation (or not)
+  const safeNav = (order, saveSucceeds = true) => vi.fn(async (action) => {
+    order.push('save parent')
+    if (saveSucceeds) await action()
+  })
+
+  it('Add saves the parent first, then creates the addendum and opens it', async () => {
+    const order = []
+    api.addReport.mockImplementation(async () => {
+      order.push('create addendum')
+      return { report_id: 'rep-new', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: REPORT_ID }
+    })
+    const user = userEvent.setup()
+    renderSection({ navigateSafely: safeNav(order) })
+    await user.click(screen.getByRole('button', { name: /add addendum/i }))
+    await user.click(screen.getByRole('button', { name: 'Concrete Truck & Mix Info' }))
+
+    expect(order).toEqual(['save parent', 'create addendum'])
+    expect(await screen.findByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-1/conc-mix/rep-new')
+  })
+
+  it('Add creates nothing and stays put when the parent save fails', async () => {
+    const order = []
+    const user = userEvent.setup()
+    renderSection({ navigateSafely: safeNav(order, false) })
+    await user.click(screen.getByRole('button', { name: /add addendum/i }))
+    await user.click(screen.getByRole('button', { name: 'Concrete Truck & Mix Info' }))
+
+    expect(order).toEqual(['save parent'])
+    expect(api.addReport).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('url')).not.toBeInTheDocument()
+    // The picker is usable again for a retry once the save error is dealt with
+    expect(screen.getByRole('button', { name: 'Concrete Truck & Mix Info' })).toBeEnabled()
+  })
+
+  it('Open saves the parent first, and stays put when that save fails', async () => {
+    const user = userEvent.setup()
+    const failing = safeNav([], false)
+    renderSection({ navigateSafely: failing })
+    await user.click(screen.getByRole('button', { name: 'Open Concrete Truck & Mix Info' }))
+    expect(failing).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('url')).not.toBeInTheDocument()
+  })
+
+  it('Open navigates once the parent save succeeds', async () => {
+    const order = []
+    renderSection({ navigateSafely: safeNav(order) })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open Concrete Truck & Mix Info' }))
+    expect(order).toEqual(['save parent'])
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-1/conc-mix/rep-mix')
+  })
+})
+
 describe('AddendumsSection — delete', () => {
   it('asks for confirmation, then deletes the addendum and refetches the IDR', async () => {
     const user = userEvent.setup()

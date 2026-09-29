@@ -2,7 +2,9 @@
  * The "Addendums" card on a main report: lists the addendums attached to this report (Open / Delete) and adds new
  * ones of any addendum type that has a form page, then opens the new addendum. Takes the IDR's reports from the page
  * instead of fetching them. Props: projectId, idrId, reportId, reports (every report in the IDR), onChanged (refetch the IDR
- * after a delete), disabled (IDR submitted or report auto-generated: hides Add and Delete).
+ * after a delete), navigateSafely(action) (runs a navigation after saving the parent's unsaved edits; Open and Add go
+ * through it, so a failed parent save neither navigates nor creates the addendum), disabled (IDR submitted or report
+ * auto-generated: hides Add and Delete).
  */
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -14,7 +16,18 @@ import ConfirmDialog from '../ConfirmDialog'
 // Addendum types with a form page, in catalog order
 const ADDABLE_TYPES = REPORT_TYPES.filter(({ code }) => isAddendumType(code) && isReportTypeAvailable(code))
 
-export default function AddendumsSection({ projectId, idrId, reportId, reports, onChanged, disabled = false }) {
+// Without a navigateSafely from the page, navigate straight away
+const navigateNow = (action) => action()
+
+export default function AddendumsSection({
+  projectId,
+  idrId,
+  reportId,
+  reports,
+  onChanged,
+  navigateSafely = navigateNow,
+  disabled = false,
+}) {
   const navigate = useNavigate()
   const location = useLocation()
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -27,7 +40,7 @@ export default function AddendumsSection({ projectId, idrId, reportId, reports, 
   const addendums = reports.filter(r => r.parent_report_id === reportId)
 
   // Keep the list the IDR was opened from, so Back to IDR from the addendum still returns there
-  const openAddendum = (addendum) => {
+  const goToAddendum = (addendum) => {
     const segment = reportTypeRoute(addendum.report_type)
     navigate(`/project/${projectId}/idr/${idrId}/${segment}/${addendum.report_id}`, {
       state: { from: location.state?.from },
@@ -39,9 +52,12 @@ export default function AddendumsSection({ projectId, idrId, reportId, reports, 
     setAdding(true)
     setAddError(null)
     try {
-      const created = await addReport(idrId, { reportType, isAddendum: true, parentReportId: reportId })
-      setPickerOpen(false)
-      openAddendum(created)
+      // Saves the parent first; if that fails, no addendum is created
+      await navigateSafely(async () => {
+        const created = await addReport(idrId, { reportType, isAddendum: true, parentReportId: reportId })
+        setPickerOpen(false)
+        goToAddendum(created)
+      })
     } catch (err) {
       setAddError(`Couldn't add addendum: ${err.message}`)
     } finally {
@@ -123,7 +139,7 @@ export default function AddendumsSection({ projectId, idrId, reportId, reports, 
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
-                    onClick={() => openAddendum(addendum)}
+                    onClick={() => navigateSafely(() => goToAddendum(addendum))}
                     disabled={!canOpen}
                     title={canOpen ? undefined : 'Form not available yet'}
                     aria-label={`Open ${label}`}
