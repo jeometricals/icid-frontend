@@ -314,7 +314,7 @@ describe('Save Draft', () => {
 
     const saved = api.saveReport.mock.calls[0][2]
     for (const key of IDR_LEVEL_KEYS) expect(saved).not.toHaveProperty(key)
-    expect(saved).toMatchObject({ workforce: { foreman: '2' }, safetyChecks: { plasticBarrels: true } })
+    expect(saved).toMatchObject({ workforce: { foreman: '2' }, safetyChecks: { plasticBarrels: 'Y' } })
   })
 
   it('a blank report saves no IDR-level keys either', async () => {

@@ -43,10 +43,21 @@ const IDR_LEVEL_KEYS = [
   'dailyTempLow', 'dailyTempHigh', 'weatherAM', 'weatherPM',
 ]
 
-// This report's saved report_data as form state: defaults for missing keys, IDR-level keys removed
+// Older reports stored safety checks as booleans (true = Y, false = N); strings and null pass through
+function normalizeSafetyCheck(value) {
+  if (value === true) return 'Y'
+  if (value === false) return 'N'
+  return value
+}
+
+// This report's saved report_data as form state: defaults for missing keys, IDR-level keys removed,
+// boolean safety checks converted to 'Y' / 'N'
 function formDataFromReport(reportData) {
   const data = { ...emptyFormData(), ...reportData }
   for (const key of IDR_LEVEL_KEYS) delete data[key]
+  data.safetyChecks = Object.fromEntries(
+    Object.entries(data.safetyChecks).map(([key, value]) => [key, normalizeSafetyCheck(value)])
+  )
   return data
 }
 
