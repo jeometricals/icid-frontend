@@ -12,8 +12,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard). One page per file.
-- `src/pages/reports/` — inspection report form pages (General, SWCB, ConcMix scaffold).
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
+- `src/pages/reports/` — inspection report form pages (General, SWCB, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
 - `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
@@ -21,7 +21,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers) and `useReportForm.js` (the hook every report page uses for load/save/state). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`).
-- `src/components/` — shared UI components. Doesn't exist yet; create it the first time JSX needs sharing.
+- `src/components/` — shared UI components (modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections, the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -77,8 +77,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Supabase code and docs are dead.** The `@supabase/supabase-js` dependency, `src/lib/supabase.js`, and multiple docs
   (README, QUICKSTART, DEPLOYMENT, PROJECT_SUMMARY, TODO.md) still reference Supabase. The real backend is the
   ICID FastAPI at `VITE_API_URL`.
-- **README references files that don't exist** (`.env.example`, `src/components/`).
+- **README's Project Structure tree is outdated** — it lists only three pages and omits `src/services/`, `src/data/` and `src/test/`.
 - **`ProjectDashboard` swallows all errors as "not found"** — fix pending Slice 1 work.
 - **Fake hardcoded weather** (52°F / 48° / 59°) on multiple pages.
 - **No ESLint config** — `npm run lint` will fail.
-- **Some pages lack tests** (`LoginPage`, all report pages).
+- **Some pages lack tests** (`LoginPage`).
