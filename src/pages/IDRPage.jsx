@@ -17,9 +17,12 @@ import SaveDraftButton from '../components/SaveDraftButton'
 import SubmitReportButton from '../components/SubmitReportButton'
 import SaveStatusText from '../components/SaveStatusText'
 import SubmittedBanner from '../components/SubmittedBanner'
+import ConfirmDialog from '../components/ConfirmDialog'
 
-const SUBMIT_CONFIRM = "Submit this IDR? Once submitted, it can't be edited."
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
+const CERTIFICATION_STATEMENT =
+  'The above described work was incorporated into this project and was constructed in conformance with all plans, ' +
+  'specifications, and standards unless otherwise noted.'
 
 // Where "Back" goes, keyed by the list page that opened the IDR (router state.from)
 const BACK_TARGETS = {
@@ -57,6 +60,7 @@ export default function IDRPage() {
   const [headerSave, setHeaderSave] = useState({ status: 'idle', savedAt: null, error: null })
   const [actionError, setActionError] = useState(null) // { scope: 'reports' | 'submit', message }
   const [refreshError, setRefreshError] = useState(null)
+  const [certifyOpen, setCertifyOpen] = useState(false) // the certification dialog shown before submitting
 
   // Puts a getIdr response into state. resetForm replaces the typed header (initial load only).
   const applyIdr = useCallback((data, { resetForm }) => {
@@ -174,14 +178,18 @@ export default function IDRPage() {
       message => setActionError({ scope: 'reports', message: `Couldn't delete report: ${message}` }))
   }
 
-  // Blocks on unsaved header edits so what gets submitted is what's on screen
-  const handleSubmit = () => {
+  // Blocks on unsaved header edits so what gets submitted is what's on screen, then asks for certification
+  const openCertify = () => {
     if (busy || reports.length === 0) return
     if (headerDirty) {
       window.alert(SAVE_HEADER_BEFORE_SUBMIT)
       return
     }
-    if (!window.confirm(SUBMIT_CONFIRM)) return
+    setCertifyOpen(true)
+  }
+
+  const confirmSubmit = () => {
+    setCertifyOpen(false)
     runAction('submit', () => submitIdr(idrId),
       message => setActionError({ scope: 'submit', message: `Submit failed: ${message}` }))
   }
@@ -293,7 +301,7 @@ export default function IDRPage() {
           <div className="flex flex-col items-end space-y-2">
             <SubmitReportButton
               label="Submit IDR"
-              onClick={handleSubmit}
+              onClick={openCertify}
               submitting={busyAction === 'submit'}
               disabled={reports.length === 0 || busy}
             />
@@ -304,6 +312,18 @@ export default function IDRPage() {
               <p role="alert" className="text-sm text-red-600">{actionError.message}</p>
             )}
           </div>
+        )}
+        {certifyOpen && (
+          <ConfirmDialog
+            title="Certification"
+            message={CERTIFICATION_STATEMENT}
+            confirmLabel="Submit"
+            cancelLabel="Cancel"
+            onConfirm={confirmSubmit}
+            onCancel={() => setCertifyOpen(false)}
+            busy={busyAction === 'submit'}
+            error={actionError?.scope === 'submit' ? actionError.message : null}
+          />
         )}
       </main>
     </div>

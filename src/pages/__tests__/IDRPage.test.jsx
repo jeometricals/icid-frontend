@@ -317,54 +317,82 @@ describe('IDRPage — reports', () => {
 // ---------------------------------------------------------------------------
 
 describe('IDRPage — submit', () => {
-  it('is disabled with a hint when the IDR has no reports', async () => {
+  const CERTIFICATION =
+    'The above described work was incorporated into this project and was constructed in conformance with all plans, ' +
+    'specifications, and standards unless otherwise noted.'
+  const certifyDialog = () => screen.queryByRole('dialog', { name: 'Certification' })
+
+  it('is disabled with a hint when the IDR has no reports, and clicking it opens no dialog', async () => {
     server = draftIdr({ reports: [] })
+    const user = userEvent.setup()
     renderPage()
     await ready()
     expect(submitButton()).toBeDisabled()
     expect(screen.getByText('Add at least one report before submitting.')).toBeInTheDocument()
+    await user.click(submitButton())
+    expect(certifyDialog()).not.toBeInTheDocument()
   })
 
-  it('asks for confirmation and does nothing on Cancel', async () => {
-    window.confirm.mockReturnValue(false)
+  it('opens the certification dialog instead of a browser confirm, without submitting yet', async () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
     await user.click(submitButton())
-    expect(window.confirm).toHaveBeenCalledWith("Submit this IDR? Once submitted, it can't be edited.")
+    const dialog = certifyDialog()
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByText(CERTIFICATION)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Submit' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    expect(window.confirm).not.toHaveBeenCalled()
     expect(api.submitIdr).not.toHaveBeenCalled()
   })
 
-  it('submits on OK, then refetches and switches to read-only', async () => {
+  it('Cancel closes the dialog without submitting', async () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
     await user.click(submitButton())
+    await user.click(within(certifyDialog()).getByRole('button', { name: 'Cancel' }))
+    expect(certifyDialog()).not.toBeInTheDocument()
+    expect(api.submitIdr).not.toHaveBeenCalled()
+    expect(submitButton()).toBeEnabled()
+  })
+
+  it('Submit closes the dialog, submits, then refetches and switches to read-only', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    await user.click(within(certifyDialog()).getByRole('button', { name: 'Submit' }))
+    expect(certifyDialog()).not.toBeInTheDocument()
+    expect(api.submitIdr).toHaveBeenCalledTimes(1)
     expect(api.submitIdr).toHaveBeenCalledWith(IDR_ID)
     expect(await screen.findByText(/^Submitted at /)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
     expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
   })
 
-  it('blocks submit while the header has unsaved changes', async () => {
+  it('blocks submit while the header has unsaved changes, without opening the dialog', async () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
     fireEvent.change(screen.getByLabelText('Weather PM'), { target: { value: 'Rainy' } })
     await user.click(submitButton())
     expect(window.alert).toHaveBeenCalledWith('Please save the header before submitting.')
-    expect(window.confirm).not.toHaveBeenCalled()
+    expect(certifyDialog()).not.toBeInTheDocument()
     expect(api.submitIdr).not.toHaveBeenCalled()
   })
 
-  it('shows a submit error and stays editable', async () => {
+  it('shows a submit error under the button and stays editable', async () => {
     api.submitIdr.mockRejectedValueOnce(new Error('IDR must contain at least one report before submission.'))
     const user = userEvent.setup()
     renderPage()
     await ready()
     await user.click(submitButton())
+    await user.click(within(certifyDialog()).getByRole('button', { name: 'Submit' }))
     expect(await screen.findByText('Submit failed: IDR must contain at least one report before submission.'))
       .toBeInTheDocument()
+    expect(certifyDialog()).not.toBeInTheDocument()
     expect(submitButton()).toBeEnabled()
   })
 })
