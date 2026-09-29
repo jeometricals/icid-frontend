@@ -198,8 +198,10 @@ export default function IDRPage() {
     if (!submitFailed) setCertifyOpen(false)
   }
 
+  // Each report type has its own form page; only types with a page can be opened (see isReportTypeAvailable)
   const openReport = (report) => {
-    navigate(`/project/${projectId}/idr/${idrId}/report/${report.report_id}`, { state: { from: location.state?.from } })
+    const routeSegment = { GEN: 'general', SWCB: 'swcb' }[report.report_type] || 'general'
+    navigate(`/project/${projectId}/idr/${idrId}/${routeSegment}/${report.report_id}`, { state: { from: location.state?.from } })
   }
 
   return (

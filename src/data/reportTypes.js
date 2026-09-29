@@ -4,6 +4,7 @@ export const REPORT_TYPES = [
   { code: 'GEN', label: 'General' },
   { code: 'SWR', label: 'Sewer' },
   { code: 'HC', label: 'House Connection' },
+  { code: 'SWCB', label: 'Sidewalk, Curb, Concrete Base' },
   { code: 'WM_1', label: 'Water Main (Sheet 1)' },
   { code: 'WM_2', label: 'Water Main (Sheet 2)' },
   { code: 'WM_3', label: 'Water Main (Sheet 3)' },
@@ -25,7 +26,7 @@ export const REPORT_TYPES = [
 ]
 
 // Types whose form page exists: they can be added to an IDR and opened. Add a code here once its page is built.
-const AVAILABLE_REPORT_TYPES = new Set(['GEN'])
+const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB'])
 
 const LABELS = Object.fromEntries(REPORT_TYPES.map(({ code, label }) => [code, label]))
 

@@ -13,7 +13,7 @@ import * as api from '../../../services/api'
 const IDR_ID = 'idr-1'
 const REPORT_ID = 'rep-gen'
 const IDR_PATH = `/project/HWS0023/idr/${IDR_ID}`
-const REPORT_URL = `${IDR_PATH}/report/${REPORT_ID}`
+const REPORT_URL = `${IDR_PATH}/general/${REPORT_ID}`
 const SAVED_AT = '2026-09-25T14:05:00Z'
 const SAVED_TEXT = `Saved at ${format(new Date(SAVED_AT), 'HH:mm')}`
 const SUBMITTED_AT = '2026-09-25T15:10:00Z'
@@ -127,7 +127,7 @@ function renderPage(from) {
   return render(
     <MemoryRouter initialEntries={[{ pathname: REPORT_URL, state: from ? { from } : null }]}>
       <Routes>
-        <Route path="/project/:projectId/idr/:idrId/report/:reportId" element={<GeneralReportPage />} />
+        <Route path="/project/:projectId/idr/:idrId/general/:reportId" element={<GeneralReportPage />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>

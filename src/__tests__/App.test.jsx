@@ -32,7 +32,7 @@ async function signIn() {
 
 describe('redirect back after login', () => {
   it('returns to the original page, query string included', async () => {
-    window.history.pushState({}, '', '/project/HWS0023/idr/idr-1/report/rep-1?tab=pay')
+    window.history.pushState({}, '', '/project/HWS0023/idr/idr-1/general/rep-1?tab=pay')
     render(<App />)
     expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
 
@@ -40,7 +40,7 @@ describe('redirect back after login', () => {
 
     await vi.waitFor(() =>
       expect(window.location.pathname + window.location.search)
-        .toBe('/project/HWS0023/idr/idr-1/report/rep-1?tab=pay')
+        .toBe('/project/HWS0023/idr/idr-1/general/rep-1?tab=pay')
     )
   })
 

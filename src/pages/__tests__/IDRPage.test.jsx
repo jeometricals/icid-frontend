@@ -302,13 +302,23 @@ describe('IDRPage — reports', () => {
     expect(await screen.findByText("Couldn't delete report: Report not found in this IDR")).toBeInTheDocument()
   })
 
-  it('opens a report at /project/:projectId/idr/:idrId/report/:reportId', async () => {
+  it('opens a General at /project/:projectId/idr/:idrId/general/:reportId', async () => {
     const user = userEvent.setup()
     renderPage('drafts')
     await ready()
     await user.click(screen.getByRole('button', { name: 'Open' }))
-    expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/report/rep-gen`)
+    expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/general/rep-gen`)
     expect(screen.getByTestId('from')).toHaveTextContent('drafts') // carried so the IDR's Back still works later
+  })
+
+  it('opens an SWCB report at /project/:projectId/idr/:idrId/swcb/:reportId', async () => {
+    server = draftIdr({ reports: [report({ report_id: 'rep-swcb', report_type: 'SWCB' })] })
+    const user = userEvent.setup()
+    renderPage('drafts')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/swcb/rep-swcb`)
+    expect(screen.getByTestId('from')).toHaveTextContent('drafts')
   })
 })
 
