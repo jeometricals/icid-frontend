@@ -1,41 +1,66 @@
 /**
  * Concrete Truck & Mix Info (CONC_MIX) addendum, at /project/:projectId/idr/:idrId/conc-mix/:reportId.
- * Same load / Save Draft / read-only flow as the other report pages (useReportForm + ReportPageShell). Its body is a
- * Description of Work plus placeholder cards for the sections that are still to be built.
+ * Same load / Save Draft / read-only flow as the other report pages (useReportForm + ReportPageShell). Its body follows
+ * the DDC template: Location of Use, Mixer Type, the Trucks table, Concrete Specifications, Material Usage and Remarks
+ * (no Description of Work block: the trucks table and its metadata are the description).
  */
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
 import ReportPageShell from '../../components/reports/ReportPageShell'
-import DescriptionSection from '../../components/reports/DescriptionSection'
+import ConcMixLocationOfUse from '../../components/reports/ConcMixLocationOfUse'
+import ConcMixMixerType from '../../components/reports/ConcMixMixerType'
+import ConcMixTrucksTable from '../../components/reports/ConcMixTrucksTable'
+import ConcMixConcreteSpecs from '../../components/reports/ConcMixConcreteSpecs'
+import ConcMixMaterialUsage from '../../components/reports/ConcMixMaterialUsage'
+import CommentsSection from '../../components/reports/CommentsSection'
 
-const DESCRIPTION_SUBHEADING = 'Describe the concrete pour this report covers.'
-
-// The body sections still to be built, shown as placeholder cards in this order
-const PLACEHOLDER_SECTIONS = [
-  'Location of Use',
-  'Mixer Type',
-  'Trucks',
-  'Concrete Specifications',
-  'Material Usage',
-  'Remarks',
-]
+// One blank row of the Trucks table (inspectionSticker is 'Y' | 'N' | 'NA', null until answered)
+const emptyTruck = () => ({
+  truckOrTicketNo: '',
+  inspectionSticker: null,
+  loadSizeCy: '',
+  endBatch: '',
+  mixingRevs: '',
+  startDischTime: '',
+  endDischTime: '',
+  slump: '',
+  airContent: '',
+  concTemp: '',
+  cylinderNumbers: ''
+})
 
 // A blank Concrete Truck & Mix Info report. Only report-specific fields: date, times and weather come from the IDR.
 function emptyFormData() {
   return {
-    description: '',
-    locationOfUse: {},
-    mixerType: '',
+    locationOfUse: { curb: false, sidewalk: false, concreteBase: false, structural: false },
+    mixerType: { type: '', otherLabel: '' },
     trucks: [],
-    concreteSpecs: {},
-    materialUsage: {},
+    concreteSpecs: { classOfConcrete: '', slumpMin: '', slumpMax: '', airMin: '', airMax: '' },
+    materialUsage: {
+      batchReportNo: '',
+      noOfTickets: '',
+      firstTicketNo: '',
+      lastTicketNo: '',
+      quantityDispatched: '',
+      quantityReceived: '',
+      quantityUsed: '',
+      quantityWasted: ''
+    },
     remarks: ''
   }
 }
 
-// This report's saved report_data as form state: defaults for missing keys
+const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+// This report's saved report_data as form state: defaults for missing keys, one level down too, so reports saved by
+// the earlier placeholder page (mixerType: '', locationOfUse: {}, …) and truck rows missing a field load cleanly
 function formDataFromReport(reportData, defaults) {
-  return { ...defaults, ...reportData }
+  const data = { ...defaults, ...reportData }
+  for (const section of ['locationOfUse', 'mixerType', 'concreteSpecs', 'materialUsage']) {
+    data[section] = { ...defaults[section], ...(isObject(data[section]) ? data[section] : {}) }
+  }
+  data.trucks = Array.isArray(data.trucks) ? data.trucks.map(truck => ({ ...emptyTruck(), ...truck })) : []
+  return data
 }
 
 export default function ConcMixReportPage() {
@@ -48,24 +73,63 @@ export default function ConcMixReportPage() {
     emptyFormData,
     formDataFromReport,
   })
-  const { formData, isReadOnly } = form
+  const { formData, isReadOnly, updateForm } = form
+
+  const handleAddTruck = () => {
+    updateForm(prev => ({ ...prev, trucks: [...prev.trucks, emptyTruck()] }))
+  }
+
+  const handleTruckChange = (index, field, value) => {
+    updateForm(prev => ({
+      ...prev,
+      trucks: prev.trucks.map((truck, i) => (i === index ? { ...truck, [field]: value } : truck))
+    }))
+  }
+
+  const handleRemoveTruck = (index) => {
+    updateForm(prev => ({ ...prev, trucks: prev.trucks.filter((_, i) => i !== index) }))
+  }
 
   return (
     <ReportPageShell title="Concrete Truck & Mix Info" form={form}>
-      <DescriptionSection
-        value={formData.description}
-        onChange={(value) => form.handleInputChange('description', value)}
-        subheading={DESCRIPTION_SUBHEADING}
+      <ConcMixLocationOfUse
+        value={formData.locationOfUse}
+        onChange={(key, checked) => form.handleNestedInputChange('locationOfUse', key, checked)}
         disabled={isReadOnly}
       />
 
-      {/* Placeholders until the Concrete Truck & Mix Info sections are built */}
-      {PLACEHOLDER_SECTIONS.map(title => (
-        <div key={title} className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">{title}</h3>
-          <p className="text-gray-500 italic">{title} — coming in Chunk C1b.</p>
-        </div>
-      ))}
+      <ConcMixMixerType
+        value={formData.mixerType}
+        onChange={(next) => form.handleInputChange('mixerType', next)}
+        disabled={isReadOnly}
+      />
+
+      <ConcMixTrucksTable
+        trucks={formData.trucks}
+        onAddTruck={handleAddTruck}
+        onTruckChange={handleTruckChange}
+        onRemoveTruck={handleRemoveTruck}
+        disabled={isReadOnly}
+      />
+
+      <ConcMixConcreteSpecs
+        value={formData.concreteSpecs}
+        onChange={(field, value) => form.handleNestedInputChange('concreteSpecs', field, value)}
+        disabled={isReadOnly}
+      />
+
+      <ConcMixMaterialUsage
+        value={formData.materialUsage}
+        onChange={(field, value) => form.handleNestedInputChange('materialUsage', field, value)}
+        disabled={isReadOnly}
+      />
+
+      <CommentsSection
+        heading="Remarks"
+        value={formData.remarks}
+        onChange={(value) => form.handleInputChange('remarks', value)}
+        disabled={isReadOnly}
+      />
     </ReportPageShell>
   )
 }
