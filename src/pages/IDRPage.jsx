@@ -188,10 +188,14 @@ export default function IDRPage() {
     setCertifyOpen(true)
   }
 
-  const confirmSubmit = () => {
-    setCertifyOpen(false)
-    runAction('submit', () => submitIdr(idrId),
-      message => setActionError({ scope: 'submit', message: `Submit failed: ${message}` }))
+  // The dialog stays open while submitting (showing "Working...") and on failure (showing the error)
+  const confirmSubmit = async () => {
+    let submitFailed = false
+    await runAction('submit', () => submitIdr(idrId), message => {
+      submitFailed = true
+      setActionError({ scope: 'submit', message: `Submit failed: ${message}` })
+    })
+    if (!submitFailed) setCertifyOpen(false)
   }
 
   const openReport = (report) => {
@@ -319,6 +323,7 @@ export default function IDRPage() {
             message={CERTIFICATION_STATEMENT}
             confirmLabel="Submit"
             cancelLabel="Cancel"
+            confirmClassName="btn-primary"
             onConfirm={confirmSubmit}
             onCancel={() => setCertifyOpen(false)}
             busy={busyAction === 'submit'}

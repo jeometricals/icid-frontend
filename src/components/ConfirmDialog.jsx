@@ -3,13 +3,15 @@ import Modal from './Modal'
 /**
  * Yes/No confirmation for a destructive action, e.g. "Delete this attachment?". The caller runs the action:
  * it sets busy while it works (buttons disabled, dialog can't be dismissed) and error if it failed (shown above the buttons).
- * Props: title, message, confirmLabel (default 'Yes'), cancelLabel (default 'No'), onConfirm, onCancel, busy, error.
+ * Props: title, message, confirmLabel (default 'Yes'), cancelLabel (default 'No'), confirmClassName (default 'btn-danger';
+ * pass 'btn-primary' for a non-destructive confirm), onConfirm, onCancel, busy, error.
  */
 export default function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Yes',
   cancelLabel = 'No',
+  confirmClassName = 'btn-danger',
   onConfirm,
   onCancel,
   busy = false,
@@ -25,7 +27,7 @@ export default function ConfirmDialog({
           <button type="button" onClick={onCancel} disabled={busy} className="btn-secondary">
             {cancelLabel}
           </button>
-          <button type="button" onClick={onConfirm} disabled={busy} className="btn-danger">
+          <button type="button" onClick={onConfirm} disabled={busy} className={confirmClassName}>
             {busy ? 'Working...' : confirmLabel}
           </button>
         </>

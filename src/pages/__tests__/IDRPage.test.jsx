@@ -358,15 +358,25 @@ describe('IDRPage — submit', () => {
     expect(submitButton()).toBeEnabled()
   })
 
-  it('Submit closes the dialog, submits, then refetches and switches to read-only', async () => {
+  it('Submit keeps the dialog open showing Working... until the submit resolves, then closes it and goes read-only', async () => {
+    let finishSubmit
+    const submit = api.submitIdr.getMockImplementation()
+    api.submitIdr.mockImplementationOnce(() => new Promise(resolve => { finishSubmit = () => resolve(submit()) }))
     const user = userEvent.setup()
     renderPage()
     await ready()
     await user.click(submitButton())
     await user.click(within(certifyDialog()).getByRole('button', { name: 'Submit' }))
-    expect(certifyDialog()).not.toBeInTheDocument()
+
     expect(api.submitIdr).toHaveBeenCalledTimes(1)
     expect(api.submitIdr).toHaveBeenCalledWith(IDR_ID)
+    const dialog = certifyDialog()
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Working...' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled()
+
+    finishSubmit()
+    await waitFor(() => expect(certifyDialog()).not.toBeInTheDocument())
     expect(await screen.findByText(/^Submitted at /)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
     expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
@@ -383,16 +393,22 @@ describe('IDRPage — submit', () => {
     expect(api.submitIdr).not.toHaveBeenCalled()
   })
 
-  it('shows a submit error under the button and stays editable', async () => {
+  it('on a submit error keeps the dialog open with the error inside it; after Cancel the error stays under the button', async () => {
+    const ERROR = 'Submit failed: IDR must contain at least one report before submission.'
     api.submitIdr.mockRejectedValueOnce(new Error('IDR must contain at least one report before submission.'))
     const user = userEvent.setup()
     renderPage()
     await ready()
     await user.click(submitButton())
     await user.click(within(certifyDialog()).getByRole('button', { name: 'Submit' }))
-    expect(await screen.findByText('Submit failed: IDR must contain at least one report before submission.'))
-      .toBeInTheDocument()
+
+    const dialog = certifyDialog()
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(ERROR)
+    expect(within(dialog).getByRole('button', { name: 'Submit' })).toBeEnabled()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(certifyDialog()).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(ERROR)
     expect(submitButton()).toBeEnabled()
   })
 })
