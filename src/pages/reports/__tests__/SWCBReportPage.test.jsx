@@ -167,13 +167,38 @@ describe('SWCBReportPage — sections', () => {
     expect(screen.getByText(/Nature of Work, Hot\/Cold weather Protection and Details\./)).toBeInTheDocument()
   })
 
-  it('shows the Detailed Activity and Inspection Matrix placeholders', async () => {
+  it('shows the Detailed Activity table and the Inspection Matrix (no placeholders left)', async () => {
     renderPage()
     await loaded()
     expect(screen.getByRole('heading', { name: 'Detailed Activity' })).toBeInTheDocument()
-    expect(screen.getByText(/Activity table \(Excavation \/ Form-Prep \/ Pour/)).toHaveClass('italic')
+    expect(screen.getByLabelText('Excavation From Station')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Inspection Matrix' })).toBeInTheDocument()
-    expect(screen.getByText(/Inspection matrix \(7 lines × Base\/Sidewalk\/Curb/)).toHaveClass('italic')
+    expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Base: Y' })).toBeInTheDocument()
+    expect(screen.queryByText(/coming in Chunk B3/)).not.toBeInTheDocument()
+  })
+
+  it('fills the activity table and matrix from the saved report_data', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: {
+        ...swcbData('Poured curb'),
+        inspectionMatrix: {
+          subgradeCompacted: { base: 'Y', sidewalk: 'N', curb: 'NA' },
+          rebarInstalled: { base: null, sidewalk: 'Y', curb: null },
+        },
+      },
+    }))
+    renderPage()
+    await loaded()
+    expect(screen.getByLabelText('Pour From Station')).toHaveValue('10+00')
+    expect(screen.getByLabelText('Pour To Station')).toHaveValue('10+40')
+    expect(screen.getByLabelText('Pour Remarks')).toHaveValue('Curb pour')
+    expect(screen.getByLabelText('Excavation From Station')).toHaveValue('')
+    expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Base: Y' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Sidewalk: N' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Curb: N/A' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Rebar Installed.*, Sidewalk: Y$/ })).toBeChecked()
+    // A line missing from the saved data loads unanswered
+    expect(screen.getByRole('radio', { name: 'Compaction Test Taken, Base: Y' })).not.toBeChecked()
   })
 
   it('renders the shared sections and the attachments for this report', async () => {
@@ -216,6 +241,29 @@ describe('SWCBReportPage — Save Draft', () => {
     expect(saved).toMatchObject({ additionalWorkforce: [], additionalEquipment: [], comments: '' })
   })
 
+  it('saves what was typed into the activity table and picked in the matrix', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.type(screen.getByLabelText('Excavation From Station'), '9+50')
+    await user.type(screen.getByLabelText('Form / Prep Remarks'), 'Forms set')
+    await user.click(screen.getByRole('radio', { name: 'Curing Compound Applied, Curb: Y' }))
+    await user.click(screen.getByRole('radio', { name: 'Compaction Test Taken, Base: N/A' }))
+    expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument()
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    const saved = api.saveReport.mock.calls[0][2]
+    expect(saved.activity).toEqual({
+      excavation: { fromStation: '9+50', toStation: '', remarks: '' },
+      formPrep: { fromStation: '', toStation: '', remarks: 'Forms set' },
+      pour: { fromStation: '10+00', toStation: '10+40', remarks: 'Curb pour' },
+    })
+    expect(saved.inspectionMatrix.curingCompoundApplied).toEqual({ base: null, sidewalk: null, curb: 'Y' })
+    expect(saved.inspectionMatrix.compactionTestTaken).toEqual({ base: 'NA', sidewalk: null, curb: null })
+    expect(saved.inspectionMatrix.subgradeCompacted).toEqual({ base: null, sidewalk: null, curb: null })
+  })
+
   it('opens a never-edited report (empty report_data) as a blank form that saves the full SWCB shape', async () => {
     api.getIdr.mockResolvedValue(parentIdr({ reportData: {} }))
     const user = userEvent.setup()
@@ -243,6 +291,8 @@ describe('SWCBReportPage — read-only', () => {
     expect(screen.getByText(SUBMITTED_TEXT)).toBeInTheDocument()
     expect(descriptionBox()).toBeDisabled()
     expect(screen.getByRole('button', { name: /add item/i })).toBeDisabled()
+    expect(screen.getByLabelText('Pour From Station')).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Base: Y' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('attachments-section')).toHaveAttribute('data-submitted', 'true')
   })

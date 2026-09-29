@@ -2,7 +2,7 @@
  * Sidewalk, Curb, Concrete Base (SWCB) report inside an IDR, at /project/:projectId/idr/:idrId/swcb/:reportId.
  * Same load / Save Draft / read-only flow as the General report: the report_data is the form, the IDR's date, times
  * and weather show as a read-only context line, and a submitted IDR (including a 409 mid-edit) locks the form.
- * The Detailed Activity table and Inspection Matrix are placeholders until their components are built.
+ * On top of the shared sections it has the SWCB Detailed Activity table and Inspection Matrix.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -18,6 +18,8 @@ import WorkforceSection from '../../components/reports/WorkforceSection'
 import EquipmentSection from '../../components/reports/EquipmentSection'
 import SafetyChecklistSection from '../../components/reports/SafetyChecklistSection'
 import CommentsSection from '../../components/reports/CommentsSection'
+import SWCBActivityTable from '../../components/reports/SWCBActivityTable'
+import SWCBInspectionMatrix from '../../components/reports/SWCBInspectionMatrix'
 import { formDataFromReportData, sharedSectionDefaults } from '../../lib/reportData'
 
 const SUBMITTED_MID_EDIT =
@@ -161,6 +163,26 @@ export default function SWCBReportPage() {
       safetyChecks: {
         ...prev.safetyChecks,
         [field]: value
+      }
+    }))
+  }
+
+  const handleActivityChange = (row, field, value) => {
+    updateForm(prev => ({
+      ...prev,
+      activity: {
+        ...prev.activity,
+        [row]: { ...prev.activity[row], [field]: value }
+      }
+    }))
+  }
+
+  const handleMatrixChange = (rowKey, column, value) => {
+    updateForm(prev => ({
+      ...prev,
+      inspectionMatrix: {
+        ...prev.inspectionMatrix,
+        [rowKey]: { ...prev.inspectionMatrix[rowKey], [column]: value }
       }
     }))
   }
@@ -390,21 +412,11 @@ export default function SWCBReportPage() {
           </div>
         </div>
 
-        {/* Detailed Activity (placeholder until the activity table is built) */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">Detailed Activity</h3>
-          <p className="text-gray-500 italic">
-            Activity table (Excavation / Form-Prep / Pour × From Station / To Station / Remarks) — coming in Chunk B3.
-          </p>
-        </div>
+        {/* Detailed Activity */}
+        <SWCBActivityTable activity={formData.activity} onChange={handleActivityChange} disabled={isReadOnly} />
 
-        {/* Inspection Matrix (placeholder until the matrix is built) */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">Inspection Matrix</h3>
-          <p className="text-gray-500 italic">
-            Inspection matrix (7 lines × Base/Sidewalk/Curb Y/N/NA) — coming in Chunk B3.
-          </p>
-        </div>
+        {/* Inspection Matrix */}
+        <SWCBInspectionMatrix matrix={formData.inspectionMatrix} onChange={handleMatrixChange} disabled={isReadOnly} />
 
         {/* Pay Items */}
         <PayItemsSection payItems={formData.payItems} onAddItem={addPayItem} onItemChange={handlePayItemChange} disabled={isReadOnly} />
