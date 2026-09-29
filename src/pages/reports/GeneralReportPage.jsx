@@ -14,6 +14,11 @@ import SubmittedBanner from '../../components/SubmittedBanner'
 import SaveStatusText from '../../components/SaveStatusText'
 import IdrContextLine from '../../components/IdrContextLine'
 import AttachmentsSection from '../../components/AttachmentsSection'
+import PayItemsSection from '../../components/reports/PayItemsSection'
+import WorkforceSection from '../../components/reports/WorkforceSection'
+import EquipmentSection from '../../components/reports/EquipmentSection'
+import SafetyChecklistSection from '../../components/reports/SafetyChecklistSection'
+import CommentsSection from '../../components/reports/CommentsSection'
 
 const SUBMITTED_MID_EDIT =
   'This IDR was submitted while you were editing. Your unsaved changes could not be saved. Reloading...'
@@ -180,7 +185,7 @@ export default function GeneralReportPage() {
   const addPayItem = () => {
     updateForm(prev => ({
       ...prev,
-      payItems: [...prev.payItems, { itemNo: '', budgetCode: '', payQuantity: '', quantityChk: '', description: '' }]
+      payItems: [...prev.payItems, { itemNo: '', budgetCode: '', payQuantity: '', description: '' }]
     }))
   }
 
@@ -369,213 +374,22 @@ export default function GeneralReportPage() {
         </div>
 
         {/* Pay Items */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="form-section-title mb-0">Pay Items</h3>
-            <button onClick={addPayItem} className="btn-secondary text-sm">
-              Add Item
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item No.</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget Code</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pay Quantity</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity CHK</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {formData.payItems.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                      No pay items added. Click "Add Item" to begin.
-                    </td>
-                  </tr>
-                ) : (
-                  formData.payItems.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Item No."
-                          value={item.itemNo}
-                          onChange={(e) => handlePayItemChange(index, 'itemNo', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Code"
-                          value={item.budgetCode}
-                          onChange={(e) => handlePayItemChange(index, 'budgetCode', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Qty"
-                          value={item.payQuantity}
-                          onChange={(e) => handlePayItemChange(index, 'payQuantity', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Initials"
-                          value={item.quantityChk}
-                          onChange={(e) => handlePayItemChange(index, 'quantityChk', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="text"
-                          className="input-field"
-                          placeholder="Description"
-                          value={item.description}
-                          onChange={(e) => handlePayItemChange(index, 'description', e.target.value)}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <PayItemsSection payItems={formData.payItems} onAddItem={addPayItem} onItemChange={handlePayItemChange} disabled={isReadOnly} />
 
         {/* Workforce and Equipment */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="form-section-title">Workforce and Equipment</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Workforce */}
-            <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-3">Work Force</h4>
-              <div className="space-y-3">
-                {['Superintendent', 'Foreman', 'Operator', 'Flagger'].map((role) => (
-                  <div key={role} className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
-                      <span className="text-sm font-medium text-gray-700">{role}</span>
-                    </div>
-                    <input
-                      type="number"
-                      className="input-field"
-                      placeholder="No."
-                      value={formData.workforce[role.toLowerCase()]}
-                      onChange={(e) => handleNestedInputChange('workforce', role.toLowerCase(), e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Equipment */}
-            <div>
-              <h4 className="text-md font-semibold text-gray-900 mb-3">Equipment</h4>
-              <div className="space-y-3">
-                {[
-                  { label: 'Front End Loader', key: 'frontEndLoader' },
-                  { label: 'Backhoe', key: 'backhoe' },
-                  { label: 'Truck (Dump)', key: 'truckDump' },
-                  { label: 'Excavator', key: 'excavator' }
-                ].map((equip) => (
-                  <div key={equip.key} className="grid grid-cols-3 gap-2">
-                    <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
-                      <span className="text-sm font-medium text-gray-700">{equip.label}</span>
-                    </div>
-                    <input
-                      type="text"
-                      className="input-field"
-                      placeholder="Model/Size"
-                      value={formData.equipment[equip.key].model}
-                      onChange={(e) => handleNestedInputChange('equipment', equip.key, { ...formData.equipment[equip.key], model: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      className="input-field"
-                      placeholder="No."
-                      value={formData.equipment[equip.key].number}
-                      onChange={(e) => handleNestedInputChange('equipment', equip.key, { ...formData.equipment[equip.key], number: e.target.value })}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <WorkforceSection workforce={formData.workforce} onChange={(role, value) => handleNestedInputChange('workforce', role, value)} disabled={isReadOnly} />
+            <EquipmentSection equipment={formData.equipment} onChange={(key, updated) => handleNestedInputChange('equipment', key, updated)} disabled={isReadOnly} />
           </div>
         </div>
 
         {/* Safety Checks */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">End of the Day MPT/Safety Check List</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-1/2">Item</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Y</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">N</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {[
-                  { label: 'Plastic Barrels', key: 'plasticBarrels' },
-                  { label: 'Pedestrian Barricades', key: 'pedestrianBarricades' },
-                  { label: 'Timber Curbs', key: 'timberCurbs' },
-                  { label: 'Timber/Breakaway Barricades', key: 'timberBreakawayBarricades' },
-                  { label: 'General Safety Conditions', key: 'generalSafety' },
-                  { label: 'Local Emergency Access', key: 'localEmergencyAccess' },
-                  { label: 'Fencing', key: 'fencing' },
-                  { label: 'Plates', key: 'plates' },
-                  { label: 'Arrow Board', key: 'arrowBoard' },
-                  { label: 'Site Cleaned and Secured', key: 'siteCleaned' }
-                ].map((item) => (
-                  <tr key={item.key}>
-                    <td className="px-4 py-3 text-sm text-gray-900">{item.label}</td>
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="radio"
-                        name={item.key}
-                        checked={formData.safetyChecks[item.key] === true}
-                        onChange={() => handleSafetyCheckChange(item.key, true)}
-                        className="h-4 w-4 text-construction-600 focus:ring-construction-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="radio"
-                        name={item.key}
-                        checked={formData.safetyChecks[item.key] === false}
-                        onChange={() => handleSafetyCheckChange(item.key, false)}
-                        className="h-4 w-4 text-construction-600 focus:ring-construction-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input type="text" className="input-field" placeholder="Remarks" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <SafetyChecklistSection safetyChecks={formData.safetyChecks} onChange={handleSafetyCheckChange} disabled={isReadOnly} />
 
         {/* Comments */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">Comments, Visitors, Other Work / Sketches</h3>
-          <textarea
-            className="input-field min-h-[150px]"
-            value={formData.comments}
-            onChange={(e) => handleInputChange('comments', e.target.value)}
-            placeholder="Enter any additional comments, visitor information, or notes about other work..."
-          />
-        </div>
+        <CommentsSection value={formData.comments} onChange={(v) => handleInputChange('comments', v)} disabled={isReadOnly} />
         </fieldset>
 
         {/* Outside the fieldset so View still works on a submitted IDR; an auto-generated General has no attachments */}

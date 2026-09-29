@@ -31,7 +31,7 @@ function generalData(description) {
   return {
     date: '2026-09-20', sheetNo: 'S-7', workActivityStart: '07:00', workActivityEnd: '', inspectorTimeStart: '',
     inspectorTimeEnd: '', dailyTempLow: '', dailyTempHigh: '', weatherAM: 'Clear', weatherPM: '',
-    description, payItems: [{ itemNo: '4.01', budgetCode: '', payQuantity: '12', quantityChk: '', description: '' }],
+    description, payItems: [{ itemNo: '4.01', budgetCode: '', payQuantity: '12', description: '' }],
     workforce: { superintendent: '', foreman: '2', operator: '', flagger: '' },
     equipment: {
       frontEndLoader: { model: '', number: '' }, backhoe: { model: '', number: '' },
@@ -439,7 +439,7 @@ describe('Save Draft', () => {
 
     await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
     expect(api.saveReport.mock.calls[0][2].payItems).toEqual([
-      { itemNo: '4.01', budgetCode: '', payQuantity: '12', quantityChk: '', description: '' },
+      { itemNo: '4.01', budgetCode: '', payQuantity: '12', description: '' },
     ])
   })
 })
