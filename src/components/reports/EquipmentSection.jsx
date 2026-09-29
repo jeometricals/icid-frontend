@@ -5,8 +5,8 @@
  * additionalEquipment ([{ label, model, number }]), onAddEquipment(label), onChangeAdditional(index, field, value),
  * onRemoveAdditional(index), disabled (makes the inputs natively disabled).
  */
-import { X } from 'lucide-react'
 import AddRowPicker, { OTHER_OPTION } from './AddRowPicker'
+import RemoveRowButton from './RemoveRowButton'
 
 const EQUIPMENT_EXTRAS = [
   'Crane', 'Paving Machine', 'AC Distributor', 'Sweepers', 'Trailers',
@@ -77,15 +77,7 @@ export default function EquipmentSection({
                 disabled={disabled}
                 onChange={(e) => onChangeAdditional(index, 'number', e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => onRemoveAdditional(index)}
-                disabled={disabled}
-                aria-label={`Remove ${row.label}`}
-                className="text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <RemoveRowButton onClick={() => onRemoveAdditional(index)} disabled={disabled} ariaLabel={`Remove ${row.label}`} />
             </div>
           </div>
         ))}

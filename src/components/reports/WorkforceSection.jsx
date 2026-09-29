@@ -4,8 +4,8 @@
  * laborers, flaggers }), onChange(role, value), additionalWorkforce ([{ label, count }]), onAddTrade(label),
  * onChangeAdditional(index, field, value), onRemoveAdditional(index), disabled (makes the inputs natively disabled).
  */
-import { X } from 'lucide-react'
 import AddRowPicker, { OTHER_OPTION } from './AddRowPicker'
+import RemoveRowButton from './RemoveRowButton'
 
 const WORKFORCE_EXTRAS = ['Chauffeurs', 'Surveyors', 'Masons', 'Carpenters', 'Timbermen', 'Teamsters', OTHER_OPTION]
 
@@ -51,15 +51,7 @@ export default function WorkforceSection({
                 disabled={disabled}
                 onChange={(e) => onChangeAdditional(index, 'count', e.target.value)}
               />
-              <button
-                type="button"
-                onClick={() => onRemoveAdditional(index)}
-                disabled={disabled}
-                aria-label={`Remove ${row.label}`}
-                className="text-gray-400 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <RemoveRowButton onClick={() => onRemoveAdditional(index)} disabled={disabled} ariaLabel={`Remove ${row.label}`} />
             </div>
           </div>
         ))}

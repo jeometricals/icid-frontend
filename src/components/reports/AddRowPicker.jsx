@@ -1,6 +1,7 @@
 /**
  * A dropdown for adding an extra row to a report section (a trade, a piece of equipment). Picking an option calls
- * onPick(label) right away; picking "Other (specify)" reveals a label input and an Add button instead.
+ * onPick(label) right away; picking "Other (specify)" reveals a label input and an Add button instead (disabled while
+ * the label is empty or matches a used label, ignoring case).
  * Props: options (strings), usedLabels (hidden from the list, except "Other (specify)"), onPick(label), placeholder, disabled.
  */
 import { useState } from 'react'
@@ -12,6 +13,10 @@ export default function AddRowPicker({ options, usedLabels = [], onPick, placeho
   const [otherLabel, setOtherLabel] = useState('')
 
   const available = options.filter(option => option === OTHER_OPTION || !usedLabels.includes(option))
+  // An "Other" label can be added only if it's non-empty and not already used (ignoring case)
+  const trimmedOther = otherLabel.trim()
+  const canAddOther =
+    trimmedOther !== '' && !usedLabels.some(label => label.toLowerCase() === trimmedOther.toLowerCase())
 
   const handleSelect = (e) => {
     const option = e.target.value
@@ -25,9 +30,8 @@ export default function AddRowPicker({ options, usedLabels = [], onPick, placeho
   }
 
   const addOther = () => {
-    const label = otherLabel.trim()
-    if (!label) return
-    onPick(label)
+    if (!canAddOther) return
+    onPick(trimmedOther)
     setSpecifying(false)
     setOtherLabel('')
   }
@@ -56,7 +60,7 @@ export default function AddRowPicker({ options, usedLabels = [], onPick, placeho
             onChange={(e) => setOtherLabel(e.target.value)}
             disabled={disabled}
           />
-          <button type="button" onClick={addOther} disabled={disabled || !otherLabel.trim()} className="btn-secondary text-sm">
+          <button type="button" onClick={addOther} disabled={disabled || !canAddOther} className="btn-secondary text-sm">
             Add
           </button>
         </>

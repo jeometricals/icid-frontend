@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -510,6 +510,81 @@ describe('unsaved changes', () => {
 
     finishSave({ report_id: REPORT_ID, updated_at: SAVED_AT })
     expect(await screen.findByText(/unsaved changes/i)).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Trades and equipment added beyond the defaults
+// ---------------------------------------------------------------------------
+
+describe('added trades and equipment', () => {
+  // An added row is the grid holding its label; its inputs sit in the same grid
+  const addedRow = (label) => screen.getByText(label, { selector: 'span' }).closest('.grid')
+  const savedData = () => api.saveReport.mock.calls[0][2]
+
+  it('adding a trade shows a row with its label and a No. input', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Add trade' }), 'Masons')
+
+    const row = addedRow('Masons')
+    expect(within(row).getByPlaceholderText('No.')).toHaveValue(null)
+    expect(within(row).getByRole('button', { name: 'Remove Masons' })).toBeInTheDocument()
+  })
+
+  it("saves an added trade's count with the next Save Draft", async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Add trade' }), 'Masons')
+    await user.type(within(addedRow('Masons')).getByPlaceholderText('No.'), '4')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().additionalWorkforce).toEqual([{ label: 'Masons', count: '4' }])
+  })
+
+  it('the × button removes an added trade, and it is not saved', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Add trade' }), 'Masons')
+    await user.click(screen.getByRole('button', { name: 'Remove Masons' }))
+
+    expect(screen.queryByText('Masons', { selector: 'span' })).not.toBeInTheDocument()
+    await user.click(saveButton())
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().additionalWorkforce).toEqual([])
+  })
+
+  it('adds equipment, saves its Model/Size, and the × button removes it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Add equipment' }), 'Crane')
+    await user.type(within(addedRow('Crane')).getByPlaceholderText('Model/Size'), 'Terex RT670')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalledTimes(1))
+    expect(savedData().additionalEquipment).toEqual([{ label: 'Crane', model: 'Terex RT670', number: '' }])
+
+    await user.click(screen.getByRole('button', { name: 'Remove Crane' }))
+    expect(screen.queryByText('Crane', { selector: 'span' })).not.toBeInTheDocument()
+  })
+
+  it('loads added rows saved in report_data', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: {
+        ...generalData('Poured curb'),
+        additionalWorkforce: [{ label: 'Ironworkers', count: '3' }],
+        additionalEquipment: [{ label: 'Crane', model: 'Terex', number: '1' }],
+      },
+    }))
+    renderPage()
+    await loaded()
+    expect(within(addedRow('Ironworkers')).getByPlaceholderText('No.')).toHaveValue(3)
+    expect(within(addedRow('Crane')).getByPlaceholderText('Model/Size')).toHaveValue('Terex')
   })
 })
 
