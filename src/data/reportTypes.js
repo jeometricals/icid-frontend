@@ -21,13 +21,13 @@ export const REPORT_TYPES = [
   { code: 'SKETCH', label: 'Sketch Sheet' },
   { code: 'CONT', label: 'Report Continuation' },
   { code: 'CONC_MIX', label: 'Concrete Truck & Mix Info', route: 'conc-mix' },
-  { code: 'CONC_CYL', label: 'Concrete Cylinder Data' },
+  { code: 'CONC_CYL', label: 'Concrete Cylinder Data', route: 'conc-cyl' },
   { code: 'FIELD_MEMO', label: 'Field Memo' },
   { code: 'FIELD_ORDER', label: 'Field Order' },
 ]
 
 // Types whose form page exists: they can be added to an IDR and opened. Add a code here once its page is built.
-const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'CONC_MIX'])
+const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'CONC_MIX', 'CONC_CYL'])
 
 // Types that are addendums by nature, as the backend's ADDENDUM_TYPES lists them (DSP can be either, so it's absent).
 // They're added from their parent report's page, not from the IDR's top-level Add report control.

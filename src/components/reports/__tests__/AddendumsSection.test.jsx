@@ -79,8 +79,10 @@ describe('AddendumsSection — list', () => {
   })
 
   it("disables Open for an addendum type whose page isn't built yet", () => {
-    renderSection()
-    expect(screen.getByRole('button', { name: 'Open Concrete Cylinder Data' })).toBeDisabled()
+    const sketch = { report_id: 'rep-sketch', report_type: 'SKETCH', is_addendum: true, parent_report_id: REPORT_ID }
+    renderSection({ reports: [main, mix, cylinders, sketch] })
+    expect(screen.getByRole('button', { name: 'Open Sketch Sheet' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Open Concrete Cylinder Data' })).toBeEnabled()
   })
 })
 
@@ -89,7 +91,8 @@ describe('AddendumsSection — add', () => {
     renderSection()
     await userEvent.setup().click(screen.getByRole('button', { name: /add addendum/i }))
     const picker = screen.getByRole('group', { name: 'Addendum types' })
-    expect(within(picker).getAllByRole('button').map(b => b.textContent)).toEqual(['Concrete Truck & Mix Info'])
+    expect(within(picker).getAllByRole('button').map(b => b.textContent))
+      .toEqual(['Concrete Truck & Mix Info', 'Concrete Cylinder Data'])
   })
 
   it('adds the picked type as an addendum of this report, then opens it', async () => {

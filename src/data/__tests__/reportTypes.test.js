@@ -28,6 +28,7 @@ describe('reportTypes', () => {
     expect(reportTypeRoute('GEN')).toBe('general')
     expect(reportTypeRoute('SWCB')).toBe('swcb')
     expect(reportTypeRoute('CONC_MIX')).toBe('conc-mix')
+    expect(reportTypeRoute('CONC_CYL')).toBe('conc-cyl')
     expect(reportTypeRoute('SWR')).toBeUndefined()
     expect(reportTypeRoute('NEW_TYPE')).toBeUndefined()
   })
@@ -36,8 +37,8 @@ describe('reportTypes', () => {
     expect(REPORT_TYPES.filter(t => t.route).map(t => t.code)).toEqual(BACKEND_ENUM.filter(isReportTypeAvailable))
   })
 
-  it('has only General, SWCB and Concrete Truck & Mix Info available for now', () => {
-    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'CONC_MIX'])
+  it('has only General, SWCB, Concrete Truck & Mix Info and Concrete Cylinder Data available for now', () => {
+    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'CONC_MIX', 'CONC_CYL'])
   })
 
   it("marks the backend's addendum types (not DSP, which can be either)", () => {
