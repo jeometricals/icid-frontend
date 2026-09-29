@@ -27,6 +27,20 @@ async function signIn() {
 }
 
 // ---------------------------------------------------------------------------
+// Legacy report URLs
+// ---------------------------------------------------------------------------
+
+describe('legacy /report/ URLs', () => {
+  it('redirect to the General page for the same project, IDR and report', async () => {
+    window.history.pushState({}, '', '/project/HWS0023/idr/idr-1/report/rep-xyz')
+    render(<App />)
+    await signIn()
+
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/project/HWS0023/idr/idr-1/general/rep-xyz'))
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Redirect back after login (refresh on a protected page lands on /login first)
 // ---------------------------------------------------------------------------
 

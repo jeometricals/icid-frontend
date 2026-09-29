@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { REPORT_TYPES, reportTypeLabel, isReportTypeAvailable } from '../reportTypes'
+import { REPORT_TYPES, reportTypeLabel, reportTypeRoute, isReportTypeAvailable } from '../reportTypes'
 
 // The backend's ReportType enum, in order
 const BACKEND_ENUM = [
@@ -22,6 +22,17 @@ describe('reportTypes', () => {
 
   it('shows an unknown code as-is', () => {
     expect(reportTypeLabel('NEW_TYPE')).toBe('NEW_TYPE')
+  })
+
+  it('gives each type with a page its URL segment, and none to types without one', () => {
+    expect(reportTypeRoute('GEN')).toBe('general')
+    expect(reportTypeRoute('SWCB')).toBe('swcb')
+    expect(reportTypeRoute('SWR')).toBeUndefined()
+    expect(reportTypeRoute('NEW_TYPE')).toBeUndefined()
+  })
+
+  it('has a route for exactly the available types', () => {
+    expect(REPORT_TYPES.filter(t => t.route).map(t => t.code)).toEqual(BACKEND_ENUM.filter(isReportTypeAvailable))
   })
 
   it('has only General and SWCB available for now', () => {

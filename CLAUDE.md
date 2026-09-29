@@ -13,12 +13,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 ## Folder structure
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard). One page per file.
-- `src/pages/reports/` — inspection report form pages (currently General).
+- `src/pages/reports/` — inspection report form pages (General, SWCB).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
 - `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
   still get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. (Contains legacy `supabase.js` — see Known technical debt.)
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers used by all report pages). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`).
 - `src/components/` — shared UI components. Doesn't exist yet; create it the first time JSX needs sharing.

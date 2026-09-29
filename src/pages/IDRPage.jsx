@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
-import { reportTypeLabel } from '../data/reportTypes'
+import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
 import IdrHeaderForm from '../components/IdrHeaderForm'
 import IdrReportRow from '../components/IdrReportRow'
 import AddReportControl from '../components/AddReportControl'
@@ -200,8 +200,8 @@ export default function IDRPage() {
 
   // Each report type has its own form page; only types with a page can be opened (see isReportTypeAvailable)
   const openReport = (report) => {
-    const routeSegment = { GEN: 'general', SWCB: 'swcb' }[report.report_type] || 'general'
-    navigate(`/project/${projectId}/idr/${idrId}/${routeSegment}/${report.report_id}`, { state: { from: location.state?.from } })
+    const segment = reportTypeRoute(report.report_type) || 'general'
+    navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, { state: { from: location.state?.from } })
   }
 
   return (

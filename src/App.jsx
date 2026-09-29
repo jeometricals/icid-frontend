@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 // Pages
@@ -33,6 +33,12 @@ const ProtectedRoute = ({ children }) => {
   }
 
   return children
+}
+
+// Report pages used to live at .../report/:reportId, and every one of them was a General
+function LegacyReportRedirect() {
+  const { projectId, idrId, reportId } = useParams()
+  return <Navigate to={`/project/${projectId}/idr/${idrId}/general/${reportId}`} replace />
 }
 
 function AppRoutes() {
@@ -95,6 +101,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/project/:projectId/idr/:idrId/report/:reportId" element={<LegacyReportRedirect />} />
       <Route path="/" element={<Navigate to="/projects" replace />} />
       <Route path="*" element={<Navigate to="/projects" replace />} />
     </Routes>

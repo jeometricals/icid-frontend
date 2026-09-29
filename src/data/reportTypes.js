@@ -1,10 +1,11 @@
 // Report types as the backend names them (ReportType enum codes), in enum order, with their display names.
+// Types with a form page also carry its URL segment (route), as in /project/:projectId/idr/:idrId/<route>/:reportId.
 
 export const REPORT_TYPES = [
-  { code: 'GEN', label: 'General' },
+  { code: 'GEN', label: 'General', route: 'general' },
   { code: 'SWR', label: 'Sewer' },
   { code: 'HC', label: 'House Connection' },
-  { code: 'SWCB', label: 'Sidewalk, Curb, Concrete Base' },
+  { code: 'SWCB', label: 'Sidewalk, Curb, Concrete Base', route: 'swcb' },
   { code: 'WM_1', label: 'Water Main (Sheet 1)' },
   { code: 'WM_2', label: 'Water Main (Sheet 2)' },
   { code: 'WM_3', label: 'Water Main (Sheet 3)' },
@@ -33,6 +34,11 @@ const LABELS = Object.fromEntries(REPORT_TYPES.map(({ code, label }) => [code, l
 /** Display name for a report type code, e.g. 'GEN' → 'General'; unknown codes show as-is. */
 export function reportTypeLabel(code) {
   return LABELS[code] || code
+}
+
+/** URL segment of a report type's form page, e.g. 'GEN' → 'general'; undefined for types without a page. */
+export function reportTypeRoute(code) {
+  return REPORT_TYPES.find(t => t.code === code)?.route
 }
 
 /** Whether a report type has a form page, so it can be added to an IDR and opened. */
