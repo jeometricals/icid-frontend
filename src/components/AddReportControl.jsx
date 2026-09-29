@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { REPORT_TYPES, isReportTypeAvailable } from '../data/reportTypes'
+import { REPORT_TYPES, isAddendumType, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
- * Report-type dropdown (all types; ones without a form page yet are "coming soon") plus Add button.
+ * Report-type dropdown (every main report type; ones without a form page yet are "coming soon") plus Add button.
+ * Addendum types are left out: they're added from their parent report's page.
  * Props: onAdd(reportType), adding (an add is running), disabled (another action is running),
  * generalExists (the IDR already has its one main General, so that option is unavailable).
  */
@@ -15,6 +16,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
     return ''
   }
   const canAdd = optionSuffix(reportType) === '' && !adding && !disabled
+  const mainReportTypes = REPORT_TYPES.filter(({ code }) => !isAddendumType(code))
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -25,7 +27,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
         value={reportType}
         onChange={e => setReportType(e.target.value)}
       >
-        {REPORT_TYPES.map(({ code, label }) => (
+        {mainReportTypes.map(({ code, label }) => (
           <option key={code} value={code} disabled={optionSuffix(code) !== ''}>
             {label}{optionSuffix(code)}
           </option>

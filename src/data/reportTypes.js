@@ -20,14 +20,18 @@ export const REPORT_TYPES = [
   { code: 'OFF', label: 'Office Report' },
   { code: 'SKETCH', label: 'Sketch Sheet' },
   { code: 'CONT', label: 'Report Continuation' },
-  { code: 'CONC_MIX', label: 'Concrete Truck & Mix Info' },
+  { code: 'CONC_MIX', label: 'Concrete Truck & Mix Info', route: 'conc-mix' },
   { code: 'CONC_CYL', label: 'Concrete Cylinder Data' },
   { code: 'FIELD_MEMO', label: 'Field Memo' },
   { code: 'FIELD_ORDER', label: 'Field Order' },
 ]
 
 // Types whose form page exists: they can be added to an IDR and opened. Add a code here once its page is built.
-const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB'])
+const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'CONC_MIX'])
+
+// Types that are addendums by nature, as the backend's ADDENDUM_TYPES lists them (DSP can be either, so it's absent).
+// They're added from their parent report's page, not from the IDR's top-level Add report control.
+const ADDENDUM_TYPES = new Set(['SKETCH', 'CONT', 'CONC_MIX', 'WM_2', 'WM_3', 'CONC_CYL'])
 
 const LABELS = Object.fromEntries(REPORT_TYPES.map(({ code, label }) => [code, label]))
 
@@ -39,6 +43,11 @@ export function reportTypeLabel(code) {
 /** URL segment of a report type's form page, e.g. 'GEN' → 'general'; undefined for types without a page. */
 export function reportTypeRoute(code) {
   return REPORT_TYPES.find(t => t.code === code)?.route
+}
+
+/** Whether a report type is an addendum by nature, added from its parent report rather than at the IDR level. */
+export function isAddendumType(code) {
+  return ADDENDUM_TYPES.has(code)
 }
 
 /** Whether a report type has a form page, so it can be added to an IDR and opened. */

@@ -10,6 +10,7 @@ import ReportArchivePage from './pages/ReportArchivePage'
 import IDRPage from './pages/IDRPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
+import ConcMixReportPage from './pages/reports/ConcMixReportPage'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -98,6 +99,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SWCBReportPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project/:projectId/idr/:idrId/conc-mix/:reportId"
+        element={
+          <ProtectedRoute>
+            <ConcMixReportPage />
           </ProtectedRoute>
         }
       />

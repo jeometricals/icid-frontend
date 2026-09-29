@@ -211,6 +211,20 @@ describe('SWCBReportPage — sections', () => {
     expect(screen.getByRole('combobox', { name: 'Add trade' })).toBeInTheDocument()
     expect(screen.getByTestId('attachments-section')).toHaveAttribute('data-report', REPORT_ID)
   })
+
+  it("lists this report's addendums from the loaded IDR, with Add addendum on a draft", async () => {
+    const idr = parentIdr()
+    idr.reports.push({
+      report_id: 'rep-mix', idr_id: IDR_ID, report_type: 'CONC_MIX', is_addendum: true, parent_report_id: REPORT_ID,
+      page_number: null, report_data: {},
+    })
+    api.getIdr.mockResolvedValue(idr)
+    renderPage()
+    await loaded()
+    expect(screen.getByRole('heading', { name: 'Addendums' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open Concrete Truck & Mix Info' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /add addendum/i })).toBeInTheDocument()
+  })
 })
 
 // ---------------------------------------------------------------------------

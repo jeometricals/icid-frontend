@@ -12,13 +12,28 @@ vi.mock('../../AttachmentsSection', () => ({
   ),
 }))
 
+// AddendumsSection navigates and calls the API itself; the shell only decides whether and how it is mounted
+vi.mock('../AddendumsSection', () => ({
+  default: (props) => (
+    <div data-testid="addendums-section" data-project={props.projectId} data-idr={props.idrId}
+      data-report={props.reportId} data-count={props.reports.length} data-disabled={String(props.disabled)}
+      onClick={props.onChanged} />
+  ),
+}))
+
 const SUBMITTED_AT = '2026-09-25T15:10:00Z'
 
 // A ready, editable form as useReportForm returns it; override per test
 function formState(overrides = {}) {
   return {
+    projectId: 'HWS0023',
     idrId: 'idr-1',
     reportId: 'rep-1',
+    reports: [
+      { report_id: 'rep-1', report_type: 'SWCB', is_addendum: false, parent_report_id: null },
+      { report_id: 'rep-2', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: 'rep-1' },
+    ],
+    report: { report_id: 'rep-1', report_type: 'SWCB', is_addendum: false, parent_report_id: null },
     loadStatus: 'ready',
     loadError: null,
     retryLoad: vi.fn(),
@@ -106,6 +121,24 @@ describe('ReportPageShell', () => {
     expect(attachments).toHaveAttribute('data-submitted', 'false')
   })
 
+  it("mounts addendums on a main report, with the IDR's reports, enabled on a draft", async () => {
+    const form = renderShell()
+    const addendums = screen.getByTestId('addendums-section')
+    expect(addendums).toHaveAttribute('data-project', 'HWS0023')
+    expect(addendums).toHaveAttribute('data-idr', 'idr-1')
+    expect(addendums).toHaveAttribute('data-report', 'rep-1')
+    expect(addendums).toHaveAttribute('data-count', '2')
+    expect(addendums).toHaveAttribute('data-disabled', 'false')
+    await userEvent.setup().click(addendums)
+    expect(form.refresh).toHaveBeenCalled() // onChanged refetches the IDR
+  })
+
+  it('shows no addendums section on an addendum (an addendum cannot have addendums)', () => {
+    renderShell({ report: { report_id: 'rep-2', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: 'rep-1' } })
+    expect(screen.queryByTestId('addendums-section')).not.toBeInTheDocument()
+    expect(screen.getByTestId('attachments-section')).toBeInTheDocument()
+  })
+
   it('when locked: submitted banner, disabled body, no Save Draft, view-only attachments', () => {
     renderShell({ isLocked: true, isReadOnly: true, submittedAt: SUBMITTED_AT })
     expect(screen.getByText(
@@ -115,6 +148,7 @@ describe('ReportPageShell', () => {
     expect(saveButtons()).toHaveLength(0)
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     expect(screen.getByTestId('attachments-section')).toHaveAttribute('data-submitted', 'true')
+    expect(screen.getByTestId('addendums-section')).toHaveAttribute('data-disabled', 'true')
   })
 
   it('when auto-generated: shows the banner text, disables the body, hides Save Draft and attachments', () => {
@@ -123,6 +157,7 @@ describe('ReportPageShell', () => {
     expect(screen.getByLabelText('Body field')).toBeDisabled()
     expect(saveButtons()).toHaveLength(0)
     expect(screen.queryByTestId('attachments-section')).not.toBeInTheDocument()
+    expect(screen.getByTestId('addendums-section')).toHaveAttribute('data-disabled', 'true')
   })
 
   it('hides the auto-generated banner once the IDR is submitted', () => {

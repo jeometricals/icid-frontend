@@ -10,10 +10,10 @@ function renderControl(props = {}) {
 }
 
 describe('AddReportControl', () => {
-  it('lists all 22 report types, with only General and SWCB enabled and the rest "coming soon"', () => {
+  it('lists the 16 main report types, with only General and SWCB enabled and the rest "coming soon"', () => {
     renderControl()
     const options = screen.getAllByRole('option')
-    expect(options).toHaveLength(22)
+    expect(options).toHaveLength(16)
     const available = ['General', 'Sidewalk, Curb, Concrete Base']
     for (const option of options) {
       if (available.includes(option.textContent)) {
@@ -23,10 +23,21 @@ describe('AddReportControl', () => {
         expect(option).toBeDisabled()
       }
     }
-    expect(options.filter(o => o.disabled)).toHaveLength(20)
+    expect(options.filter(o => o.disabled)).toHaveLength(14)
     expect(screen.getByRole('option', { name: 'Sidewalk, Curb, Concrete Base' })).toHaveValue('SWCB')
     expect(screen.getByRole('option', { name: 'Sewer (coming soon)' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Field Order (coming soon)' })).toBeInTheDocument()
+  })
+
+  it('leaves out addendum types, which are added from their parent report', () => {
+    renderControl()
+    const labels = screen.getAllByRole('option').map(o => o.textContent)
+    for (const addendum of ['Concrete Truck & Mix Info', 'Concrete Cylinder Data', 'Sketch Sheet', 'Report Continuation',
+      'Water Main (Sheet 2)', 'Water Main (Sheet 3)']) {
+      expect(labels.some(l => l.startsWith(addendum))).toBe(false)
+    }
+    expect(screen.getByRole('option', { name: 'Water Main (Sheet 1) (coming soon)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Daily Site Patrol (coming soon)' })).toBeInTheDocument()
   })
 
   it('starts on General', () => {

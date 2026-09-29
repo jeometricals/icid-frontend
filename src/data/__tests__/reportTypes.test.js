@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { REPORT_TYPES, reportTypeLabel, reportTypeRoute, isReportTypeAvailable } from '../reportTypes'
+import { REPORT_TYPES, reportTypeLabel, reportTypeRoute, isAddendumType, isReportTypeAvailable } from '../reportTypes'
 
 // The backend's ReportType enum, in order
 const BACKEND_ENUM = [
@@ -27,6 +27,7 @@ describe('reportTypes', () => {
   it('gives each type with a page its URL segment, and none to types without one', () => {
     expect(reportTypeRoute('GEN')).toBe('general')
     expect(reportTypeRoute('SWCB')).toBe('swcb')
+    expect(reportTypeRoute('CONC_MIX')).toBe('conc-mix')
     expect(reportTypeRoute('SWR')).toBeUndefined()
     expect(reportTypeRoute('NEW_TYPE')).toBeUndefined()
   })
@@ -35,7 +36,13 @@ describe('reportTypes', () => {
     expect(REPORT_TYPES.filter(t => t.route).map(t => t.code)).toEqual(BACKEND_ENUM.filter(isReportTypeAvailable))
   })
 
-  it('has only General and SWCB available for now', () => {
-    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB'])
+  it('has only General, SWCB and Concrete Truck & Mix Info available for now', () => {
+    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'CONC_MIX'])
+  })
+
+  it("marks the backend's addendum types (not DSP, which can be either)", () => {
+    expect(BACKEND_ENUM.filter(isAddendumType)).toEqual(['WM_2', 'WM_3', 'SKETCH', 'CONT', 'CONC_MIX', 'CONC_CYL'])
+    expect(isAddendumType('DSP')).toBe(false)
+    expect(isAddendumType('GEN')).toBe(false)
   })
 })
