@@ -12,6 +12,7 @@ import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
 import ConcCylReportPage from './pages/reports/ConcCylReportPage'
+import ACReportPage from './pages/reports/ACReportPage'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -100,6 +101,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SWCBReportPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/project/:projectId/idr/:idrId/ac/:reportId"
+        element={
+          <ProtectedRoute>
+            <ACReportPage />
           </ProtectedRoute>
         }
       />

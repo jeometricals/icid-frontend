@@ -10,11 +10,11 @@ function renderControl(props = {}) {
 }
 
 describe('AddReportControl', () => {
-  it('lists the 16 main report types, with only General and SWCB enabled and the rest "coming soon"', () => {
+  it('lists the 16 main report types, with only General, SWCB and AC enabled and the rest "coming soon"', () => {
     renderControl()
     const options = screen.getAllByRole('option')
     expect(options).toHaveLength(16)
-    const available = ['General', 'Sidewalk, Curb, Concrete Base']
+    const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete']
     for (const option of options) {
       if (available.includes(option.textContent)) {
         expect(option).toBeEnabled()
@@ -23,8 +23,9 @@ describe('AddReportControl', () => {
         expect(option).toBeDisabled()
       }
     }
-    expect(options.filter(o => o.disabled)).toHaveLength(14)
+    expect(options.filter(o => o.disabled)).toHaveLength(13)
     expect(screen.getByRole('option', { name: 'Sidewalk, Curb, Concrete Base' })).toHaveValue('SWCB')
+    expect(screen.getByRole('option', { name: 'Asphaltic Concrete' })).toHaveValue('AC')
     expect(screen.getByRole('option', { name: 'Sewer (coming soon)' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Field Order (coming soon)' })).toBeInTheDocument()
   })

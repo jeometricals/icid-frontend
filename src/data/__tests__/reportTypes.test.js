@@ -17,6 +17,7 @@ describe('reportTypes', () => {
     expect(reportTypeLabel('WM_2')).toBe('Water Main (Sheet 2)')
     expect(reportTypeLabel('CONC_MIX')).toBe('Concrete Truck & Mix Info')
     expect(reportTypeLabel('SWCB')).toBe('Sidewalk, Curb, Concrete Base')
+    expect(reportTypeLabel('AC')).toBe('Asphaltic Concrete')
     for (const { code, label } of REPORT_TYPES) expect(label).not.toBe(code)
   })
 
@@ -27,6 +28,7 @@ describe('reportTypes', () => {
   it('gives each type with a page its URL segment, and none to types without one', () => {
     expect(reportTypeRoute('GEN')).toBe('general')
     expect(reportTypeRoute('SWCB')).toBe('swcb')
+    expect(reportTypeRoute('AC')).toBe('ac')
     expect(reportTypeRoute('CONC_MIX')).toBe('conc-mix')
     expect(reportTypeRoute('CONC_CYL')).toBe('conc-cyl')
     expect(reportTypeRoute('SWR')).toBeUndefined()
@@ -37,8 +39,8 @@ describe('reportTypes', () => {
     expect(REPORT_TYPES.filter(t => t.route).map(t => t.code)).toEqual(BACKEND_ENUM.filter(isReportTypeAvailable))
   })
 
-  it('has only General, SWCB, Concrete Truck & Mix Info and Concrete Cylinder Data available for now', () => {
-    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'CONC_MIX', 'CONC_CYL'])
+  it('has only General, SWCB, Asphaltic Concrete, Concrete Truck & Mix Info and Concrete Cylinder Data available for now', () => {
+    expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'AC', 'CONC_MIX', 'CONC_CYL'])
   })
 
   it("marks the backend's addendum types (not DSP, which can be either)", () => {

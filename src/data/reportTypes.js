@@ -9,7 +9,7 @@ export const REPORT_TYPES = [
   { code: 'WM_1', label: 'Water Main (Sheet 1)' },
   { code: 'WM_2', label: 'Water Main (Sheet 2)' },
   { code: 'WM_3', label: 'Water Main (Sheet 3)' },
-  { code: 'AC', label: 'Asphalt Concrete' },
+  { code: 'AC', label: 'Asphaltic Concrete', route: 'ac' },
   { code: 'CONC', label: 'Concrete (Structures)' },
   { code: 'BOX', label: 'Box Sewer' },
   { code: 'PILE', label: 'Pile Driving' },
@@ -27,7 +27,7 @@ export const REPORT_TYPES = [
 ]
 
 // Types whose form page exists: they can be added to an IDR and opened. Add a code here once its page is built.
-const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'CONC_MIX', 'CONC_CYL'])
+const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'AC', 'CONC_MIX', 'CONC_CYL'])
 
 // Types that are addendums by nature, as the backend's ADDENDUM_TYPES lists them (DSP can be either, so it's absent).
 // They're added from their parent report's page, not from the IDR's top-level Add report control.
