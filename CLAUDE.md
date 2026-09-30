@@ -13,7 +13,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 ## Folder structure
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
-- `src/pages/reports/` — inspection report form pages (General, SWCB, ConcMix, ConcCyl).
+- `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
 - `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
