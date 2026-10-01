@@ -381,10 +381,21 @@ describe('SWCBReportPage — DDC form shape', () => {
 
     await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
     const saved = api.saveReport.mock.calls[0][2]
-    expect(saved.inspectionMatrix.sidewalkFoundationPlaced).toEqual({ base: null, sidewalk: 'Y', curb: null })
+    expect(saved.inspectionMatrix.sidewalkFoundationPlaced).toEqual({ base: 'Y', sidewalk: 'Y', curb: null })
     expect(saved.inspectionMatrix.roadwayStoneBasePlaced).toEqual({ base: 'NA', sidewalk: null, curb: null })
     expect(saved.inspectionMatrix.otherCuringMethods).toEqual({ base: '', sidewalk: 'Wet burlap', curb: '' })
     expect(saved).toMatchObject({ structural: false, subcontractor: '' })
+  })
+
+  it('saves a Base answer on Sidewalk 6" Foundation', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.click(screen.getByRole('radio', { name: 'Sidewalk 6" Foundation Material Placed and Compacted, Base: N/A' }))
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(api.saveReport.mock.calls[0][2].inspectionMatrix.sidewalkFoundationPlaced).toEqual({ base: 'NA', sidewalk: null, curb: null })
   })
 
   it('has no Excavator row or Pavement Cutter option, and drops saved Excavator data with a warning', async () => {

@@ -105,13 +105,18 @@ describe('SWCBInspectionMatrix', () => {
     for (const box of screen.getAllByRole('textbox')) expect(box).toBeDisabled()
   })
 
-  it('Sidewalk 6" Foundation takes only Sidewalk: Base and Curb are greyed out', async () => {
+  it('Sidewalk 6" Foundation takes Base and Sidewalk: only Curb is greyed out', async () => {
     const onChange = renderMatrix()
     const row = 'Sidewalk 6" Foundation Material Placed and Compacted'
-    for (const column of ['Base', 'Curb']) {
-      for (const option of ['Y', 'N', 'N/A']) expect(radio(`${row}, ${column}: ${option}`)).toBeDisabled()
+    for (const option of ['Y', 'N', 'N/A']) {
+      expect(radio(`${row}, Curb: ${option}`)).toBeDisabled()
+      expect(radio(`${row}, Base: ${option}`)).toBeEnabled()
+      expect(radio(`${row}, Sidewalk: ${option}`)).toBeEnabled()
     }
-    await userEvent.setup().click(radio(`${row}, Sidewalk: Y`))
+    const user = userEvent.setup()
+    await user.click(radio(`${row}, Base: N`))
+    expect(onChange).toHaveBeenLastCalledWith('sidewalkFoundationPlaced', 'base', 'N')
+    await user.click(radio(`${row}, Sidewalk: Y`))
     expect(onChange).toHaveBeenLastCalledWith('sidewalkFoundationPlaced', 'sidewalk', 'Y')
   })
 
