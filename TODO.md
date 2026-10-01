@@ -1,40 +1,27 @@
 # ICID Co. - TODO & Roadmap
 
-## 🚀 MVP Complete ✅
+## 🚀 Current State ✅
 
 The current version includes:
-- ✅ Authentication (Supabase + Demo Mode)
-- ✅ Project Selection
-- ✅ Three Main Inspection Forms
+- ✅ Login screen and Demo Mode (auth is hardcoded to the dev user for now; real auth is its own future slice)
+- ✅ Project Selection and Project Dashboard
+- ✅ Inspector Daily Diary (IDR): one per inspector, project and day, with a shared header (times, temperatures, weather)
+- ✅ Report pages: General, Sidewalk/Curb/Concrete Base, Asphaltic Concrete, plus the Concrete Truck & Mix Info and
+  Concrete Cylinder Data addendums; an auto-generated General when an IDR has several reports
+- ✅ Draft / Submit, with a certification step, page numbering and a read-only submitted IDR
+- ✅ Drafts list and per-project Report Archive of submitted IDRs
+- ✅ Attachments (photos and PDFs) on every report
+- ✅ Pay items picked from the project's contract-item catalog
+- ✅ All data through the ICID FastAPI backend
 - ✅ Responsive Design
-- ✅ Draft/Submit Functionality
-- ✅ Vercel Deployment Ready
+- ✅ Vercel Deployment
 
 ---
 
 ## 📋 Immediate Next Steps
 
-### 1. Backend Integration
-- [ ] Set up Supabase database schema
-  - [ ] Create `projects` table
-  - [ ] Create `inspection_reports` table
-  - [ ] Create `users` table with profiles
-  - [ ] Set up row-level security (RLS) policies
-- [ ] Implement actual data persistence
-  - [ ] Save drafts to database
-  - [ ] Submit reports to database
-  - [ ] Retrieve saved reports
-- [ ] Replace mock data with real Supabase queries
-
-### 2. File Uploads & Attachments
-- [ ] Implement photo upload functionality
-- [ ] Set up Supabase Storage buckets
-- [ ] Add image preview/gallery
-- [ ] Support PDF attachments
-- [ ] Implement file size limits
-- [ ] Add file type validation
-
-### 3. Weather Integration
+### 1. Weather Integration
+Today the inspector enters AM/PM weather and temperatures by hand in the IDR header.
 - [ ] Choose weather API (OpenWeather, WeatherAPI, etc.)
 - [ ] Implement automatic weather fetching
 - [ ] Store weather with location coordinates
@@ -49,8 +36,7 @@ The current version includes:
 - [ ] Add remaining report types:
   - [ ] Sewer Report
   - [ ] Water Main Report
-  - [ ] Utility Work Report
-  - [ ] Asphaltic Concrete Report
+  - [x] Asphaltic Concrete Report
   - [ ] Pile Driving Report
   - [ ] Box Sewer Report
 - [ ] Implement form validation
@@ -79,14 +65,15 @@ The current version includes:
 
 ### Workflow & Approvals
 - [ ] Implement supervisor review workflow
-- [ ] Add report status tracking (Draft, Submitted, Reviewed, Approved)
+- [ ] Extend report status beyond Draft / Submitted (Reviewed, Approved)
 - [ ] Email notifications for submissions
 - [ ] Comments/feedback system
 - [ ] Revision history tracking
 - [ ] Report rejection with reasons
 
 ### Data & Analytics
-- [ ] Report archive with search
+- [x] Report archive (submitted IDRs, per project)
+- [ ] Search in the report archive
 - [ ] Filter reports by date, project, inspector
 - [ ] Export reports to CSV/Excel
 - [ ] Dashboard with statistics
@@ -128,7 +115,7 @@ The current version includes:
 ### User Experience
 - [ ] Add loading skeletons
 - [ ] Implement toast notifications
-- [ ] Add confirmation dialogs for destructive actions
+- [x] Add confirmation dialogs for destructive actions
 - [ ] Improve error messages
 - [ ] Add helpful tooltips
 - [ ] Create onboarding tour
@@ -158,8 +145,8 @@ The current version includes:
 ## 🧪 Testing & Quality
 
 ### Testing
-- [ ] Set up Jest for unit tests
-- [ ] Add React Testing Library tests
+- [x] Set up unit tests (Vitest)
+- [x] Add React Testing Library tests
 - [ ] Implement E2E tests (Playwright/Cypress)
 - [ ] Add visual regression tests
 - [ ] Set up CI/CD pipeline
@@ -192,7 +179,6 @@ The current version includes:
 ### Third-Party Services
 - [ ] Email service (SendGrid/Postmark)
 - [ ] SMS notifications (Twilio)
-- [ ] Cloud storage (S3/Google Cloud)
 - [ ] Analytics (Mixpanel/Amplitude)
 - [ ] Error tracking (Sentry)
 - [ ] Performance monitoring
@@ -208,11 +194,9 @@ The current version includes:
 ## 🐛 Known Issues
 
 ### Minor Issues
-- [ ] No actual weather API connected (using mock data)
-- [ ] Photo upload UI present but not functional
+- [ ] No weather API connected (weather is entered by hand in the IDR header)
 - [x] Pay items table needs better UX for adding/removing rows
 - [ ] No actual PDF generation
-- [ ] Draft saving only logs to console
 
 ### Future Enhancements
 - [ ] Better form validation messages
@@ -235,7 +219,7 @@ The current version includes:
 ### Future Optimization
 - [ ] Service worker caching strategy
 - [ ] Preload critical resources
-- [ ] Optimize Tailwind CSS (purge unused)
+- [x] Optimize Tailwind CSS (purge unused)
 - [ ] Implement skeleton screens
 - [ ] Add progressive image loading
 
@@ -292,34 +276,5 @@ The current version includes:
 
 ---
 
-## 🏁 Version History
-
-### v0.1.0 (Current - MVP)
-- ✅ Initial release
-- ✅ Three inspection forms
-- ✅ Demo mode
-- ✅ Basic authentication
-- ✅ Responsive design
-
-### v0.2.0 (Planned)
-- Backend integration
-- File uploads
-- Real weather data
-- Additional forms
-
-### v0.3.0 (Planned)
-- PDF generation
-- Supervisor workflows
-- Report archive
-- Search functionality
-
-### v1.0.0 (Target)
-- Full feature set
-- Production ready
-- Mobile apps
-- Complete documentation
-
----
-
-**Last Updated**: February 2024
+**Last Updated**: October 2026
 **Next Review**: After MVP deployment feedback

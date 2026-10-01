@@ -80,6 +80,5 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   ICID FastAPI at `VITE_API_URL`.
 - **README's Project Structure tree is outdated** — it lists only three pages and omits `src/services/`, `src/data/` and `src/test/`.
 - **`ProjectDashboard` swallows all errors as "not found"** — fix pending Slice 1 work.
-- **Fake hardcoded weather** (52°F / 48° / 59°) on multiple pages.
 - **No ESLint config** — `npm run lint` will fail.
 - **Some pages lack tests** (`LoginPage`).
