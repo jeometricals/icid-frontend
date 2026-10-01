@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { format } from 'date-fns'
 import SWCBReportPage from '../SWCBReportPage'
 import * as api from '../../../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -69,6 +70,7 @@ const PROJECT = {
 }
 
 vi.mock('../../../services/api', () => ({
+  getContractItems: vi.fn(),
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
@@ -87,6 +89,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
   api.getProjectById.mockResolvedValue(PROJECT)
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_type: 'SWCB', report_data: reportData, updated_at: SAVED_AT,
   }))

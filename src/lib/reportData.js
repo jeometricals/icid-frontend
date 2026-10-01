@@ -83,7 +83,8 @@ export function sharedSectionDefaults() {
 /**
  * A report's saved report_data as form state, given that page's blank form (defaults). Fills missing keys from the
  * defaults (including missing workforce roles, equipment types and safety remarks), drops IDR-level keys, renames
- * legacy workforce keys, converts boolean safety checks to 'Y' / 'N' and drops the retired pay item quantityChk.
+ * legacy workforce keys, converts boolean safety checks to 'Y' / 'N', drops the retired pay item quantityChk and gives
+ * pay items saved before the unit field a blank unit.
  */
 export function formDataFromReportData(reportData, defaults) {
   const data = { ...defaults, ...reportData }
@@ -93,7 +94,7 @@ export function formDataFromReportData(reportData, defaults) {
   // Older reports stored one never-displayed safetyRemarks string; it's dropped for the per-item object
   const savedRemarks = typeof data.safetyRemarks === 'object' && data.safetyRemarks !== null ? data.safetyRemarks : {}
   data.safetyRemarks = { ...defaults.safetyRemarks, ...savedRemarks }
-  data.payItems = data.payItems.map(({ quantityChk, ...item }) => item)
+  data.payItems = data.payItems.map(({ quantityChk, ...item }) => ({ ...item, unit: item.unit ?? '' }))
   data.safetyChecks = Object.fromEntries(
     Object.entries(data.safetyChecks).map(([key, value]) => [key, normalizeSafetyCheck(value)])
   )

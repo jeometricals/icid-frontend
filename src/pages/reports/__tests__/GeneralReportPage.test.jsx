@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { format } from 'date-fns'
 import GeneralReportPage from '../GeneralReportPage'
 import * as api from '../../../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -86,6 +87,7 @@ const PROJECT = {
 }
 
 vi.mock('../../../services/api', () => ({
+  getContractItems: vi.fn(),
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
@@ -107,6 +109,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
   api.getProjectById.mockResolvedValue(PROJECT)
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_type: 'GEN', report_data: reportData, updated_at: SAVED_AT,
   }))
@@ -482,7 +485,7 @@ describe('Save Draft', () => {
 
     await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
     expect(api.saveReport.mock.calls[0][2].payItems).toEqual([
-      { itemNo: '4.01', budgetCode: '', payQuantity: '12', description: '' },
+      { itemNo: '4.01', budgetCode: '', payQuantity: '12', unit: '', description: '' },
     ])
   })
 })
@@ -690,7 +693,9 @@ describe('safety remarks and legacy cleanup', () => {
     await user.click(saveButton())
 
     await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
-    expect(savedData().payItems).toEqual([{ itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', description: 'Curb' }])
+    expect(savedData().payItems).toEqual([
+      { itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', unit: '', description: 'Curb' },
+    ])
   })
 })
 

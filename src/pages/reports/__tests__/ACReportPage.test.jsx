@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { format } from 'date-fns'
 import ACReportPage from '../ACReportPage'
 import * as api from '../../../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -84,6 +85,7 @@ const PROJECT = {
 }
 
 vi.mock('../../../services/api', () => ({
+  getContractItems: vi.fn(),
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
@@ -102,6 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
   api.getProjectById.mockResolvedValue(PROJECT)
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_type: 'AC', report_data: reportData, updated_at: SAVED_AT,
   }))
@@ -271,7 +274,8 @@ describe('ACReportPage — Save Draft', () => {
       { location: '', ticketNo: '', temperature: '290' },
     ])
     expect(saved.comments).toBe('Milled and paved Main St - day 2')
-    expect(saved.payItems).toEqual(AC_DATA.payItems)
+    // AC_DATA's pay item predates the unit field, so it saves back with a blank unit
+    expect(saved.payItems).toEqual([{ ...AC_DATA.payItems[0], unit: '' }])
   })
 
   it('removes a course and a delivery ticket', async () => {

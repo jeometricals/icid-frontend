@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { format } from 'date-fns'
 import ConcCylReportPage from '../ConcCylReportPage'
 import * as api from '../../../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 
 const IDR_ID = 'idr-1'
 const REPORT_ID = 'rep-cyl'
@@ -55,6 +56,7 @@ const PROJECT = {
 }
 
 vi.mock('../../../services/api', () => ({
+  getContractItems: vi.fn(),
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
@@ -68,6 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
   api.getProjectById.mockResolvedValue(PROJECT)
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_type: 'CONC_CYL', report_data: reportData, updated_at: SAVED_AT,
   }))

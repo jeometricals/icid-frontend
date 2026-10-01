@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import useReportForm, { SUBMITTED_MID_EDIT } from '../useReportForm'
+import { formDataFromReportData, sharedSectionDefaults } from '../reportData'
 import * as api from '../../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../../test/contractItems'
 
 vi.mock('../../services/api', () => ({
+  getContractItems: vi.fn(),
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
@@ -47,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(idrWith())
   api.getProjectById.mockResolvedValue(PROJECT)
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({
     report_id: reportId, report_data: reportData, updated_at: '2026-09-25T14:05:00Z',
   }))
@@ -257,7 +261,7 @@ describe('useReportForm — editing and saving', () => {
     await act(() => result.current.handleSaveDraft())
     expect(api.saveReport).toHaveBeenCalledWith(IDR_ID, REPORT_ID, {
       description: 'Poured curb - day 2',
-      payItems: [{ itemNo: '', budgetCode: '', payQuantity: '', description: '' }],
+      payItems: [{ itemNo: '', budgetCode: '', payQuantity: '', unit: '', description: '' }],
     })
     expect(result.current.saveStatus).toBe('saved')
     expect(result.current.savedAt).toBe('2026-09-25T14:05:00Z')
@@ -316,5 +320,67 @@ describe('useReportForm — editing and saving', () => {
 
     await act(() => result.current.refresh())
     expect(result.current.refreshError).toBeNull()
+  })
+})
+
+describe('useReportForm — pay item unit', () => {
+  // The real loader every report page uses, over the shared sections' blank state
+  const realLoader = { emptyFormData: sharedSectionDefaults, formDataFromReport: formDataFromReportData }
+
+  it("addPayItem's blank row has an empty unit", async () => {
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.addPayItem())
+    expect(result.current.formData.payItems).toEqual([
+      { itemNo: '', budgetCode: '', payQuantity: '', unit: '', description: '' },
+    ])
+  })
+
+  it('keeps a saved unit on load', async () => {
+    const payItem = { itemNo: '4.13 AAS', budgetCode: '12345', payQuantity: '150.00', unit: 'SF', description: 'Sidewalk' }
+    api.getIdr.mockResolvedValue(idrWith({ reportData: { payItems: [payItem] } }))
+    const { result } = renderForm(realLoader)
+    await ready(result)
+    expect(result.current.formData.payItems).toEqual([payItem])
+  })
+
+  it('gives pay items saved before the unit field an empty unit', async () => {
+    api.getIdr.mockResolvedValue(idrWith({
+      reportData: { payItems: [{ itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', description: 'Curb' }] },
+    }))
+    const { result } = renderForm(realLoader)
+    await ready(result)
+    expect(result.current.formData.payItems).toEqual([
+      { itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', unit: '', description: 'Curb' },
+    ])
+  })
+})
+
+describe('useReportForm — contract items', () => {
+  it("fetches the project's contract items once and exposes them", async () => {
+    const { result } = renderForm()
+    expect(result.current.contractItemsLoading).toBe(true)
+    await waitFor(() => expect(result.current.contractItemsLoading).toBe(false))
+    expect(api.getContractItems).toHaveBeenCalledWith('HWS0023')
+    expect(result.current.contractItems).toEqual(MOCK_CONTRACT_ITEMS)
+    expect(result.current.contractItemsError).toBeNull()
+
+    // Saving refetches the IDR but not the contract items
+    await ready(result)
+    await act(() => result.current.handleSaveDraft())
+    expect(api.getContractItems).toHaveBeenCalledTimes(1)
+  })
+
+  it('records a failed fetch without blocking the form', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    api.getContractItems.mockRejectedValueOnce(new Error('Failed to fetch contract items'))
+    const { result } = renderForm()
+    await waitFor(() => expect(result.current.contractItemsLoading).toBe(false))
+    await ready(result)
+    expect(result.current.contractItemsError).toBe('Failed to fetch contract items')
+    expect(result.current.contractItems).toEqual([])
+    expect(result.current.formData.description).toBe('Poured curb')
+    expect(consoleError).toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 })

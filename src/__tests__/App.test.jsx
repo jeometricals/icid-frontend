@@ -3,8 +3,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App'
 import * as api from '../services/api'
+import { MOCK_CONTRACT_ITEMS } from '../test/contractItems'
 
 vi.mock('../services/api', () => ({
+  getContractItems: vi.fn(),
   getProjectsForUser: vi.fn(),
   getProjectById: vi.fn(),
   getIdr: vi.fn(),
@@ -15,6 +17,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getProjectsForUser.mockResolvedValue([])
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens 2025' })
+  api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.listIdrs.mockResolvedValue([])
   api.getIdr.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
 })
