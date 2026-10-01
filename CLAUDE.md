@@ -15,13 +15,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
-- `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
   still get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers) and `useReportForm.js` (the hook every report page uses for load/save/state). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
-- `src/test/` — global Vitest + React Testing Library setup (`setup.js`).
-- `src/components/` — shared UI components (modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections, the report page shell and the addendums section.
+- `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
+- `src/components/` — shared UI components (modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -68,6 +68,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·
     `GET` (list) · `GET /{attachment_id}/download-url` · `PUT /{attachment_id}` · `DELETE /{attachment_id}`
     (the file itself is PUT straight to the Storage signed URL from upload-request, not to the API)
+  - `GET /v1/contract_items/?project_id=` (the project's pay-item catalog, for the pay-item picker)
 - **Follow the existing design language** (construction-orange palette, white cards on `bg-gray-50`, `max-w-7xl`
   layout, lucide-react icons) unless we're deliberately reworking it.
 - **Mention unrelated bugs you notice, but don't touch them.** Scope creep in fixes hurts more than it helps.

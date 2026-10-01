@@ -210,7 +210,7 @@ The current version includes:
 ### Minor Issues
 - [ ] No actual weather API connected (using mock data)
 - [ ] Photo upload UI present but not functional
-- [ ] Pay items table needs better UX for adding/removing rows
+- [x] Pay items table needs better UX for adding/removing rows
 - [ ] No actual PDF generation
 - [ ] Draft saving only logs to console
 
