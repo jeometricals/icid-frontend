@@ -8,7 +8,10 @@ const ROW_KEYS = [
   'subgradeCompacted', 'compactionTestTaken', 'sidewalkFoundationPlaced', 'roadwayStoneBasePlaced',
   'curingCompoundApplied', 'otherCuringMethods', 'rebarInstalled',
 ]
-const EMPTY_MATRIX = Object.fromEntries(ROW_KEYS.map(key => [key, { base: null, sidewalk: null, curb: null }]))
+const EMPTY_MATRIX = {
+  ...Object.fromEntries(ROW_KEYS.map(key => [key, { base: null, sidewalk: null, curb: null }])),
+  otherCuringMethods: { base: '', sidewalk: '', curb: '' },
+}
 
 function renderMatrix(props = {}) {
   const onChange = vi.fn()
@@ -50,9 +53,9 @@ describe('SWCBInspectionMatrix', () => {
     ])
   })
 
-  it('has Y, N and N/A radios in each of the three cells of every row, all unchecked when empty', () => {
+  it('has Y, N and N/A radios in each of the three cells of every answer row, all unchecked when empty', () => {
     renderMatrix()
-    for (const row of bodyRows()) {
+    for (const row of bodyRows().filter(r => r.cells[0].textContent !== 'Other Curing Methods')) {
       const cells = Array.from(row.cells).slice(1)
       expect(cells).toHaveLength(3)
       for (const cell of cells) {
@@ -61,7 +64,7 @@ describe('SWCBInspectionMatrix', () => {
         for (const r of radios) expect(r).not.toBeChecked()
       }
     }
-    expect(screen.getAllByRole('radio')).toHaveLength(7 * 3 * 3)
+    expect(screen.getAllByRole('radio')).toHaveLength(6 * 3 * 3)
   })
 
   it('shows saved answers in the right cell', () => {
@@ -77,8 +80,8 @@ describe('SWCBInspectionMatrix', () => {
     const user = userEvent.setup()
     await user.click(radio('Subgrade Compacted, Curb: N'))
     expect(onChange).toHaveBeenLastCalledWith('subgradeCompacted', 'curb', 'N')
-    await user.click(radio('Other Curing Methods, Sidewalk: N/A'))
-    expect(onChange).toHaveBeenLastCalledWith('otherCuringMethods', 'sidewalk', 'NA')
+    await user.click(radio('Curing Compound Applied, Sidewalk: N/A'))
+    expect(onChange).toHaveBeenLastCalledWith('curingCompoundApplied', 'sidewalk', 'NA')
     await user.click(radio('Rebar Installed per Approved Shop Drawings and Bending Schedule?, Base: Y'))
     expect(onChange).toHaveBeenLastCalledWith('rebarInstalled', 'base', 'Y')
   })
@@ -96,8 +99,40 @@ describe('SWCBInspectionMatrix', () => {
     expect(radio('Compaction Test Taken, Base: N/A')).not.toBeChecked()
   })
 
-  it('disables every radio when disabled', () => {
+  it('disables every radio and text box when disabled', () => {
     renderMatrix({ disabled: true })
     for (const r of screen.getAllByRole('radio')) expect(r).toBeDisabled()
+    for (const box of screen.getAllByRole('textbox')) expect(box).toBeDisabled()
+  })
+
+  it('Sidewalk 6" Foundation takes only Sidewalk: Base and Curb are greyed out', async () => {
+    const onChange = renderMatrix()
+    const row = 'Sidewalk 6" Foundation Material Placed and Compacted'
+    for (const column of ['Base', 'Curb']) {
+      for (const option of ['Y', 'N', 'N/A']) expect(radio(`${row}, ${column}: ${option}`)).toBeDisabled()
+    }
+    await userEvent.setup().click(radio(`${row}, Sidewalk: Y`))
+    expect(onChange).toHaveBeenLastCalledWith('sidewalkFoundationPlaced', 'sidewalk', 'Y')
+  })
+
+  it('Roadway Stone Base takes only Base: Sidewalk and Curb are greyed out', async () => {
+    const onChange = renderMatrix()
+    const row = 'Roadway Stone Base Placed and Compacted'
+    for (const column of ['Sidewalk', 'Curb']) {
+      for (const option of ['Y', 'N', 'N/A']) expect(radio(`${row}, ${column}: ${option}`)).toBeDisabled()
+    }
+    await userEvent.setup().click(radio(`${row}, Base: N`))
+    expect(onChange).toHaveBeenLastCalledWith('roadwayStoneBasePlaced', 'base', 'N')
+  })
+
+  it('Other Curing Methods is a text box per column that keeps what was typed', async () => {
+    render(<StatefulMatrix />)
+    const user = userEvent.setup()
+    expect(screen.queryByRole('radio', { name: /^Other Curing Methods/ })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Other Curing Methods, Base' }), 'Wet burlap')
+    await user.type(screen.getByRole('textbox', { name: 'Other Curing Methods, Curb' }), 'Plastic sheet')
+    expect(screen.getByRole('textbox', { name: 'Other Curing Methods, Base' })).toHaveValue('Wet burlap')
+    expect(screen.getByRole('textbox', { name: 'Other Curing Methods, Sidewalk' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Other Curing Methods, Curb' })).toHaveValue('Plastic sheet')
   })
 })

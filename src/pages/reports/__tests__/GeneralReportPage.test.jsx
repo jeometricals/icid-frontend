@@ -593,6 +593,14 @@ describe('unsaved changes', () => {
 // ---------------------------------------------------------------------------
 
 describe('added trades and equipment', () => {
+  it('keeps the Excavator row and the Pavement Cutter option (only the SWCB form drops them)', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByText('Excavator')).toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Add equipment' })
+    expect([...picker.options].map(o => o.value)).toContain('Pavement Cutter')
+  })
+
   // An added row is the grid holding its label; its inputs sit in the same grid
   const addedRow = (label) => screen.getByText(label, { selector: 'span' }).closest('.grid')
   const savedData = () => api.saveReport.mock.calls[0][2]

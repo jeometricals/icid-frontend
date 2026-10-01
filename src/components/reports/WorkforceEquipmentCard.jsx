@@ -1,11 +1,13 @@
 /**
  * The "Workforce and Equipment" card: WorkforceSection and EquipmentSection side by side, wired to useReportForm.
- * Props: form (the object useReportForm returns; reads formData, isReadOnly and the workforce / equipment handlers).
+ * Props: form (the object useReportForm returns; reads formData, isReadOnly and the workforce / equipment handlers),
+ * and optionally standardEquipment / equipmentExtras for a report whose form lists different equipment (see
+ * EquipmentSection; both default to the usual lists).
  */
 import WorkforceSection from './WorkforceSection'
 import EquipmentSection from './EquipmentSection'
 
-export default function WorkforceEquipmentCard({ form }) {
+export default function WorkforceEquipmentCard({ form, standardEquipment, equipmentExtras }) {
   const { formData, isReadOnly } = form
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -28,6 +30,8 @@ export default function WorkforceEquipmentCard({ form }) {
           onChangeAdditional={form.handleChangeAdditionalEquipment}
           onRemoveAdditional={form.handleRemoveAdditionalEquipment}
           disabled={isReadOnly}
+          standardEquipment={standardEquipment}
+          extras={equipmentExtras}
         />
       </div>
     </div>

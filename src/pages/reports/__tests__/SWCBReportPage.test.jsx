@@ -335,6 +335,83 @@ describe('SWCBReportPage — Save Draft', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Operation line, DDC-shaped matrix, and the SWCB equipment rows
+// ---------------------------------------------------------------------------
+
+describe('SWCBReportPage — DDC form shape', () => {
+  it('saves Structural and the Subcontractor, and loads them back', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    expect(screen.getByRole('checkbox', { name: 'Structural' })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: 'Structural' }))
+    await user.type(screen.getByLabelText('Subcontractor (if any)'), 'Acme Concrete')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(api.saveReport.mock.calls[0][2]).toMatchObject({ structural: true, subcontractor: 'Acme Concrete' })
+  })
+
+  it('loads saved Structural and Subcontractor, defaulting bad values', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({ reportData: { ...swcbData('Poured curb'), structural: true, subcontractor: 'Acme' } }))
+    renderPage()
+    await loaded()
+    expect(screen.getByRole('checkbox', { name: 'Structural' })).toBeChecked()
+    expect(screen.getByLabelText('Subcontractor (if any)')).toHaveValue('Acme')
+  })
+
+  it('clears answers older reports saved in cells the form has no box for, and Y/N/NA in the text line', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: {
+        ...swcbData('Poured curb'),
+        inspectionMatrix: {
+          sidewalkFoundationPlaced: { base: 'Y', sidewalk: 'Y', curb: 'N' },
+          roadwayStoneBasePlaced: { base: 'NA', sidewalk: 'Y', curb: 'Y' },
+          otherCuringMethods: { base: 'Y', sidewalk: 'Wet burlap', curb: null },
+        },
+        structural: 'yes',
+        subcontractor: 42,
+      },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    expect(screen.getByRole('textbox', { name: 'Other Curing Methods, Sidewalk' })).toHaveValue('Wet burlap')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    const saved = api.saveReport.mock.calls[0][2]
+    expect(saved.inspectionMatrix.sidewalkFoundationPlaced).toEqual({ base: null, sidewalk: 'Y', curb: null })
+    expect(saved.inspectionMatrix.roadwayStoneBasePlaced).toEqual({ base: 'NA', sidewalk: null, curb: null })
+    expect(saved.inspectionMatrix.otherCuringMethods).toEqual({ base: '', sidewalk: 'Wet burlap', curb: '' })
+    expect(saved).toMatchObject({ structural: false, subcontractor: '' })
+  })
+
+  it('has no Excavator row or Pavement Cutter option, and drops saved Excavator data with a warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: { ...swcbData('Poured curb'), equipment: { backhoe: { model: 'CAT 420', number: '1' }, excavator: { model: 'PC200', number: '1' } } },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    expect(screen.queryByText('Excavator')).not.toBeInTheDocument()
+    expect(screen.getByText('Backhoe')).toBeInTheDocument()
+    const picker = screen.getByRole('combobox', { name: 'Add equipment' })
+    expect([...picker.options].map(o => o.value)).not.toContain('Pavement Cutter')
+    expect([...picker.options].map(o => o.value)).toContain('Crane')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"excavator"'), { model: 'PC200', number: '1' })
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    const saved = api.saveReport.mock.calls[0][2]
+    expect(Object.keys(saved.equipment)).toEqual(['frontEndLoader', 'backhoe', 'truckDump', 'compressor'])
+    expect(saved.equipment.backhoe).toEqual({ model: 'CAT 420', number: '1' })
+    warn.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Read-only when the parent IDR is submitted
 // ---------------------------------------------------------------------------
 
