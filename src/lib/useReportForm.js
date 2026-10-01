@@ -186,6 +186,10 @@ export default function useReportForm({
     }))
   }
 
+  const removePayItem = (index) => {
+    updateForm(prev => ({ ...prev, payItems: prev.payItems.filter((_, i) => i !== index) }))
+  }
+
   const handlePayItemChange = (index, field, value) => {
     updateForm(prev => ({
       ...prev,
@@ -299,7 +303,7 @@ export default function useReportForm({
     // Form state and handlers
     formData, updateForm, handleSaveDraft,
     handleInputChange, handleNestedInputChange, handleSafetyCheckChange, handleSafetyRemarksChange,
-    addPayItem, handlePayItemChange,
+    addPayItem, handlePayItemChange, removePayItem,
     handleAddTrade, handleChangeAdditionalWorkforce, handleRemoveAdditionalWorkforce,
     handleAddEquipment, handleChangeAdditionalEquipment, handleRemoveAdditionalEquipment,
 

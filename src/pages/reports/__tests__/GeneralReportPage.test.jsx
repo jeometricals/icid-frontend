@@ -488,6 +488,36 @@ describe('Save Draft', () => {
       { itemNo: '4.01', budgetCode: '', payQuantity: '12', unit: '', description: '' },
     ])
   })
+
+  it("saves a pay item picked from the project's catalog, budget code chosen from its codes", async () => {
+    api.getIdr.mockResolvedValue(parentIdr({ reportData: {} }))
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Add Item' }))
+    await user.click(screen.getByRole('option', { name: /^4\.13 AAS/ }))
+    await user.selectOptions(screen.getByLabelText('Pay item 1 Budget Code'), '67890')
+    await user.type(screen.getByLabelText('Pay item 1 Pay Quantity'), '150')
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(api.saveReport.mock.calls[0][2].payItems).toEqual([{
+      itemNo: '4.13 AAS', budgetCode: '67890', payQuantity: '150', unit: 'S.F.', description: '4" Concrete Sidewalk (Unpigmented)',
+    }])
+  })
+
+  it('saves without a removed pay item', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: { payItems: [{ itemNo: 'A', budgetCode: '', payQuantity: '', unit: '', description: '' },
+        { itemNo: 'B', budgetCode: '', payQuantity: '', unit: '', description: '' }] },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: 'Remove pay item 1' }))
+    await user.click(saveButton())
+
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(api.saveReport.mock.calls[0][2].payItems.map(item => item.itemNo)).toEqual(['B'])
+  })
 })
 
 // ---------------------------------------------------------------------------

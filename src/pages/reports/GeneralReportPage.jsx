@@ -56,6 +56,10 @@ export default function GeneralReportPage() {
         payItems={formData.payItems}
         onAddItem={form.addPayItem}
         onItemChange={form.handlePayItemChange}
+        onRemoveItem={form.removePayItem}
+        contractItems={form.contractItems}
+        contractItemsLoading={form.contractItemsLoading}
+        contractItemsError={form.contractItemsError}
         disabled={isReadOnly}
       />
 

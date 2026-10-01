@@ -354,6 +354,26 @@ describe('useReportForm — pay item unit', () => {
       { itemNo: '4.01', budgetCode: 'B7', payQuantity: '12', unit: '', description: 'Curb' },
     ])
   })
+
+  it('turns a saved null unit into an empty one', async () => {
+    api.getIdr.mockResolvedValue(idrWith({
+      reportData: { payItems: [{ itemNo: '4.01', budgetCode: '', payQuantity: '', unit: null, description: '' }] },
+    }))
+    const { result } = renderForm(realLoader)
+    await ready(result)
+    expect(result.current.formData.payItems[0].unit).toBe('')
+  })
+})
+
+describe('useReportForm — removePayItem', () => {
+  it('removes the pay item at that index and marks the form unsaved', async () => {
+    api.getIdr.mockResolvedValue(idrWith({ reportData: { payItems: [{ itemNo: 'A' }, { itemNo: 'B' }] } }))
+    const { result } = renderForm()
+    await ready(result)
+    act(() => result.current.removePayItem(0))
+    expect(result.current.formData.payItems).toEqual([{ itemNo: 'B' }])
+    expect(result.current.hasUnsavedChanges).toBe(true)
+  })
 })
 
 describe('useReportForm — contract items', () => {
