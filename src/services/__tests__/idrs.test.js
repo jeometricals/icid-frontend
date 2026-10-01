@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createIdr, listIdrs, getIdr, saveIdrHeader, submitIdr } from '../idrs'
-import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { format } from 'date-fns'
+import { createIdr, createOrGetIdr, listIdrs, getIdr, saveIdrHeader, submitIdr } from '../idrs'
+import { mockFetch, mockFetchFailure, mockFetchSequence, fetchUrl, fetchInit } from '../../test/mockFetch'
 import { CURRENT_USER_ID } from '../session'
 
 beforeEach(() => {
@@ -91,6 +92,41 @@ describe('createIdr', () => {
     mockFetchFailure('Network error')
     await expect(createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' }))
       .rejects.toThrow('Network error')
+  })
+})
+
+describe('createOrGetIdr', () => {
+  const SUBMITTED = { ...MOCK_IDR, status: 'submitted', submitted_at: '2026-09-25T21:10:00Z', reports: [] }
+
+  it('creates the IDR for the given date and says it is new', async () => {
+    mockFetch(201, { status: 'success', data: MOCK_IDR })
+    const result = await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-24' })
+    expect(JSON.parse(fetchInit().body).report_date).toBe('2026-09-24')
+    expect(result).toEqual({ idr: MOCK_IDR, isNew: true })
+  })
+
+  it('defaults the date to today, local time', async () => {
+    mockFetch(201, { status: 'success', data: MOCK_IDR })
+    await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID })
+    expect(JSON.parse(fetchInit().body).report_date).toBe(format(new Date(), 'yyyy-MM-dd'))
+  })
+
+  it("on a 409 fetches that day's existing IDR, with its status", async () => {
+    mockFetchSequence([
+      [409, { detail: 'IDR already exists for this project and date', existing_idr_id: IDR_ID }],
+      [200, { status: 'success', data: SUBMITTED }],
+    ])
+    const result = await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' })
+    expect(new URL(fetch.mock.calls[1][0]).pathname).toBe(`/v1/idrs/${IDR_ID}`)
+    expect(result.isNew).toBe(false)
+    expect(result.idr).toMatchObject({ idr_id: IDR_ID, status: 'submitted', submitted_at: '2026-09-25T21:10:00Z' })
+  })
+
+  it('throws any other failure', async () => {
+    mockFetch(403, { detail: 'Reporter is not assigned to this project' })
+    await expect(createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' }))
+      .rejects.toMatchObject({ status: 403 })
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 })
 

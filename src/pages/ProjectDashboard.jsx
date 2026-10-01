@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { HardHat, LogOut, ArrowLeft } from 'lucide-react'
-import { format } from 'date-fns'
-import { getProjectById, createIdr } from '../services/api'
+import { getProjectById } from '../services/api'
+import NewIdrDateModal from '../components/NewIdrDateModal'
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()
@@ -13,8 +13,7 @@ export default function ProjectDashboard() {
   const [loadingProject, setLoadingProject] = useState(true)
   const [loadError, setLoadError] = useState(null) // the thrown Error; status 404 means the project doesn't exist
   const [attempt, setAttempt] = useState(0) // bump to retry
-  const [creatingIdr, setCreatingIdr] = useState(false)
-  const [createIdrError, setCreateIdrError] = useState(null)
+  const [pickingIdrDate, setPickingIdrDate] = useState(false) // the "Pick a report date" dialog is open
 
   useEffect(() => {
     let ignore = false
@@ -32,25 +31,6 @@ export default function ProjectDashboard() {
     navigate('/login')
   }
 
-  // Opens today's IDR: creates it, or on 409 (one already exists for today) opens that one instead.
-  // Either way the inspector just lands on their IDR; any other failure is shown under the button.
-  const handleNewIdr = async () => {
-    if (creatingIdr) return
-    setCreatingIdr(true)
-    setCreateIdrError(null)
-    try {
-      const idr = await createIdr({ projectId, reporterUuid: user.id, reportDate: format(new Date(), 'yyyy-MM-dd') })
-      navigate(`/project/${projectId}/idr/${idr.idr_id}`)
-    } catch (err) {
-      if (err.status === 409 && err.body?.existing_idr_id) {
-        navigate(`/project/${projectId}/idr/${err.body.existing_idr_id}`)
-      } else {
-        setCreateIdrError(err.message)
-      }
-    } finally {
-      setCreatingIdr(false)
-    }
-  }
 
   if (loadingProject) {
     return (
@@ -186,18 +166,12 @@ export default function ProjectDashboard() {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div>
-            <button
-              onClick={handleNewIdr}
-              disabled={creatingIdr}
-              className="w-full h-full bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center disabled:opacity-60 disabled:cursor-wait"
-            >
-              <h3 className="font-bold text-lg">{creatingIdr ? 'Opening...' : 'New Inspector Daily Diary'}</h3>
-            </button>
-            {createIdrError && (
-              <p role="alert" className="mt-2 text-sm text-red-600">Couldn't start today's IDR: {createIdrError}</p>
-            )}
-          </div>
+          <button
+            onClick={() => setPickingIdrDate(true)}
+            className="bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center"
+          >
+            <h3 className="font-bold text-lg">New Inspector Daily Diary</h3>
+          </button>
           <button
             onClick={() => navigate(`/project/${projectId}/drafts`)}
             className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
@@ -219,6 +193,15 @@ export default function ProjectDashboard() {
           </button>
         </div>
       </main>
+
+      {pickingIdrDate && (
+        <NewIdrDateModal
+          projectId={projectId}
+          reporterUuid={user.id}
+          onOpen={(idrId) => navigate(`/project/${projectId}/idr/${idrId}`)}
+          onClose={() => setPickingIdrDate(false)}
+        />
+      )}
     </div>
   )
 }

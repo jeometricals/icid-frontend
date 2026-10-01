@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import { apiFetch } from './apiClient'
 
 /**
@@ -8,6 +9,20 @@ export async function createIdr({ projectId, reporterUuid, reportDate }) {
   const body = { project_id: projectId, reporter_uuid: reporterUuid, report_date: reportDate }
   const json = await apiFetch('/v1/idrs/', { method: 'POST', body })
   return json.data
+}
+
+/**
+ * Opens an inspector's IDR for one day: creates the draft, or, when that day's IDR already exists (409), fetches it.
+ * reportDate ('yyyy-MM-dd') defaults to today, local time.
+ * Returns { idr, isNew }; idr carries status and submitted_at either way.
+ */
+export async function createOrGetIdr({ projectId, reporterUuid, reportDate = format(new Date(), 'yyyy-MM-dd') }) {
+  try {
+    return { idr: await createIdr({ projectId, reporterUuid, reportDate }), isNew: true }
+  } catch (err) {
+    if (err.status !== 409 || !err.body?.existing_idr_id) throw err
+    return { idr: await getIdr(err.body.existing_idr_id), isNew: false }
+  }
 }
 
 /**

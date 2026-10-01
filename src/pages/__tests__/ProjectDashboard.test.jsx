@@ -240,50 +240,37 @@ describe('ProjectDashboard new IDR button', () => {
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
   })
 
-  it("creates today's IDR for the signed-in inspector and opens it", async () => {
-    vi.spyOn(api, 'createIdr').mockResolvedValue({ idr_id: 'idr-new', status: 'draft' })
+  it('opens the "Pick a report date" dialog, defaulted to today', async () => {
     renderDashboard()
     await userEvent.click(await newIdrButton())
+    expect(screen.getByRole('dialog', { name: 'Pick a report date' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Report date')).toHaveValue(format(new Date(), 'yyyy-MM-dd'))
+  })
 
-    expect(api.createIdr).toHaveBeenCalledWith({
+  it("creates the picked day's IDR for the signed-in inspector and opens it", async () => {
+    vi.spyOn(api, 'createOrGetIdr').mockResolvedValue({ idr: { idr_id: 'idr-new', status: 'draft' }, isNew: true })
+    renderDashboard()
+    await userEvent.click(await newIdrButton())
+    await userEvent.clear(screen.getByLabelText('Report date'))
+    await userEvent.type(screen.getByLabelText('Report date'), '2026-09-29')
+    await userEvent.click(screen.getByRole('button', { name: 'Open / Create' }))
+
+    expect(api.createOrGetIdr).toHaveBeenCalledWith({
       projectId: 'HWS0023',
       reporterUuid: DEV_USER.id,
-      reportDate: format(new Date(), 'yyyy-MM-dd'), // local date, not UTC
+      reportDate: '2026-09-29',
     })
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/idr/idr-new'))
   })
 
-  it("opens the existing IDR on a 409 (today's IDR already exists), with no error shown", async () => {
-    vi.spyOn(api, 'createIdr').mockRejectedValue(
-      Object.assign(apiError('An IDR already exists for this date', 409), { body: { existing_idr_id: 'idr-today' } })
-    )
+  it('Cancel closes the dialog without creating anything', async () => {
+    vi.spyOn(api, 'createOrGetIdr')
     renderDashboard()
     await userEvent.click(await newIdrButton())
-
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/idr/idr-today'))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('shows any other failure under the button and stays on the dashboard', async () => {
-    vi.spyOn(api, 'createIdr').mockRejectedValue(apiError('Reporter is not assigned to this project', 403))
-    renderDashboard()
-    await userEvent.click(await newIdrButton())
-
-    expect(await screen.findByRole('alert'))
-      .toHaveTextContent("Couldn't start today's IDR: Reporter is not assigned to this project")
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(api.createOrGetIdr).not.toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
-    expect(await newIdrButton()).toBeEnabled()
-  })
-
-  it('shows "Opening..." and ignores extra clicks while the request is running', async () => {
-    vi.spyOn(api, 'createIdr').mockReturnValue(new Promise(() => {}))
-    renderDashboard()
-    await userEvent.click(await newIdrButton())
-
-    const busy = screen.getByRole('button', { name: 'Opening...' })
-    expect(busy).toBeDisabled()
-    await userEvent.click(busy)
-    expect(api.createIdr).toHaveBeenCalledTimes(1)
   })
 })
 
