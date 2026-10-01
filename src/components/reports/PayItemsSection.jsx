@@ -4,7 +4,7 @@
  * With the project's contract items loaded, Add Item opens the pay-item picker on the new row, and clicking a row's
  * Item No. or Description opens it there; picking fills Item No., Description and Unit, plus Budget Code when the
  * item has only one. An item under several budget codes gets a Budget Code dropdown of just those codes. Every field
- * stays editable after a pick. While the catalog loads Add Item is disabled; if it failed to load, rows are typed by hand.
+ * stays editable after a pick. A row the inspector chose "+ Add manually" for no longer opens the picker on click. While the catalog loads Add Item is disabled; if it failed to load, rows are typed by hand.
  * Props: payItems (array of { itemNo, budgetCode, payQuantity, unit, description }), onAddItem(),
  * onItemChange(index, field, value), onRemoveItem(index), contractItems, contractItemsLoading, contractItemsError,
  * disabled (makes the buttons and inputs natively disabled).
@@ -30,6 +30,8 @@ export default function PayItemsSection({
   // The open picker: which row and cell it hangs off, and whether it takes focus (nonce remounts it to refocus)
   const [picker, setPicker] = useState(null) // { index, field, focusSearch, nonce } | null
   const cellRefs = useRef({})
+  // Indexes of rows chosen for manual entry ("+ Add manually"); their cells no longer open the picker
+  const [manualRows, setManualRows] = useState(() => new Set())
 
   const entries = useMemo(() => catalogEntries(contractItems), [contractItems])
   const budgetCodesByItemNo = useMemo(
@@ -39,8 +41,10 @@ export default function PayItemsSection({
 
   const pickerAvailable = !disabled && !contractItemsLoading && !contractItemsError
 
+  const canPick = (index) => pickerAvailable && !manualRows.has(index)
+
   const openPicker = (index, field, focusSearch) => {
-    if (!pickerAvailable) return
+    if (!canPick(index)) return
     setPicker(prev => ({ index, field, focusSearch, nonce: (prev?.nonce ?? 0) + 1 }))
   }
   const closePicker = useCallback(() => setPicker(null), [])
@@ -61,11 +65,14 @@ export default function PayItemsSection({
   // Closes the picker and leaves the row for typing, focused on the cell the picker hung off
   const handleAddManual = () => {
     const anchorInput = cellRefs.current[`${picker.index}-${picker.field}`]?.querySelector('input')
+    setManualRows(prev => new Set(prev).add(picker.index))
     setPicker(null)
     anchorInput?.focus()
   }
 
+  // The rows below a removed one move up an index, and their manual marks move with them
   const handleRemove = (index) => {
+    setManualRows(prev => new Set([...prev].filter(i => i !== index).map(i => (i > index ? i - 1 : i))))
     setPicker(null)
     onRemoveItem(index)
   }
@@ -78,6 +85,7 @@ export default function PayItemsSection({
   // Item No. and Description open the picker on click; ArrowDown opens it with the search box focused
   const pickerCell = (item, index, field, label, placeholder) => {
     const isOpen = picker?.index === index && picker?.field === field
+    const pickable = canPick(index)
     return (
       <td className="px-4 py-2" ref={el => { cellRefs.current[`${index}-${field}`] = el }}>
         <input
@@ -85,13 +93,13 @@ export default function PayItemsSection({
           className="input-field"
           placeholder={placeholder}
           aria-label={`Pay item ${index + 1} ${label}`}
-          aria-haspopup={pickerAvailable ? 'listbox' : undefined}
-          aria-expanded={pickerAvailable ? isOpen : undefined}
+          aria-haspopup={pickable ? 'listbox' : undefined}
+          aria-expanded={pickable ? isOpen : undefined}
           value={item[field] ?? ''}
           disabled={disabled}
           onClick={() => { if (!isOpen) openPicker(index, field, false) }}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' && pickerAvailable) {
+            if (e.key === 'ArrowDown' && pickable) {
               e.preventDefault()
               openPicker(index, field, true)
             } else if (e.key === 'Escape' && isOpen) {

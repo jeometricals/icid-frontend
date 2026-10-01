@@ -320,6 +320,16 @@ describe('IDRPage — reports', () => {
     expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/swcb/rep-swcb`)
     expect(screen.getByTestId('from')).toHaveTextContent('drafts')
   })
+
+  it('opens an AC report at /project/:projectId/idr/:idrId/ac/:reportId', async () => {
+    server = draftIdr({ reports: [report({ report_id: 'rep-ac', report_type: 'AC' })] })
+    const user = userEvent.setup()
+    renderPage('drafts')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/ac/rep-ac`)
+    expect(screen.getByTestId('from')).toHaveTextContent('drafts')
+  })
 })
 
 // ---------------------------------------------------------------------------

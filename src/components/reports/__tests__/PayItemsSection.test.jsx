@@ -176,6 +176,59 @@ describe('PayItemsSection — picker', () => {
   })
 })
 
+describe('PayItemsSection — manual rows', () => {
+  it("after '+ Add manually', clicking that row's cells or pressing ArrowDown no longer opens the picker", async () => {
+    const user = userEvent.setup()
+    renderSection()
+    await user.click(addButton())
+    await user.click(screen.getByRole('button', { name: '+ Add manually' }))
+
+    await user.click(cell(1, 'Pay Quantity'))
+    await user.click(cell(1, 'Item No.'))
+    expect(picker()).not.toBeInTheDocument()
+    await user.click(cell(1, 'Description'))
+    expect(picker()).not.toBeInTheDocument()
+    await user.keyboard('{ArrowDown}')
+    expect(picker()).not.toBeInTheDocument()
+    expect(cell(1, 'Item No.')).not.toHaveAttribute('aria-expanded')
+  })
+
+  it('other rows still open the picker, including a new one from Add Item', async () => {
+    const user = userEvent.setup()
+    renderSection({ initial: [blankRow()] })
+    await user.click(addButton())
+    await user.click(screen.getByRole('button', { name: '+ Add manually' })) // row 2 is manual
+    await user.click(cell(1, 'Item No.'))
+    expect(picker()).toBeInTheDocument()
+
+    await user.click(addButton()) // row 3
+    expect(picker()).toBeInTheDocument()
+    expect(cell(3, 'Item No.')).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('removing a row moves the manual marks of the rows below it up with them', async () => {
+    const user = userEvent.setup()
+    renderSection({ initial: [blankRow(), blankRow(), blankRow()] })
+    // Mark row 2 manual
+    await user.click(cell(2, 'Item No.'))
+    await user.click(screen.getByRole('button', { name: '+ Add manually' }))
+
+    // Removing row 2 itself: the old row 3 is now row 2, and opens the picker
+    await user.click(screen.getByRole('button', { name: 'Remove pay item 2' }))
+    await user.click(cell(2, 'Item No.'))
+    expect(picker()).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    expect(picker()).not.toBeInTheDocument()
+
+    // Mark the new row 2 manual, then remove row 1: it moves up to row 1 and stays manual
+    await user.click(cell(2, 'Item No.'))
+    await user.click(screen.getByRole('button', { name: '+ Add manually' }))
+    await user.click(screen.getByRole('button', { name: 'Remove pay item 1' }))
+    await user.click(cell(1, 'Item No.'))
+    expect(picker()).not.toBeInTheDocument()
+  })
+})
+
 describe('PayItemsSection — catalog states', () => {
   it('when the catalog failed to load: no picker, a notice, and Add Item still appends a blank row', async () => {
     const user = userEvent.setup()

@@ -120,6 +120,12 @@ describe('useReportForm — loading', () => {
     await waitFor(() => expect(result.current.loadStatus).toBe('error'))
     expect(result.current.loadError).toBe('This report is not a Sidewalk, Curb, Concrete Base report')
   })
+
+  it("uses 'an' before a label starting with a vowel", async () => {
+    const { result } = renderForm({ expectedReportType: 'AC' })
+    await waitFor(() => expect(result.current.loadStatus).toBe('error'))
+    expect(result.current.loadError).toBe('This report is not an Asphaltic Concrete report')
+  })
 })
 
 describe('useReportForm — navigateSafely', () => {

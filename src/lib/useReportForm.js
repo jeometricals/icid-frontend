@@ -21,7 +21,9 @@ function findReport(idr, projectId, reportId, expectedReportType) {
   const report = idr.reports.find(r => r.report_id === reportId)
   if (!report) throw new Error('Report not found in this IDR')
   if (report.report_type !== expectedReportType) {
-    throw new Error(`This report is not a ${reportTypeLabel(expectedReportType)} report`)
+    const label = reportTypeLabel(expectedReportType)
+    const article = /^[aeiou]/i.test(label.trim()) ? 'an' : 'a'
+    throw new Error(`This report is not ${article} ${label} report`)
   }
   return report
 }

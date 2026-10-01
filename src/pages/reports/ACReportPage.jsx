@@ -7,7 +7,7 @@
  */
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
-import { formDataFromReportData, sharedSectionDefaults } from '../../lib/reportData'
+import { formDataFromReportData, isObject, sharedSectionDefaults } from '../../lib/reportData'
 import ReportPageShell from '../../components/reports/ReportPageShell'
 import ACPavingContractorInfo from '../../components/reports/ACPavingContractorInfo'
 import ACTemperature from '../../components/reports/ACTemperature'
@@ -69,8 +69,6 @@ function emptyFormData() {
     ...sharedSectionDefaults()
   }
 }
-
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // Saved object over its defaults; anything that isn't an object (missing, '', an array) loads as the defaults
 const mergeSection = (defaults, saved) => ({ ...defaults, ...(isObject(saved) ? saved : {}) })

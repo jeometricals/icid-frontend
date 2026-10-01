@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
+import { isObject } from '../../lib/reportData'
 import ReportPageShell from '../../components/reports/ReportPageShell'
 import ConcCylTestingLab from '../../components/reports/ConcCylTestingLab'
 import ConcCylDeliveryCasting from '../../components/reports/ConcCylDeliveryCasting'
@@ -27,8 +28,6 @@ function emptyFormData() {
     remarks: ''
   }
 }
-
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // This report's saved report_data as form state: defaults for missing keys, one level down too, so partial or
 // older saved shapes and cylinder rows missing a field load cleanly

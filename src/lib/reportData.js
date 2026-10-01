@@ -9,6 +9,9 @@ export const IDR_LEVEL_KEYS = [
   'dailyTempLow', 'dailyTempHigh', 'weatherAM', 'weatherPM',
 ]
 
+/** True for a plain object: not null, not an array. Saved report_data sections are checked with it before merging. */
+export const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
+
 // Older reports stored safety checks as booleans (true = Y, false = N); strings and null pass through
 function normalizeSafetyCheck(value) {
   if (value === true) return 'Y'
@@ -84,7 +87,7 @@ export function sharedSectionDefaults() {
  * A report's saved report_data as form state, given that page's blank form (defaults). Fills missing keys from the
  * defaults (including missing workforce roles, equipment types and safety remarks), drops IDR-level keys, renames
  * legacy workforce keys, converts boolean safety checks to 'Y' / 'N', drops the retired pay item quantityChk and gives
- * pay items saved before the unit field a blank unit.
+ * pay items saved before the unit field a blank unit. A saved payItems that isn't an array loads as no pay items.
  */
 export function formDataFromReportData(reportData, defaults) {
   const data = { ...defaults, ...reportData }
@@ -94,7 +97,8 @@ export function formDataFromReportData(reportData, defaults) {
   // Older reports stored one never-displayed safetyRemarks string; it's dropped for the per-item object
   const savedRemarks = typeof data.safetyRemarks === 'object' && data.safetyRemarks !== null ? data.safetyRemarks : {}
   data.safetyRemarks = { ...defaults.safetyRemarks, ...savedRemarks }
-  data.payItems = data.payItems.map(({ quantityChk, ...item }) => ({ ...item, unit: item.unit ?? '' }))
+  const savedPayItems = Array.isArray(data.payItems) ? data.payItems : []
+  data.payItems = savedPayItems.map(({ quantityChk, ...item }) => ({ ...item, unit: item.unit ?? '' }))
   data.safetyChecks = Object.fromEntries(
     Object.entries(data.safetyChecks).map(([key, value]) => [key, normalizeSafetyCheck(value)])
   )

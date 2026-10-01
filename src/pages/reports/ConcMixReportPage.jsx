@@ -6,6 +6,7 @@
  */
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
+import { isObject } from '../../lib/reportData'
 import ReportPageShell from '../../components/reports/ReportPageShell'
 import ConcMixLocationOfUse from '../../components/reports/ConcMixLocationOfUse'
 import ConcMixMixerType from '../../components/reports/ConcMixMixerType'
@@ -49,8 +50,6 @@ function emptyFormData() {
     remarks: ''
   }
 }
-
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // This report's saved report_data as form state: defaults for missing keys, one level down too, so reports saved by
 // the earlier placeholder page (mixerType: '', locationOfUse: {}, …) and truck rows missing a field load cleanly

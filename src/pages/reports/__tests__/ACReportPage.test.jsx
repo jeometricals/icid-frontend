@@ -158,7 +158,7 @@ describe('ACReportPage — loading', () => {
   it('shows a load error when the report is not an AC report', async () => {
     api.getIdr.mockResolvedValue(parentIdr({ reportType: 'GEN' }))
     renderPage()
-    expect(await screen.findByText('This report is not a Asphaltic Concrete report')).toBeInTheDocument()
+    expect(await screen.findByText('This report is not an Asphaltic Concrete report')).toBeInTheDocument()
     expect(screen.queryByPlaceholderText(/additional comments/i)).not.toBeInTheDocument()
   })
 
