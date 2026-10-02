@@ -58,6 +58,7 @@ vi.mock('../../services/api', () => ({
   addReport: vi.fn(),
   deleteReport: vi.fn(),
   submitIdr: vi.fn(),
+  generateExport: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -482,6 +483,40 @@ describe('IDRPage — read-only', () => {
     await ready()
     expect(reportRows()[0]).toHaveTextContent('Saved')
     expect(screen.queryByText(/^Page /)).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — export', () => {
+  const exportButton = () => screen.getByRole('button', { name: /export/i })
+
+  it('offers "Export Draft (.xlsx)" next to Submit on a draft, exporting this IDR', async () => {
+    api.generateExport.mockResolvedValue('IDR.xlsx')
+    renderPage()
+    await ready()
+    expect(exportButton()).toHaveTextContent('Export Draft (.xlsx)')
+    expect(exportButton().parentElement.parentElement).toContainElement(submitButton())  // the same row
+    await userEvent.click(exportButton())
+    expect(api.generateExport).toHaveBeenCalledWith(IDR_ID)
+  })
+
+  it('offers "Export (.xlsx)" beside the Submitted banner once submitted', async () => {
+    server = draftIdr({ status: 'submitted', submitted_at: '2026-09-25T16:05:23Z', total_pages: 1 })
+    renderPage('archive')
+    await ready()
+    expect(exportButton()).toHaveTextContent('Export (.xlsx)')
+    expect(exportButton()).toBeEnabled()
+    expect(exportButton().closest('header')).toHaveTextContent(/Submitted at/)
+  })
+
+  it('is disabled while the IDR has no reports', async () => {
+    server = draftIdr({ reports: [] })
+    renderPage()
+    await ready()
+    expect(exportButton()).toBeDisabled()
   })
 })
 

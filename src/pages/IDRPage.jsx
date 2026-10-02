@@ -1,7 +1,8 @@
 /**
  * One IDR (Inspector Daily Report) at /project/:projectId/idr/:idrId: the shared header form, the reports
- * inside the IDR (add, open, delete) and Submit. Every change is followed by a silent refetch, so the page
- * always shows what the server has. A submitted IDR renders read-only with a "Submitted at" banner.
+ * inside the IDR (add, open, delete), Export (.xlsx) and Submit. Every change is followed by a silent refetch, so
+ * the page always shows what the server has. A submitted IDR renders read-only with a "Submitted at" banner, and
+ * keeps its Export button.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -18,6 +19,7 @@ import SubmitReportButton from '../components/SubmitReportButton'
 import SaveStatusText from '../components/SaveStatusText'
 import SubmittedBanner from '../components/SubmittedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ExportIdrButton from '../components/ExportIdrButton'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 const CERTIFICATION_STATEMENT =
@@ -217,7 +219,12 @@ export default function IDRPage() {
               <ArrowLeft className="h-5 w-5" />
               <span className="font-medium">{back.label}</span>
             </button>
-            {readOnly && <SubmittedBanner submittedAt={idr.submitted_at} />}
+            {readOnly && (
+              <div className="flex items-start space-x-3">
+                <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />
+                <SubmittedBanner submittedAt={idr.submitted_at} />
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -302,15 +309,18 @@ export default function IDRPage() {
           )}
         </section>
 
-        {/* Submit */}
+        {/* Export and Submit */}
         {!readOnly && (
           <div className="flex flex-col items-end space-y-2">
-            <SubmitReportButton
-              label="Submit IDR"
-              onClick={openCertify}
-              submitting={busyAction === 'submit'}
-              disabled={reports.length === 0 || busy}
-            />
+            <div className="flex items-start space-x-3">
+              <ExportIdrButton idrId={idrId} isDraft disabled={reports.length === 0 || busy} />
+              <SubmitReportButton
+                label="Submit IDR"
+                onClick={openCertify}
+                submitting={busyAction === 'submit'}
+                disabled={reports.length === 0 || busy}
+              />
+            </div>
             {reports.length === 0 && (
               <p className="text-sm text-gray-500">Add at least one report before submitting.</p>
             )}
