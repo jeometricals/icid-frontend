@@ -21,6 +21,7 @@ import SaveStatusText from '../components/SaveStatusText'
 import SubmittedBanner from '../components/SubmittedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
+import GoToProjectButton from '../components/GoToProjectButton'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
@@ -125,7 +126,7 @@ export default function IDRPage() {
 
   if (loadStatus === 'loading') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
         <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
         <p className="mt-4 text-gray-600">Loading IDR...</p>
       </div>
@@ -134,7 +135,7 @@ export default function IDRPage() {
 
   if (loadStatus === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
           <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't open this IDR</h2>
           <p className="text-red-600 mb-6">{loadError}</p>
@@ -212,18 +213,22 @@ export default function IDRPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="flex-1 bg-gray-50 pb-20">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate(`/project/${projectId}${back.path}`)}
-              className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
-            >
-              <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium">{back.label}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <button
+                onClick={() => navigate(`/project/${projectId}${back.path}`)}
+                className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                <span className="font-medium">{back.label}</span>
+              </button>
+              {/* Not when Back already goes to the project page */}
+              {back !== BACK_TO_PROJECT && <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />}
+            </div>
             {readOnly && (
               <div className="flex items-start space-x-3">
                 <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />

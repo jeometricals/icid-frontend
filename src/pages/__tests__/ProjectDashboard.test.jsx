@@ -6,7 +6,7 @@ import { format } from 'date-fns'
 import ProjectDashboard from '../ProjectDashboard'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { DEMO_USER, TEST_USER } from '../../test/users'
+import { TEST_USER } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -207,28 +207,24 @@ describe('ProjectDashboard with optional fields null', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Sign out
+// Navigation off the page
 // ---------------------------------------------------------------------------
 
-describe('ProjectDashboard sign out', () => {
-  it('signs out through the header (the auth context does the redirect)', async () => {
-    const logout = vi.fn().mockResolvedValue(undefined)
-    mockAuth({ logout })
+describe('ProjectDashboard navigation', () => {
+  it('has no "Back to Project Page" button: this is the project page', async () => {
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
-    await waitFor(() => screen.getByText('Sign Out'))
-    await userEvent.click(screen.getByText('Sign Out'))
-    expect(logout).toHaveBeenCalled()
+    await screen.findByText('Report Archive')
+    expect(screen.queryByText('Back to Project Page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Go to Project Page')).not.toBeInTheDocument()
+    expect(screen.getByText('Back to Project List')).toBeInTheDocument()
   })
 
-  it('asks a demo user to confirm before signing out', async () => {
-    const logout = vi.fn().mockResolvedValue(undefined)
-    mockAuth({ user: DEMO_USER, logout })
+  it('leaves the app header to the layout', async () => {
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
-    await userEvent.click(await screen.findByText('Sign Out'))
-    expect(screen.getByRole('dialog', { name: 'Sign out of demo mode?' })).toBeInTheDocument()
-    expect(logout).not.toHaveBeenCalled()
+    await screen.findByText('Report Archive')
+    expect(screen.queryByText('Sign Out')).not.toBeInTheDocument()
   })
 })
 

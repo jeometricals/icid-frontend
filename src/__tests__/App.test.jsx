@@ -121,3 +121,53 @@ describe('protected routes', () => {
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// The app header
+// ---------------------------------------------------------------------------
+
+describe('app header', () => {
+  const logoLink = () => screen.findByRole('link', { name: /ICID Co\./ })
+
+  beforeEach(() => {
+    localStorage.setItem(TOKEN_KEY, 'stored-token')
+    api.fetchCurrentUser.mockResolvedValue(TEST_USER)
+  })
+
+  it.each([
+    ['the project list', '/projects'],
+    ['the project page', '/project/HWS0023'],
+    ['Drafts', '/project/HWS0023/drafts'],
+    ['the Archive', '/project/HWS0023/archive'],
+    ['an IDR', '/project/HWS0023/idr/idr-1'],
+    ['a General report', '/project/HWS0023/idr/idr-1/general/rep-1'],
+    ['an SWCB report', '/project/HWS0023/idr/idr-1/swcb/rep-1'],
+    ['an AC report', '/project/HWS0023/idr/idr-1/ac/rep-1'],
+  ])('is on %s, with the user\'s name and Sign Out', async (_, path) => {
+    api.listUsers = vi.fn().mockResolvedValue([])
+    window.history.pushState({}, '', path)
+    render(<App />)
+    expect(await logoLink()).toHaveAttribute('href', '/projects')
+    expect(screen.getByText('Genghis')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument()
+    expect(screen.getAllByRole('banner').length).toBeGreaterThanOrEqual(1)
+    expect(window.location.pathname).toBe(path)
+  })
+
+  it('takes the user from a deep page to the project list when the logo is clicked', async () => {
+    window.history.pushState({}, '', '/project/HWS0023/drafts')
+    render(<App />)
+    await userEvent.click(await logoLink())
+    await vi.waitFor(() => expect(window.location.pathname).toBe('/projects'))
+    expect(await screen.findByText('Pick A Project')).toBeInTheDocument()
+  })
+
+  it('is not on the login page', async () => {
+    localStorage.clear()
+    window.history.pushState({}, '', '/login')
+    render(<App />)
+    expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /ICID Co\./ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign Out' })).not.toBeInTheDocument()
+  })
+})

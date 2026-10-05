@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { getProjectById } from '../services/api'
 import NewIdrDateModal from '../components/NewIdrDateModal'
-import AppHeader from '../components/AppHeader'
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()
@@ -28,7 +27,7 @@ export default function ProjectDashboard() {
 
   if (loadingProject) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
       </div>
     )
@@ -36,7 +35,7 @@ export default function ProjectDashboard() {
 
   if (loadError?.status === 404) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Project not found</h2>
           <button onClick={() => navigate('/projects')} className="mt-4 btn-primary">
@@ -49,7 +48,7 @@ export default function ProjectDashboard() {
 
   if (loadError || !project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-lg shadow-sm p-6 text-center max-w-md">
           <h2 className="text-lg font-bold text-gray-900 mb-2">Couldn't load this project</h2>
           <p className="text-red-600 mb-6">{loadError?.message || 'No project data returned'}</p>
@@ -67,8 +66,7 @@ export default function ProjectDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AppHeader />
+    <div className="flex-1 bg-gray-50">
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -140,13 +138,6 @@ export default function ProjectDashboard() {
             className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
           >
             <h3 className="font-bold text-lg">Report Archive</h3>
-          </button>
-        </div>
-
-        {/* Back Button (bottom) */}
-        <div className="text-center">
-          <button onClick={() => navigate('/projects')} className="btn-secondary">
-            Back to Project Page
           </button>
         </div>
       </main>

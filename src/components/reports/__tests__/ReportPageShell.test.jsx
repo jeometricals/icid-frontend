@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { format } from 'date-fns'
 import ReportPageShell from '../ReportPageShell'
+import { LeaveGuardProvider, useGuardedLeave } from '../../../contexts/LeaveGuardContext'
 
 // AttachmentsSection fetches its own data; the shell only decides whether and how it is mounted
 vi.mock('../../AttachmentsSection', () => ({
@@ -117,6 +118,10 @@ describe('ReportPageShell', () => {
     expect(form.navigateSafely).toHaveBeenLastCalledWith(form.backToIdr)
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(form.navigateSafely).toHaveBeenLastCalledWith(form.backToProject)
+    form.navigateSafely.mockClear()
+    await user.click(screen.getByRole('button', { name: 'Go to Project Page' }))
+    expect(form.navigateSafely).toHaveBeenCalledTimes(1)
+    expect(form.navigateSafely).toHaveBeenLastCalledWith(form.backToProject)
     // The shell never navigates around navigateSafely
     expect(form.backToIdr).not.toHaveBeenCalled()
     expect(form.backToProject).not.toHaveBeenCalled()
@@ -195,5 +200,41 @@ describe('ReportPageShell', () => {
     const form = renderShell({ refreshError: 'Network error' })
     await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }))
     expect(form.refresh).toHaveBeenCalled()
+  })
+})
+
+describe('ReportPageShell — Go to Project Page', () => {
+  it('sits right after Back to IDR in the header', () => {
+    renderShell()
+    const back = screen.getByRole('button', { name: 'Back to IDR' })
+    expect(back.nextElementSibling).toBe(screen.getByRole('button', { name: 'Go to Project Page' }))
+  })
+
+  it('is there on a submitted (read-only) report too', () => {
+    renderShell({ isLocked: true, isReadOnly: true, submittedAt: SUBMITTED_AT })
+    expect(screen.getByRole('button', { name: 'Go to Project Page' })).toBeEnabled()
+  })
+})
+
+describe('ReportPageShell — leave guard for the app header', () => {
+  // Stands in for the app header: an exit that isn't one of the shell's own buttons
+  function HeaderExit({ action }) {
+    const leave = useGuardedLeave()
+    return <button onClick={() => leave(action)}>header exit</button>
+  }
+
+  it("routes the header's exits through navigateSafely, so unsaved edits are saved first", async () => {
+    const form = formState({ hasUnsavedChanges: true })
+    const action = vi.fn()
+    render(
+      <LeaveGuardProvider>
+        <HeaderExit action={action} />
+        <ReportPageShell title="SWCB Report" form={form}><div /></ReportPageShell>
+      </LeaveGuardProvider>
+    )
+    await userEvent.setup().click(screen.getByRole('button', { name: 'header exit' }))
+    expect(form.navigateSafely).toHaveBeenCalledTimes(1)
+    expect(form.navigateSafely).toHaveBeenCalledWith(action)
+    expect(action).not.toHaveBeenCalled() // navigateSafely decides, here a mock that never runs it
   })
 })

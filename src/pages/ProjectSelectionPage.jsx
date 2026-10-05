@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getProjectsForUser } from '../services/api'
-import AppHeader from '../components/AppHeader'
 
 export default function ProjectSelectionPage() {
   const { user } = useAuth()
@@ -24,8 +23,7 @@ export default function ProjectSelectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AppHeader />
+    <div className="flex-1 bg-gray-50">
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

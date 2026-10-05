@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import AppLayout from './components/AppLayout'
 
 // Pages
 import LoginPage from './pages/LoginPage'
@@ -28,16 +29,19 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/projects" element={<ProjectSelectionPage />} />
-        <Route path="/project/:projectId" element={<ProjectDashboard />} />
-        <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
-        <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
-        <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
-        <Route path="/project/:projectId/idr/:idrId/general/:reportId" element={<GeneralReportPage />} />
-        <Route path="/project/:projectId/idr/:idrId/swcb/:reportId" element={<SWCBReportPage />} />
-        <Route path="/project/:projectId/idr/:idrId/ac/:reportId" element={<ACReportPage />} />
-        <Route path="/project/:projectId/idr/:idrId/conc-mix/:reportId" element={<ConcMixReportPage />} />
-        <Route path="/project/:projectId/idr/:idrId/conc-cyl/:reportId" element={<ConcCylReportPage />} />
+        {/* Every signed-in page sits under the app header */}
+        <Route element={<AppLayout />}>
+          <Route path="/projects" element={<ProjectSelectionPage />} />
+          <Route path="/project/:projectId" element={<ProjectDashboard />} />
+          <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
+          <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
+          <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
+          <Route path="/project/:projectId/idr/:idrId/general/:reportId" element={<GeneralReportPage />} />
+          <Route path="/project/:projectId/idr/:idrId/swcb/:reportId" element={<SWCBReportPage />} />
+          <Route path="/project/:projectId/idr/:idrId/ac/:reportId" element={<ACReportPage />} />
+          <Route path="/project/:projectId/idr/:idrId/conc-mix/:reportId" element={<ConcMixReportPage />} />
+          <Route path="/project/:projectId/idr/:idrId/conc-cyl/:reportId" element={<ConcCylReportPage />} />
+        </Route>
         <Route path="/project/:projectId/idr/:idrId/report/:reportId" element={<LegacyReportRedirect />} />
         <Route path="/" element={<Navigate to="/projects" replace />} />
         <Route path="*" element={<Navigate to="/projects" replace />} />

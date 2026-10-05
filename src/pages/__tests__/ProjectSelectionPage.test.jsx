@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import ProjectSelectionPage from '../ProjectSelectionPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { DEMO_USER, TEST_USER } from '../../test/users'
+import { TEST_USER } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
@@ -100,17 +100,11 @@ describe('ProjectSelectionPage with projects', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023')
   })
 
-  it('shows the signed-in user\'s first name in the header', async () => {
+  it('leaves the app header to the layout', async () => {
     renderPage()
-    await waitFor(() => screen.getByText('Genghis'))
-    expect(screen.getByText('Genghis')).toBeInTheDocument()
-    expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
-  })
-
-  it('shows the Demo Mode badge for a demo user', async () => {
-    mockAuth({ user: DEMO_USER })
-    renderPage()
-    expect(await screen.findByText('Demo Mode')).toBeInTheDocument()
+    await waitFor(() => screen.getByText('HWS0023'))
+    expect(screen.queryByText('Sign Out')).not.toBeInTheDocument()
+    expect(screen.queryByText('ICID Co.')).not.toBeInTheDocument()
   })
 })
 
@@ -142,18 +136,3 @@ describe('ProjectSelectionPage fetch error', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// Sign out
-// ---------------------------------------------------------------------------
-
-describe('ProjectSelectionPage sign out', () => {
-  it('signs out through the header (the auth context does the redirect)', async () => {
-    const logout = vi.fn().mockResolvedValue(undefined)
-    mockAuth({ logout })
-    vi.spyOn(api, 'getProjectsForUser').mockResolvedValue(MOCK_PROJECTS)
-    renderPage()
-    await waitFor(() => screen.getByText('HWS0023'))
-    await userEvent.click(screen.getByText('Sign Out'))
-    expect(logout).toHaveBeenCalled()
-  })
-})

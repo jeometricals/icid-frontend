@@ -602,3 +602,38 @@ describe('IDRPage — signed-in user who is not a demo user', () => {
     expect(screen.queryByText('Demo mode — submit is disabled')).not.toBeInTheDocument()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Go to Project Page
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — Go to Project Page', () => {
+  const goToProject = () => screen.queryByRole('button', { name: 'Go to Project Page' })
+
+  it.each([['drafts', 'Back to Drafts'], ['archive', 'Back to Archive']])(
+    'sits beside "%s"-opened IDR\'s Back button and goes to the project page',
+    async (from, backLabel) => {
+      const user = userEvent.setup()
+      renderPage(from)
+      await ready()
+      const back = screen.getByRole('button', { name: backLabel })
+      expect(goToProject().parentElement).toBe(back.parentElement)
+      expect(back.nextElementSibling).toBe(goToProject())
+      await user.click(goToProject())
+      expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023$/)
+    })
+
+  it('is left out when Back already goes to the project page', async () => {
+    renderPage()
+    await ready()
+    expect(screen.getByRole('button', { name: 'Back to Project Dashboard' })).toBeInTheDocument()
+    expect(goToProject()).not.toBeInTheDocument()
+  })
+
+  it('is there on a submitted IDR too', async () => {
+    server = draftIdr({ status: 'submitted', submitted_at: '2026-09-25T16:05:00Z', total_pages: 1 })
+    renderPage('archive')
+    await ready()
+    expect(goToProject()).toBeInTheDocument()
+  })
+})

@@ -1,16 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from '../AppHeader'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
 
 let logout
 
-function renderHeader(user) {
-  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user, logout })
-  return render(<AppHeader />)
+function CurrentUrl() {
+  return <div data-testid="url">{useLocation().pathname}</div>
 }
+
+function renderHeader(user, path = '/project/HWS0023/idr/idr-1') {
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user, logout })
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AppHeader />
+      <Routes>
+        <Route path="*" element={<CurrentUrl />} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
+const logoLink = () => screen.getByRole('link', { name: /ICID Co\./ })
 
 const signOutButton = () => screen.getByRole('button', { name: 'Sign Out' })
 const confirmDialog = () => screen.queryByRole('dialog', { name: 'Sign out of demo mode?' })
@@ -78,5 +92,36 @@ describe('AppHeader', () => {
     expect(within(confirmDialog()).getByRole('button', { name: 'Working...' })).toBeDisabled()
     expect(within(confirmDialog()).getByRole('button', { name: 'Cancel' })).toBeDisabled()
     await act(async () => finish())
+  })
+})
+
+describe('AppHeader logo', () => {
+  it('is a link to the project list, wrapping the logo and the title', () => {
+    renderHeader(TEST_USER)
+    expect(logoLink()).toHaveAttribute('href', '/projects')
+    expect(within(logoLink()).getByText('ICID Co.')).toBeInTheDocument()
+    expect(within(logoLink()).getByText('Integrated Construction Information Database')).toBeInTheDocument()
+    expect(logoLink().className).toContain('cursor-pointer')
+    expect(logoLink().className).toContain('hover:')
+  })
+
+  it('goes to /projects when clicked from a deep page', async () => {
+    renderHeader(TEST_USER, '/project/HWS0023/idr/idr-1/general/rep-1')
+    await userEvent.click(logoLink())
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/projects$/)
+  })
+
+  it('stays put when clicked on the project list itself', async () => {
+    renderHeader(TEST_USER, '/projects')
+    await userEvent.click(logoLink())
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/projects$/)
+  })
+
+  it('works for a demo user too, without asking anything', async () => {
+    renderHeader(DEMO_USER)
+    await userEvent.click(logoLink())
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/projects$/)
+    expect(confirmDialog()).not.toBeInTheDocument()
+    expect(logout).not.toHaveBeenCalled()
   })
 })

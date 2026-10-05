@@ -14,14 +14,14 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (the signed-in user; see Sign-in below).
+- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers) and `useReportForm.js` (the hook every report page uses for load/save/state). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (the app header, `ProtectedRoute`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -43,6 +43,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   `input-label`, …) and the `construction-*` palette from `tailwind.config.js`. Inline styles only for dynamic values
   Tailwind classes can't express.
 - React Router for navigation (`useNavigate`, `<Navigate>`, `<Link>`), never `window.location`.
+- **Navigation.** Every signed-in page renders inside `AppLayout` (`App.jsx`), which supplies the app header: the
+  ICID Co. logo (a link to `/projects`), the user's name and Sign Out. Pages don't render a header of their own,
+  and size their root with `flex-1` (the layout owns the screen height), not `min-h-screen`.
+  - A page deep inside a project shows `GoToProjectButton` beside its Back button, unless Back already goes to the
+    project page.
+  - Report forms save unsaved edits before any exit (`form.navigateSafely`). `ReportPageShell` registers that as
+    the page's leave guard (`useLeaveGuard`), and the header runs the logo and Sign Out through it
+    (`useGuardedLeave`). A new page with edits worth keeping registers a guard the same way; a new exit in the
+    header goes through `useGuardedLeave`.
 - **Any component that fetches data must explicitly handle loading, success, and error states.** No silent
   failures — no `.catch(() => {})`, no mapping every error to "not found". `ProjectSelectionPage.jsx` is the reference pattern.
 - New page → matching test under `src/pages/__tests__/` (or `src/pages/reports/__tests__/` for report pages).
