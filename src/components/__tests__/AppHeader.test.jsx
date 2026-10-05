@@ -1,20 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from '../AppHeader'
 import * as AuthContext from '../../contexts/AuthContext'
-import { DEMO_USER, TEST_USER, UNSIGNED_USER } from '../../test/users'
+import { DEMO_USER, TEST_USER } from '../../test/users'
 
-// The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
-vi.mock('../SignatureSetupModal', () => ({
-  default: ({ isOpen, onClose, onSuccess, title }) => (isOpen ? (
-    <div role="dialog" aria-label={title ?? 'Set Up Your Signature'}>
-      <button onClick={() => { onSuccess?.(); onClose() }}>finish signature</button>
-      <button onClick={onClose}>cancel signature</button>
-    </div>
-  ) : null),
-}))
+// The user menu has its own tests; the header only has to carry it
+vi.mock('../SignatureSetupModal', () => ({ default: () => null }))
 
 let logout
 
@@ -35,9 +28,7 @@ function renderHeader(user, path = '/project/HWS0023/idr/idr-1') {
 }
 
 const logoLink = () => screen.getByRole('link', { name: /ICID Co\./ })
-
-const signOutButton = () => screen.getByRole('button', { name: 'Sign Out' })
-const confirmDialog = () => screen.queryByRole('dialog', { name: 'Sign out of demo mode?' })
+const userMenu = () => screen.getByRole('button', { name: /^User menu:/ })
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -45,63 +36,32 @@ beforeEach(() => {
 })
 
 describe('AppHeader', () => {
-  it('shows the logo and the signed-in user\'s first name', () => {
+  it('shows the logo on the left and the user menu on the right', () => {
     renderHeader(TEST_USER)
-    expect(screen.getByText('ICID Co.')).toBeInTheDocument()
-    expect(screen.getByText('Genghis')).toBeInTheDocument()
-    expect(screen.queryByText('Genghis Khan')).not.toBeInTheDocument()
+    const header = screen.getByRole('banner')
+    expect(within(header).getByText('ICID Co.')).toBeInTheDocument()
+    expect(userMenu()).toHaveTextContent('Genghis')
+    expect(logoLink().compareDocumentPosition(userMenu()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('falls back to the email when the user has no first name', () => {
-    renderHeader({ ...TEST_USER, first_name: null })
-    expect(screen.getByText('KhanG@magnoleng.pc')).toBeInTheDocument()
-  })
-
-  it('shows the Demo Mode badge only for a demo user', () => {
-    const { unmount } = renderHeader(TEST_USER)
-    expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
-    unmount()
-    renderHeader(DEMO_USER)
-    expect(screen.getByText('Demo')).toBeInTheDocument()
-    expect(screen.getByText('Demo Mode')).toBeInTheDocument()
-  })
-
-  it('signs a regular user out straight away, with no confirmation', async () => {
+  it('keeps Sign Out and the signature inside the menu, not on the bar', async () => {
     renderHeader(TEST_USER)
-    await userEvent.click(signOutButton())
+    expect(screen.queryByRole('button', { name: 'Sign Out' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /signature/i })).not.toBeInTheDocument()
+    await userEvent.click(userMenu())
+    expect(screen.getAllByRole('menuitem').map(el => el.textContent)).toEqual(['Update signature', 'Sign Out'])
+  })
+
+  it('signs out from the menu', async () => {
+    renderHeader(TEST_USER)
+    await userEvent.click(userMenu())
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }))
     expect(logout).toHaveBeenCalledTimes(1)
-    expect(confirmDialog()).not.toBeInTheDocument()
   })
 
-  it('asks a demo user to confirm, warning that their test data will be deleted', async () => {
+  it('shows a demo user their Demo Mode badge', () => {
     renderHeader(DEMO_USER)
-    await userEvent.click(signOutButton())
-    const dialog = confirmDialog()
-    expect(dialog).toBeInTheDocument()
-    expect(within(dialog).getByText('This will delete all your test data. Continue?')).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
-    expect(logout).not.toHaveBeenCalled()
-  })
-
-  it('does nothing when the demo user cancels', async () => {
-    renderHeader(DEMO_USER)
-    await userEvent.click(signOutButton())
-    await userEvent.click(within(confirmDialog()).getByRole('button', { name: 'Cancel' }))
-    expect(confirmDialog()).not.toBeInTheDocument()
-    expect(logout).not.toHaveBeenCalled()
-  })
-
-  it('signs the demo user out on confirmation, showing Working... meanwhile', async () => {
-    let finish
-    logout.mockReturnValue(new Promise(resolve => { finish = resolve }))
-    renderHeader(DEMO_USER)
-    await userEvent.click(signOutButton())
-    await userEvent.click(within(confirmDialog()).getByRole('button', { name: 'Sign out' }))
-    expect(logout).toHaveBeenCalledTimes(1)
-    expect(within(confirmDialog()).getByRole('button', { name: 'Working...' })).toBeDisabled()
-    expect(within(confirmDialog()).getByRole('button', { name: 'Cancel' })).toBeDisabled()
-    await act(async () => finish())
+    expect(userMenu()).toHaveTextContent('Demo Mode')
   })
 })
 
@@ -131,52 +91,7 @@ describe('AppHeader logo', () => {
     renderHeader(DEMO_USER)
     await userEvent.click(logoLink())
     expect(screen.getByTestId('url')).toHaveTextContent(/^\/projects$/)
-    expect(confirmDialog()).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(logout).not.toHaveBeenCalled()
-  })
-})
-
-describe('AppHeader signature button', () => {
-  const signatureDialog = name => screen.queryByRole('dialog', { name })
-
-  it('offers "Set up signature" to a user without one, opening the setup dialog', async () => {
-    renderHeader(UNSIGNED_USER)
-    const button = screen.getByRole('button', { name: 'Set up signature' })
-    expect(button).toHaveAttribute('title', 'No signature on file yet')
-    expect(screen.queryByRole('button', { name: 'Update signature' })).not.toBeInTheDocument()
-    await userEvent.click(button)
-    expect(signatureDialog('Set Up Your Signature')).toBeInTheDocument()
-  })
-
-  it('offers "Update signature" to a user with one, saying when it was set', async () => {
-    renderHeader(TEST_USER)
-    const button = screen.getByRole('button', { name: 'Update signature' })
-    expect(button).toHaveAttribute('title', 'Signature on file, set Oct 1, 2026')
-    expect(screen.queryByRole('button', { name: 'Set up signature' })).not.toBeInTheDocument()
-    await userEvent.click(button)
-    expect(signatureDialog('Update Your Signature')).toBeInTheDocument()
-  })
-
-  it('closes the dialog when it is finished or cancelled, without signing out or leaving the page', async () => {
-    renderHeader(UNSIGNED_USER, '/project/HWS0023')
-    await userEvent.click(screen.getByRole('button', { name: 'Set up signature' }))
-    await userEvent.click(screen.getByRole('button', { name: 'cancel signature' }))
-    expect(signatureDialog('Set Up Your Signature')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Set up signature' }))
-    await userEvent.click(screen.getByRole('button', { name: 'finish signature' }))
-    expect(signatureDialog('Set Up Your Signature')).not.toBeInTheDocument()
-    expect(logout).not.toHaveBeenCalled()
-    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023')
-  })
-
-  it('shows neither to a demo user, who cannot submit', () => {
-    renderHeader(DEMO_USER)
-    expect(screen.queryByRole('button', { name: /signature/i })).not.toBeInTheDocument()
-    expect(signOutButton()).toBeInTheDocument()
-  })
-
-  it('keeps Sign Out beside it', () => {
-    renderHeader(TEST_USER)
-    expect(screen.getByRole('button', { name: 'Update signature' }).nextElementSibling).toBe(signOutButton())
   })
 })

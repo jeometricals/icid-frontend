@@ -45,14 +45,53 @@ export function trimmedCanvas(canvas) {
   return cropped
 }
 
+// Crops a canvas to its ink and turns it into a PNG Blob; throws emptyMessage when nothing is on it
+async function croppedPngBlob(canvas, emptyMessage) {
+  const cropped = trimmedCanvas(canvas)
+  if (!cropped) throw new Error(emptyMessage)
+  const blob = await new Promise(resolve => cropped.toBlob(resolve, 'image/png'))
+  if (!blob) throw new Error('The signature could not be turned into an image. Please try again.')
+  return blob
+}
+
 /**
  * Turns a drawn signature into a PNG Blob, cropped to the ink. Takes the signature canvas.
  * Throws when nothing is drawn or the browser can't make the image.
  */
 export async function drawnSignatureBlob(canvas) {
-  const cropped = trimmedCanvas(canvas)
-  if (!cropped) throw new Error('Draw your signature first.')
-  const blob = await new Promise(resolve => cropped.toBlob(resolve, 'image/png'))
-  if (!blob) throw new Error('The drawing could not be turned into an image. Please try again.')
-  return blob
+  return croppedPngBlob(canvas, 'Draw your signature first.')
+}
+
+// A typed signature is drawn large (so it stays sharp when the form scales it down) in the app's dark ink
+const TYPED_FONT_PX = 96
+const TYPED_INK = '#111827'
+
+/**
+ * Turns a typed name into a signature PNG Blob: the text drawn in a handwriting font, cropped to the ink.
+ * Takes the text and the font's family name (one of the fonts the app bundles, e.g. 'Dancing Script').
+ * Waits for the font to load first, and throws if it can't be loaded (rather than sign in a fallback font), if
+ * the text is blank, or if the browser can't make the image.
+ */
+export async function typedSignatureBlob(text, fontFamily) {
+  const name = text.trim()
+  if (!name) throw new Error('Type your name first.')
+  const font = `${TYPED_FONT_PX}px "${fontFamily}"`
+  // load() gives the font faces it loaded for this text: none means the font isn't there (or its file couldn't be
+  // fetched), and the browser would quietly draw the name in some other font
+  const faces = await document.fonts.load(font, name).catch(() => [])
+  if (faces.length === 0) {
+    throw new Error('The signature font could not be loaded. Check your connection and try again.')
+  }
+  const canvas = document.createElement('canvas')
+  const measuring = canvas.getContext('2d')
+  measuring.font = font
+  // Room for flourishes that swing outside the measured width and above or below the line
+  canvas.width = Math.ceil(measuring.measureText(name).width) + TYPED_FONT_PX * 2
+  canvas.height = TYPED_FONT_PX * 3
+  const context = canvas.getContext('2d') // sizing a canvas resets its context, so the font is set again
+  context.font = font
+  context.fillStyle = TYPED_INK
+  context.textBaseline = 'middle'
+  context.fillText(name, TYPED_FONT_PX, canvas.height / 2)
+  return croppedPngBlob(canvas, 'Type your name first.')
 }

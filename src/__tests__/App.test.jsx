@@ -143,13 +143,12 @@ describe('app header', () => {
     ['a General report', '/project/HWS0023/idr/idr-1/general/rep-1'],
     ['an SWCB report', '/project/HWS0023/idr/idr-1/swcb/rep-1'],
     ['an AC report', '/project/HWS0023/idr/idr-1/ac/rep-1'],
-  ])('is on %s, with the user\'s name and Sign Out', async (_, path) => {
+  ])('is on %s, with the user menu', async (_, path) => {
     api.listUsers = vi.fn().mockResolvedValue([])
     window.history.pushState({}, '', path)
     render(<App />)
     expect(await logoLink()).toHaveAttribute('href', '/projects')
-    expect(screen.getByText('Genghis')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'User menu: Genghis' })).toBeInTheDocument()
     expect(screen.getAllByRole('banner').length).toBeGreaterThanOrEqual(1)
     expect(window.location.pathname).toBe(path)
   })
@@ -168,6 +167,20 @@ describe('app header', () => {
     render(<App />)
     expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /ICID Co\./ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sign Out' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^User menu:/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('signing out from the user menu', () => {
+  it('returns to the login page and forgets the session', async () => {
+    localStorage.setItem(TOKEN_KEY, 'stored-token')
+    api.fetchCurrentUser.mockResolvedValue(TEST_USER)
+    window.history.pushState({}, '', '/project/HWS0023')
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: 'User menu: Genghis' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }))
+    expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
   })
 })

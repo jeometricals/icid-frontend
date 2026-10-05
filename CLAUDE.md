@@ -21,7 +21,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `useReportForm.js` (the hook every report page uses for load/save/state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -44,7 +44,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   Tailwind classes can't express.
 - React Router for navigation (`useNavigate`, `<Navigate>`, `<Link>`), never `window.location`.
 - **Navigation.** Every signed-in page renders inside `AppLayout` (`App.jsx`), which supplies the app header: the
-  ICID Co. logo (a link to `/projects`), the user's name and Sign Out. Pages don't render a header of their own,
+  ICID Co. logo (a link to `/projects`) and the user menu (`UserMenu`: the user's name, opening a dropdown with
+  their signature and Sign Out; a new entry is one more object in its `items` list). Pages don't render a header of their own,
   and size their root with `flex-1` (the layout owns the screen height), not `min-h-screen`.
   - A page deep inside a project shows `GoToProjectButton` beside its Back button, unless Back already goes to the
     project page.
@@ -82,15 +83,18 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Signatures.** Submitting an IDR signs it with the user's signature, which the backend stamps on the export.
   - `user.has_signature` and `user.signature_set_at` come with the user; `refreshUser()` on `AuthContext` re-reads
     them after a change.
-  - `SignatureSetupModal` is the one place a signature is set or replaced: draw it (`react-signature-canvas`) or
-    upload a PNG. `saveSignature` in `services/signatures.js` does the three steps: `upload-request`, a PUT of the
+  - `SignatureSetupModal` is the one place a signature is set or replaced: draw it (`react-signature-canvas`),
+    upload a PNG, or type a name and pick one of four handwriting fonts (`SIGNATURE_FONTS`; the fonts are bundled
+    through `@fontsource/*`, so nothing is fetched from a font service). A typed signature is rendered to a PNG
+    in the browser and saved as `drawn`, like a drawing. `saveSignature` in `services/signatures.js` does the three steps: `upload-request`, a PUT of the
     PNG straight to the signed Storage URL (not through `apiFetch`), then `confirm`. PNG only, 500 KB at most.
-  - A drawing is cropped to its ink before upload (`lib/signatureImage.js`), so it fills the signature line on
-    the printed form.
+  - A drawing or a typed name is cropped to its ink before upload (`lib/signatureImage.js`), so it fills the
+    signature line on the printed form. A typed signature waits for its font to load and refuses to save in a
+    fallback font.
   - On the IDR page, Submit opens the modal first for a user without a signature, then the certification dialog
-    (which now carries the attestation sentence under the certification statement). The header has a
-    "Set up signature" / "Update signature" button.
-  - Demo users never see any of it: no header button, and Submit is disabled for them. The backend refuses them
+    (which now carries the attestation sentence under the certification statement). The user menu in the header
+    has "Set up signature" / "Update signature".
+  - Demo users never see any of it: no menu item, and Submit is disabled for them. The backend refuses them
     too (403).
   - Tests don't have a real canvas: they mock `react-signature-canvas`, and pages mock `SignatureSetupModal`.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.

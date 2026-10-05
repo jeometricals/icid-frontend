@@ -2,17 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
 import { useAuth } from '../contexts/AuthContext'
 import { saveSignature, validateSignatureFile } from '../services/api'
-import { drawnSignatureBlob } from '../lib/signatureImage'
+import { drawnSignatureBlob, typedSignatureBlob } from '../lib/signatureImage'
 import Modal from './Modal'
+// The handwriting fonts a typed signature can use, bundled with the app (no font service at run time)
+import '@fontsource/dancing-script/400.css'
+import '@fontsource/great-vibes/400.css'
+import '@fontsource/satisfy/400.css'
+import '@fontsource/caveat/400.css'
 
 const TABS = [
   { id: 'draw', label: 'Draw' },
   { id: 'upload', label: 'Upload' },
+  { id: 'type', label: 'Type' },
 ]
 
+// family is the name the font's stylesheet registers; the canvas and the previews both ask for it by that name
+export const SIGNATURE_FONTS = [
+  { id: 'dancing-script', family: 'Dancing Script', description: 'Flowing cursive' },
+  { id: 'great-vibes', family: 'Great Vibes', description: 'Formal script' },
+  { id: 'satisfy', family: 'Satisfy', description: 'Brush style' },
+  { id: 'caveat', family: 'Caveat', description: 'Casual handwriting' },
+]
+const TYPED_MAX_LENGTH = 60
+
 /**
- * The dialog where a user sets (or replaces) the signature that is stamped on the IDRs they submit: draw it, or
- * upload a PNG. Save uploads the image and records it, then refreshes the signed-in user.
+ * The dialog where a user sets (or replaces) the signature that is stamped on the IDRs they submit: draw it,
+ * upload a PNG, or type their name and pick a handwriting font. Save uploads the image and records it, then
+ * refreshes the signed-in user.
  * Props: isOpen, onClose, onSuccess (called once the signature is saved, before onClose), title
  * (default "Set Up Your Signature"; pass "Update Your Signature" when replacing one).
  */
@@ -22,13 +38,16 @@ export default function SignatureSetupModal({ isOpen, ...props }) {
 }
 
 function SignatureSetupDialog({ onClose, onSuccess = () => {}, title = 'Set Up Your Signature' }) {
-  const { refreshUser } = useAuth()
+  const { user, refreshUser } = useAuth()
   const canvasRef = useRef(null)
   const [tab, setTab] = useState('draw')
   const [hasDrawn, setHasDrawn] = useState(false)
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [fileError, setFileError] = useState(null)
+  const [typedName, setTypedName] = useState(() => [user?.first_name, user?.last_name].filter(Boolean).join(' '))
+  const [fontId, setFontId] = useState(SIGNATURE_FONTS[0].id)
+  const font = SIGNATURE_FONTS.find(f => f.id === fontId)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
@@ -58,14 +77,20 @@ function SignatureSetupDialog({ onClose, onSuccess = () => {}, title = 'Set Up Y
     setFile(invalid ? null : chosen)
   }
 
-  const canSave = tab === 'draw' ? hasDrawn : Boolean(file)
+  const canSave = { draw: hasDrawn, upload: Boolean(file), type: typedName.trim() !== '' }[tab]
+
+  // What gets uploaded, per tab. A typed signature is pixels like a drawn one, so it is recorded as 'drawn'.
+  const signatureBlob = () => ({
+    draw: () => drawnSignatureBlob(canvasRef.current.getCanvas()),
+    upload: () => file,
+    type: () => typedSignatureBlob(typedName, font.family),
+  })[tab]()
 
   const save = async () => {
     setSaving(true)
     setSaveError(null)
     try {
-      const blob = tab === 'draw' ? await drawnSignatureBlob(canvasRef.current.getCanvas()) : file
-      await saveSignature(blob, tab === 'draw' ? 'drawn' : 'uploaded')
+      await saveSignature(await signatureBlob(), tab === 'upload' ? 'uploaded' : 'drawn')
     } catch (err) {
       setSaveError(err.message)
       setSaving(false)
@@ -167,6 +192,63 @@ function SignatureSetupDialog({ onClose, onSuccess = () => {}, title = 'Set Up Y
             <img src={previewUrl} alt="Signature preview" className="max-h-32 max-w-full object-contain" />
           </div>
         )}
+      </div>
+
+      <div role="tabpanel" aria-label="Type" hidden={tab !== 'type'}>
+        <label htmlFor="signature-text" className="input-label">Your name</label>
+        <input
+          id="signature-text"
+          type="text"
+          className="input-field"
+          placeholder="Your full name"
+          maxLength={TYPED_MAX_LENGTH}
+          value={typedName}
+          onChange={(e) => { setTypedName(e.target.value); setSaveError(null) }}
+          disabled={saving}
+        />
+
+        <fieldset className="mt-4" disabled={saving}>
+          <legend className="input-label">Style</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {SIGNATURE_FONTS.map(option => (
+              <label
+                key={option.id}
+                className={`block cursor-pointer rounded-md border p-2 text-center focus-within:ring-2 focus-within:ring-construction-500 ${
+                  option.id === fontId ? 'border-construction-600 bg-construction-50' : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="signature-font"
+                  value={option.id}
+                  checked={option.id === fontId}
+                  onChange={() => setFontId(option.id)}
+                  aria-label={`${option.family}: ${option.description}`}
+                  className="sr-only"
+                />
+                <span
+                  data-testid={`font-sample-${option.id}`}
+                  className="block truncate text-2xl leading-10 text-gray-900"
+                  style={{ fontFamily: `"${option.family}", cursive` }}
+                >
+                  {typedName.trim() || 'Your name'}
+                </span>
+                <span className="block text-xs text-gray-500">{option.family}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="mt-4 border border-gray-300 rounded-md bg-white px-3 py-2 overflow-hidden">
+          <p className="text-xs text-gray-500">Preview</p>
+          <p
+            data-testid="typed-preview"
+            className="truncate text-center text-gray-900"
+            style={{ fontFamily: `"${font.family}", cursive`, fontSize: 48, lineHeight: '72px' }}
+          >
+            {typedName.trim() || ' '}
+          </p>
+        </div>
       </div>
 
       {saveError && (

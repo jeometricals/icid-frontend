@@ -37,6 +37,12 @@ function renderLayout(path = '/form', user = TEST_USER) {
 }
 
 const logoLink = () => screen.getByRole('link', { name: /ICID Co\./ })
+const userMenu = () => screen.getByRole('button', { name: /^User menu:/ })
+// Opens the user menu and picks Sign Out
+async function chooseSignOut() {
+  await userEvent.click(userMenu())
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Sign Out' }))
+}
 const url = () => screen.getByTestId('url').textContent
 
 beforeEach(() => {
@@ -51,7 +57,7 @@ describe('AppLayout', () => {
     const header = screen.getByRole('banner')
     const page = screen.getByText('a plain page')
     expect(header).toContainElement(logoLink())
-    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeInTheDocument()
+    expect(header).toContainElement(userMenu())
     expect(header.compareDocumentPosition(page) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
@@ -92,7 +98,7 @@ describe('AppLayout — leaving a page that guards its unsaved edits', () => {
 
   it('runs Sign Out through the guard for a regular user', async () => {
     renderLayout()
-    await userEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    await chooseSignOut()
     expect(guard).toHaveBeenCalledTimes(1)
     expect(logout).toHaveBeenCalledTimes(1)
   })
@@ -100,13 +106,13 @@ describe('AppLayout — leaving a page that guards its unsaved edits', () => {
   it('does not sign out when the guard refuses', async () => {
     guard = vi.fn()
     renderLayout()
-    await userEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    await chooseSignOut()
     expect(logout).not.toHaveBeenCalled()
   })
 
   it('skips the guard for a demo user signing out: their data is deleted anyway', async () => {
     renderLayout('/form', DEMO_USER)
-    await userEvent.click(screen.getByRole('button', { name: 'Sign Out' }))
+    await chooseSignOut()
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(logout).toHaveBeenCalledTimes(1)
     expect(guard).not.toHaveBeenCalled()

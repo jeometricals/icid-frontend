@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { forwardRef, useImperativeHandle } from 'react'
-import SignatureSetupModal from '../SignatureSetupModal'
+import SignatureSetupModal, { SIGNATURE_FONTS } from '../SignatureSetupModal'
 import * as AuthContext from '../../contexts/AuthContext'
 import * as api from '../../services/api'
 import * as signatureImage from '../../lib/signatureImage'
@@ -18,9 +18,10 @@ vi.mock('react-signature-canvas', () => ({
 }))
 
 vi.mock('../../services/api', () => ({ saveSignature: vi.fn(), validateSignatureFile: vi.fn() }))
-vi.mock('../../lib/signatureImage', () => ({ drawnSignatureBlob: vi.fn() }))
+vi.mock('../../lib/signatureImage', () => ({ drawnSignatureBlob: vi.fn(), typedSignatureBlob: vi.fn() }))
 
 const DRAWN_BLOB = new Blob(['drawn'], { type: 'image/png' })
+const TYPED_BLOB = new Blob(['typed'], { type: 'image/png' })
 const png = (name = 'signature.png') => new File(['png-bytes'], name, { type: 'image/png' })
 
 let refreshUser
@@ -44,6 +45,7 @@ beforeEach(() => {
   api.saveSignature.mockResolvedValue({ ...TEST_USER, has_signature: true })
   api.validateSignatureFile.mockImplementation(file => (file.type === 'image/png' ? null : 'The signature must be a PNG image.'))
   signatureImage.drawnSignatureBlob.mockResolvedValue(DRAWN_BLOB)
+  signatureImage.typedSignatureBlob.mockResolvedValue(TYPED_BLOB)
   URL.createObjectURL = vi.fn(() => 'blob:preview')
   URL.revokeObjectURL = vi.fn()
 })
@@ -60,6 +62,7 @@ describe('SignatureSetupModal — frame', () => {
     expect(screen.getByRole('dialog', { name: 'Set Up Your Signature' })).toBeInTheDocument()
     expect(tab('Draw')).toHaveAttribute('aria-selected', 'true')
     expect(tab('Upload')).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getAllByRole('tab').map(el => el.textContent)).toEqual(['Draw', 'Upload', 'Type'])
     expect(canvas()).toBeVisible()
     expect(saveButton()).toBeDisabled()
   })
@@ -237,5 +240,138 @@ describe('SignatureSetupModal — failures', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
     expect(onSuccess).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('SignatureSetupModal — Type tab', () => {
+  const nameInput = () => screen.getByLabelText('Your name')
+  const fontOption = family => screen.getByRole('radio', { name: new RegExp(`^${family}:`) })
+  const preview = () => screen.getByTestId('typed-preview')
+  const openTypeTab = () => userEvent.click(tab('Type'))
+
+  it('offers four handwriting fonts', () => {
+    expect(SIGNATURE_FONTS.map(f => f.family)).toEqual(['Dancing Script', 'Great Vibes', 'Satisfy', 'Caveat'])
+  })
+
+  it('starts with the user\'s name, in the first font, ready to save', async () => {
+    renderModal()
+    await openTypeTab()
+    expect(nameInput()).toHaveValue('Genghis Khan')
+    expect(fontOption('Dancing Script')).toBeChecked()
+    expect(preview()).toHaveTextContent('Genghis Khan')
+    expect(preview().style.fontFamily).toContain('Dancing Script')
+    expect(preview().style.fontSize).toBe('48px')
+    expect(saveButton()).toBeEnabled()
+  })
+
+  it('shows the typed text in every font card and in the preview as it changes', async () => {
+    renderModal()
+    await openTypeTab()
+    await userEvent.clear(nameInput())
+    await userEvent.type(nameInput(), 'G. Khan')
+    expect(preview()).toHaveTextContent('G. Khan')
+    for (const { id, family } of SIGNATURE_FONTS) {
+      const sample = screen.getByTestId(`font-sample-${id}`)
+      expect(sample).toHaveTextContent('G. Khan')
+      expect(sample.style.fontFamily).toContain(family)
+    }
+  })
+
+  it('switches the preview to the font that is picked', async () => {
+    renderModal()
+    await openTypeTab()
+    await userEvent.click(fontOption('Satisfy'))
+    expect(fontOption('Satisfy')).toBeChecked()
+    expect(fontOption('Dancing Script')).not.toBeChecked()
+    expect(preview().style.fontFamily).toContain('Satisfy')
+  })
+
+  it('lets the font be picked from the keyboard: one radio group, moved through with the arrow keys', async () => {
+    renderModal()
+    await openTypeTab()
+    const group = screen.getByRole('group', { name: 'Style' })
+    const radios = within(group).getAllByRole('radio')
+    expect(radios).toHaveLength(4)
+    expect(new Set(radios.map(r => r.name)).size).toBe(1)
+    fontOption('Dancing Script').focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(fontOption('Great Vibes')).toBeChecked()
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+    expect(fontOption('Caveat')).toBeChecked()
+    expect(preview().style.fontFamily).toContain('Caveat')
+    await userEvent.keyboard('{ArrowUp}')
+    expect(fontOption('Satisfy')).toBeChecked()
+  })
+
+  it('disables Save while the name is blank or only spaces', async () => {
+    renderModal()
+    await openTypeTab()
+    await userEvent.clear(nameInput())
+    expect(saveButton()).toBeDisabled()
+    expect(screen.getByTestId('font-sample-caveat')).toHaveTextContent('Your name') // a sample still shows the style
+    await userEvent.type(nameInput(), '   ')
+    expect(saveButton()).toBeDisabled()
+    await userEvent.type(nameInput(), 'G')
+    expect(saveButton()).toBeEnabled()
+  })
+
+  it('starts blank for a user with no name on file', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+      user: { ...TEST_USER, first_name: null, last_name: null }, refreshUser,
+    })
+    render(<SignatureSetupModal isOpen onClose={vi.fn()} />)
+    await openTypeTab()
+    expect(nameInput()).toHaveValue('')
+    expect(nameInput()).toHaveAttribute('placeholder', 'Your full name')
+    expect(saveButton()).toBeDisabled()
+  })
+
+  it('saves the name rendered in the chosen font, through the same upload as a drawing', async () => {
+    const { onClose, onSuccess } = renderModal()
+    await openTypeTab()
+    await userEvent.clear(nameInput())
+    await userEvent.type(nameInput(), 'Genghis K.')
+    await userEvent.click(fontOption('Great Vibes'))
+    await userEvent.click(saveButton())
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(signatureImage.typedSignatureBlob).toHaveBeenCalledWith('Genghis K.', 'Great Vibes')
+    expect(api.saveSignature).toHaveBeenCalledWith(TYPED_BLOB, 'drawn') // pixels, like a drawing
+    expect(signatureImage.drawnSignatureBlob).not.toHaveBeenCalled()
+    expect(refreshUser).toHaveBeenCalledTimes(1)
+    expect(onSuccess).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows why inline, and stays open, when the font cannot be loaded', async () => {
+    signatureImage.typedSignatureBlob.mockRejectedValue(
+      new Error('The signature font could not be loaded. Check your connection and try again.'))
+    const { onClose } = renderModal()
+    await openTypeTab()
+    await userEvent.click(saveButton())
+    expect(await screen.findByRole('alert')).toHaveTextContent('The signature font could not be loaded.')
+    expect(api.saveSignature).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('keeps what was typed and drawn when moving between tabs', async () => {
+    renderModal()
+    await draw()
+    await openTypeTab()
+    await userEvent.clear(nameInput())
+    await userEvent.type(nameInput(), 'Khan')
+    await userEvent.click(tab('Draw'))
+    expect(saveButton()).toBeEnabled()
+    await openTypeTab()
+    expect(nameInput()).toHaveValue('Khan')
+  })
+
+  it('locks the name and the fonts while saving', async () => {
+    let finish
+    api.saveSignature.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    renderModal()
+    await openTypeTab()
+    await userEvent.click(saveButton())
+    expect(nameInput()).toBeDisabled()
+    expect(fontOption('Caveat')).toBeDisabled()
+    await act(async () => finish({}))
   })
 })
