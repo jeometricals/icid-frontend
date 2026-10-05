@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut } from 'lucide-react'
 import { getProjectsForUser } from '../services/api'
+import AppHeader from '../components/AppHeader'
 
 export default function ProjectSelectionPage() {
-  const { user, signOut, isDemoMode } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
@@ -13,7 +13,7 @@ export default function ProjectSelectionPage() {
 
   useEffect(() => {
     if (!user) return
-    getProjectsForUser(user.id)
+    getProjectsForUser()
       .then(data => setProjects(data))
       .catch(err => setFetchError(err.message))
       .finally(() => setLoadingProjects(false))
@@ -23,52 +23,9 @@ export default function ProjectSelectionPage() {
     navigate(`/project/${projectId}`)
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="bg-construction-600 p-2 rounded-lg">
-                <HardHat className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-construction-900">ICID Co.</h1>
-                <p className="text-xs text-gray-500">Integrated Construction Information Database</p>
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="flex items-center space-x-6">
-              {/* User Menu */}
-              <div className="flex items-center space-x-3">
-                <div className="text-right hidden sm:block">
-                  <div className="text-sm font-medium text-gray-900">
-                    {user?.user_metadata?.full_name || user?.email || 'User'}
-                  </div>
-                  {isDemoMode && (
-                    <div className="text-xs text-construction-600 font-medium">Demo Mode</div>
-                  )}
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

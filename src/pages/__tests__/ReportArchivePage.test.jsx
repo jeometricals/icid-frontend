@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import ReportArchivePage from '../ReportArchivePage'
 import * as api from '../../services/api'
-import { CURRENT_USER_ID } from '../../services/session'
+import * as AuthContext from '../../contexts/AuthContext'
+import { DEMO_USER, TEST_USER, TEST_USER_ID } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const KHAN = CURRENT_USER_ID
+const KHAN = TEST_USER_ID
 const SHAH = '5246b39d-87fe-4e21-92a3-2804c899e8b3'
 
 const USERS = [
@@ -46,6 +47,7 @@ vi.mock('../../services/api', () => ({ listIdrs: vi.fn(), listUsers: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: TEST_USER })
   api.listUsers.mockResolvedValue(USERS)
 })
 
@@ -151,5 +153,20 @@ describe('ReportArchivePage', () => {
     await user.click(screen.getByRole('button', { name: /retry/i }))
     expect(await screen.findByText('Inspector: Nadir Shah')).toBeInTheDocument()
     expect(api.listUsers).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Demo users: the backend refuses them the user list
+// ---------------------------------------------------------------------------
+
+describe('ReportArchivePage for a demo user', () => {
+  it('lists the archive without asking for the user list', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: DEMO_USER })
+    api.listIdrs.mockResolvedValue([])
+    renderPage()
+    expect(await screen.findByText(/No submitted IDRs for this project yet/)).toBeInTheDocument()
+    expect(api.listIdrs).toHaveBeenCalledWith({ projectId: 'HWS0023', status: 'submitted' })
+    expect(api.listUsers).not.toHaveBeenCalled()
   })
 })

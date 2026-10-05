@@ -4,8 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { format } from 'date-fns'
 import AttachmentsSection from '../AttachmentsSection'
 import * as attachments from '../../services/attachments'
-import * as AuthContext from '../../contexts/AuthContext'
-import { CURRENT_USER_ID } from '../../services/session'
+import { TEST_USER_ID } from '../../test/users'
 
 // Only the network calls are mocked; validation and error classes are the real ones
 vi.mock('../../services/attachments', async (importOriginal) => ({
@@ -27,7 +26,7 @@ const IMAGE = {
   file_name: 'crack.jpg',
   file_type: 'image/jpeg',
   file_size_bytes: 2_516_582,
-  uploaded_by: CURRENT_USER_ID,
+  uploaded_by: TEST_USER_ID,
   uploaded_at: '2026-09-28T13:00:00Z',
   attachment_name: 'Crack at curb',
   attachment_description: 'North side, station 12+50',
@@ -54,7 +53,6 @@ const card = name => screen.getByText(name).closest('li')
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: { id: CURRENT_USER_ID } })
   attachments.listAttachments.mockResolvedValue([])
   attachments.getDownloadUrl.mockImplementation(async (_, __, id) => signed(id === PDF.attachment_id ? PDF_URL : THUMB_URL))
 })
@@ -193,7 +191,7 @@ describe('upload', () => {
     expect(screen.queryByText('No attachments yet.')).not.toBeInTheDocument()
     expect(await screen.findByRole('img', { name: 'Crack at curb' })).toHaveAttribute('src', THUMB_URL)
     expect(attachments.uploadAttachment).toHaveBeenCalledWith(IDR_ID, REPORT_ID,
-      expect.objectContaining({ uploadedBy: CURRENT_USER_ID }))
+      expect.objectContaining({ name: 'Crack at curb' }))
     expect(attachments.listAttachments).toHaveBeenCalledTimes(1)
   })
 

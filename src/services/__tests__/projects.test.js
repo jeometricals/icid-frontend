@@ -25,35 +25,33 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('getProjectsForUser', () => {
-  it('calls the correct endpoint with user_id', async () => {
+  it('asks for the signed-in user\'s projects, with no user id in the URL', async () => {
     mockFetch(200, { status: 'success', data: MOCK_PROJECTS })
-    await getProjectsForUser(28)
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/v1/projects/?user_id=28'),
-      { method: 'GET' }
-    )
+    await getProjectsForUser()
+    expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/v1\/projects\/$/), { method: 'GET' })
+    expect(fetch.mock.calls[0][0]).not.toContain('user_id')
   })
 
   it('returns the data array on success', async () => {
     mockFetch(200, { status: 'success', data: MOCK_PROJECTS })
-    const result = await getProjectsForUser(28)
+    const result = await getProjectsForUser()
     expect(result).toEqual(MOCK_PROJECTS)
   })
 
   it('returns an empty array when the user has no projects', async () => {
     mockFetch(200, { status: 'success', data: [] })
-    const result = await getProjectsForUser(28)
+    const result = await getProjectsForUser()
     expect(result).toEqual([])
   })
 
   it('throws when the API returns a non-ok status', async () => {
     mockFetch(500, { detail: 'Internal Server Error' })
-    await expect(getProjectsForUser(28)).rejects.toThrow('Internal Server Error')
+    await expect(getProjectsForUser()).rejects.toThrow('Internal Server Error')
   })
 
   it('throws when fetch itself fails (network error)', async () => {
     mockFetchFailure('Network error')
-    await expect(getProjectsForUser(28)).rejects.toThrow('Network error')
+    await expect(getProjectsForUser()).rejects.toThrow('Network error')
   })
 })
 

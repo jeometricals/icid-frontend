@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
 import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
@@ -22,6 +23,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
+// Demo users can do everything except submit (the backend refuses it too)
+const DEMO_SUBMIT_DISABLED = 'Demo mode — submit is disabled'
 const CERTIFICATION_STATEMENT =
   'The above described work was incorporated into this project and was constructed in conformance with all plans, ' +
   'specifications, and standards unless otherwise noted.'
@@ -44,6 +47,8 @@ export default function IDRPage() {
   const { projectId, idrId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { user } = useAuth()
+  const isDemo = Boolean(user?.is_demo)
   const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
 
   // Initial load; only this shows a spinner
@@ -314,14 +319,19 @@ export default function IDRPage() {
           <div className="flex flex-col items-end space-y-2">
             <div className="flex items-start space-x-3">
               <ExportIdrButton idrId={idrId} isDraft disabled={reports.length === 0 || busy} />
-              <SubmitReportButton
-                label="Submit IDR"
-                onClick={openCertify}
-                submitting={busyAction === 'submit'}
-                disabled={reports.length === 0 || busy}
-              />
+              {/* The tooltip sits on a wrapper: a disabled button doesn't reliably show its own */}
+              <span title={isDemo ? DEMO_SUBMIT_DISABLED : undefined}>
+                <SubmitReportButton
+                  label="Submit IDR"
+                  onClick={openCertify}
+                  submitting={busyAction === 'submit'}
+                  disabled={isDemo || reports.length === 0 || busy}
+                />
+              </span>
             </div>
-            {reports.length === 0 && (
+            {isDemo ? (
+              <p className="text-sm text-gray-500">{DEMO_SUBMIT_DISABLED}</p>
+            ) : reports.length === 0 && (
               <p className="text-sm text-gray-500">Add at least one report before submitting.</p>
             )}
             {actionError?.scope === 'submit' && (

@@ -5,17 +5,13 @@ import { MemoryRouter } from 'react-router-dom'
 import ProjectSelectionPage from '../ProjectSelectionPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { CURRENT_USER_ID } from '../../services/session'
+import { DEMO_USER, TEST_USER } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const DEV_USER = {
-  id: CURRENT_USER_ID,
-  email: 'KhanG@magnoleng.pc',
-  user_metadata: { full_name: 'Genghis Khan' }
-}
+const DEV_USER = TEST_USER
 
 const MOCK_PROJECTS = [
   { project_id: 'HWS0023', project_name: 'Curb & Sidewalk', borough: 'Queens', status: 'active', user_role: 'inspector' },
@@ -25,8 +21,7 @@ const MOCK_PROJECTS = [
 function mockAuth(overrides = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
     user: DEV_USER,
-    isDemoMode: false,
-    signOut: vi.fn().mockResolvedValue({ error: null }),
+    logout: vi.fn().mockResolvedValue(undefined),
     ...overrides
   })
 }
@@ -93,9 +88,9 @@ describe('ProjectSelectionPage with projects', () => {
     expect(screen.getByText('Queens')).toBeInTheDocument()
   })
 
-  it('calls getProjectsForUser with the dev user id', async () => {
+  it('asks for the signed-in user\'s projects without passing a user id', async () => {
     renderPage()
-    await waitFor(() => expect(api.getProjectsForUser).toHaveBeenCalledWith(DEV_USER.id))
+    await waitFor(() => expect(api.getProjectsForUser).toHaveBeenCalledWith())
   })
 
   it('navigates to the project dashboard when a project is clicked', async () => {
@@ -105,10 +100,17 @@ describe('ProjectSelectionPage with projects', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023')
   })
 
-  it('shows the signed-in user name in the header', async () => {
+  it('shows the signed-in user\'s first name in the header', async () => {
     renderPage()
-    await waitFor(() => screen.getByText('Genghis Khan'))
-    expect(screen.getByText('Genghis Khan')).toBeInTheDocument()
+    await waitFor(() => screen.getByText('Genghis'))
+    expect(screen.getByText('Genghis')).toBeInTheDocument()
+    expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
+  })
+
+  it('shows the Demo Mode badge for a demo user', async () => {
+    mockAuth({ user: DEMO_USER })
+    renderPage()
+    expect(await screen.findByText('Demo Mode')).toBeInTheDocument()
   })
 })
 
@@ -145,14 +147,13 @@ describe('ProjectSelectionPage fetch error', () => {
 // ---------------------------------------------------------------------------
 
 describe('ProjectSelectionPage sign out', () => {
-  it('calls signOut and navigates to /login', async () => {
-    const signOut = vi.fn().mockResolvedValue({ error: null })
-    mockAuth({ signOut })
+  it('signs out through the header (the auth context does the redirect)', async () => {
+    const logout = vi.fn().mockResolvedValue(undefined)
+    mockAuth({ logout })
     vi.spyOn(api, 'getProjectsForUser').mockResolvedValue(MOCK_PROJECTS)
     renderPage()
     await waitFor(() => screen.getByText('HWS0023'))
     await userEvent.click(screen.getByText('Sign Out'))
-    expect(signOut).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/login')
+    expect(logout).toHaveBeenCalled()
   })
 })

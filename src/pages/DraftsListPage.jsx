@@ -22,12 +22,12 @@ export default function DraftsListPage() {
     let ignore = false
     setLoading(true)
     setError(null)
-    listIdrs({ projectId, reporterUuid: user.id, status: 'draft' })
+    listIdrs({ projectId, reporterUuid: user.uuid, status: 'draft' })
       .then(data => { if (!ignore) setDrafts(data) })
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [projectId, user.id, attempt])
+  }, [projectId, user.uuid, attempt])
 
   const openDraft = (idrId) => {
     navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: 'drafts' } })

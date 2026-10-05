@@ -2,11 +2,13 @@
  * Lists every submitted IDR for one project (route param :projectId), most recently edited first
  * (for a submitted IDR that is its submission time), with the inspector who submitted it.
  * Project-wide on purpose: submitted IDRs are shared project records, not per-inspector.
- * Clicking an IDR opens its IDR page read-only.
+ * Clicking an IDR opens its IDR page read-only. A demo user isn't allowed the user list, and can't submit, so for
+ * them the page skips the inspector lookup.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { listIdrs, listUsers } from '../services/api'
 import IdrCard from '../components/IdrCard'
 
@@ -21,6 +23,8 @@ function namesById(users) {
 export default function ReportArchivePage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isDemo = Boolean(user?.is_demo)
   const [idrs, setIdrs] = useState([])
   const [reporterNames, setReporterNames] = useState({})
   const [loading, setLoading] = useState(true)
@@ -31,7 +35,7 @@ export default function ReportArchivePage() {
     let ignore = false
     setLoading(true)
     setError(null)
-    Promise.all([listIdrs({ projectId, status: 'submitted' }), listUsers()])
+    Promise.all([listIdrs({ projectId, status: 'submitted' }), isDemo ? [] : listUsers()])
       .then(([idrData, users]) => {
         if (ignore) return
         setIdrs(idrData)
@@ -40,7 +44,7 @@ export default function ReportArchivePage() {
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [projectId, attempt])
+  }, [projectId, isDemo, attempt])
 
   const openIdr = (idrId) => {
     navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: 'archive' } })

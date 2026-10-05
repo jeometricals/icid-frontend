@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AttachmentUploadModal from '../AttachmentUploadModal'
 import * as attachments from '../../services/attachments'
-import { CURRENT_USER_ID } from '../../services/session'
+import { TEST_USER_ID } from '../../test/users'
 
 // Only the network call is mocked; validation, constants and error classes are the real ones
 vi.mock('../../services/attachments', async (importOriginal) => ({
@@ -19,7 +19,7 @@ const UPLOADED = {
   file_name: 'crack.jpg',
   file_type: 'image/jpeg',
   file_size_bytes: 4,
-  uploaded_by: CURRENT_USER_ID,
+  uploaded_by: TEST_USER_ID,
   uploaded_at: '2026-09-28T13:00:00Z',
   attachment_name: 'Crack at curb',
   attachment_description: 'North side',
@@ -29,7 +29,7 @@ const jpeg = () => new File(['abcd'], 'crack.jpg', { type: 'image/jpeg' })
 
 function renderModal() {
   const handlers = { onUploaded: vi.fn(), onClose: vi.fn() }
-  render(<AttachmentUploadModal idrId={IDR_ID} reportId={REPORT_ID} uploadedBy={CURRENT_USER_ID} {...handlers} />)
+  render(<AttachmentUploadModal idrId={IDR_ID} reportId={REPORT_ID} {...handlers} />)
   return handlers
 }
 
@@ -112,7 +112,6 @@ describe('AttachmentUploadModal', () => {
     await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(UPLOADED))
     expect(attachments.uploadAttachment).toHaveBeenCalledWith(IDR_ID, REPORT_ID, expect.objectContaining({
       file,
-      uploadedBy: CURRENT_USER_ID,
       name: 'Crack at curb',
       description: 'North side',
       onProgress: expect.any(Function),

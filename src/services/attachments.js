@@ -133,14 +133,14 @@ async function putToSignedUrl(url, file, headers) {
 
 /**
  * Uploads a file to a report on a draft IDR: upload-request → PUT to the signed URL → upload-complete.
- * Takes the File, the uploader's uuid, the attachment name and description, and an optional
+ * Takes the File, the attachment name and description (the uploader is the signed-in user), and an optional
  * onProgress({step: 'requesting'|'uploading'|'completing'|'done', percent}) callback. fetch can't
  * measure upload progress, so percent is only set (to 100) on 'done'; show a spinner for the other steps.
  * Returns the uploaded attachment's metadata (same shape as one listAttachments item).
  * If the PUT fails, the pending attachment is deleted (best-effort) and the original error is rethrown.
  * If upload-complete fails, nothing is deleted (the file is already stored); the error carries attachmentId.
  */
-export async function uploadAttachment(idrId, reportId, { file, uploadedBy, name, description, onProgress = () => {} }) {
+export async function uploadAttachment(idrId, reportId, { file, name, description, onProgress = () => {} }) {
   const invalid = validateFileForUpload(file) || validateMetadata(name, description)
   if (invalid) throw invalid
 
@@ -150,7 +150,6 @@ export async function uploadAttachment(idrId, reportId, { file, uploadedBy, name
   const request = await attachmentFetch(`${path}/upload-request`, {
     method: 'POST',
     body: {
-      uploaded_by: uploadedBy,
       file_name: file.name,
       file_type: file.type.toLowerCase(),
       file_size_bytes: file.size,

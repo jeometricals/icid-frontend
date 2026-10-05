@@ -2,7 +2,7 @@
  * "Pick a report date" dialog behind the dashboard's New Inspector Daily Diary button. The inspector picks any day
  * (today by default) and the dialog creates that day's IDR or finds the existing one. A draft opens straight away;
  * an already-submitted IDR asks first, since it opens view-only.
- * Props: projectId, reporterUuid, onOpen(idrId), onClose.
+ * Props: projectId, onOpen(idrId), onClose.
  */
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
@@ -12,7 +12,7 @@ import { createOrGetIdr } from '../services/api'
 export const DATE_HELP =
   "Inspectors can file for any past date (e.g. yesterday's pour) or an upcoming date (e.g. a planned pour next week)."
 
-export default function NewIdrDateModal({ projectId, reporterUuid, onOpen, onClose }) {
+export default function NewIdrDateModal({ projectId, onOpen, onClose }) {
   const [reportDate, setReportDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -24,7 +24,7 @@ export default function NewIdrDateModal({ projectId, reporterUuid, onOpen, onClo
     setBusy(true)
     setError(null)
     try {
-      const { idr } = await createOrGetIdr({ projectId, reporterUuid, reportDate })
+      const { idr } = await createOrGetIdr({ projectId, reportDate })
       if (idr.status === 'submitted') {
         setSubmittedIdr(idr)
         setBusy(false)

@@ -6,17 +6,13 @@ import { format } from 'date-fns'
 import ProjectDashboard from '../ProjectDashboard'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { CURRENT_USER_ID } from '../../services/session'
+import { DEMO_USER, TEST_USER } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const DEV_USER = {
-  id: CURRENT_USER_ID,
-  email: 'KhanG@magnoleng.pc',
-  user_metadata: { full_name: 'Genghis Khan' }
-}
+const DEV_USER = TEST_USER
 
 const MOCK_PROJECT = {
   project_id: 'HWS0023',
@@ -30,8 +26,7 @@ const MOCK_PROJECT = {
 function mockAuth(overrides = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
     user: DEV_USER,
-    isDemoMode: false,
-    signOut: vi.fn().mockResolvedValue({ error: null }),
+    logout: vi.fn().mockResolvedValue(undefined),
     ...overrides
   })
 }
@@ -216,15 +211,24 @@ describe('ProjectDashboard with optional fields null', () => {
 // ---------------------------------------------------------------------------
 
 describe('ProjectDashboard sign out', () => {
-  it('calls signOut and navigates to /login', async () => {
-    const signOut = vi.fn().mockResolvedValue({ error: null })
-    mockAuth({ signOut })
+  it('signs out through the header (the auth context does the redirect)', async () => {
+    const logout = vi.fn().mockResolvedValue(undefined)
+    mockAuth({ logout })
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
     await waitFor(() => screen.getByText('Sign Out'))
     await userEvent.click(screen.getByText('Sign Out'))
-    expect(signOut).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/login')
+    expect(logout).toHaveBeenCalled()
+  })
+
+  it('asks a demo user to confirm before signing out', async () => {
+    const logout = vi.fn().mockResolvedValue(undefined)
+    mockAuth({ user: DEMO_USER, logout })
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByText('Sign Out'))
+    expect(screen.getByRole('dialog', { name: 'Sign out of demo mode?' })).toBeInTheDocument()
+    expect(logout).not.toHaveBeenCalled()
   })
 })
 
@@ -257,7 +261,6 @@ describe('ProjectDashboard new IDR button', () => {
 
     expect(api.createOrGetIdr).toHaveBeenCalledWith({
       projectId: 'HWS0023',
-      reporterUuid: DEV_USER.id,
       reportDate: '2026-09-29',
     })
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/idr/idr-new'))

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { Eye, FileImage, FileText, Paperclip, Pencil, Plus, Trash2 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
 import {
   deleteAttachment,
   getDownloadUrl as getAttachmentDownloadUrl,
@@ -83,8 +82,6 @@ function AttachmentCard({ attachment, thumbnailUrl, readOnly, onThumbnailError, 
  * Props: idrId, reportId, isSubmitted (IDR is locked: view only, with a note), className (added to the card).
  */
 export default function AttachmentsSection({ idrId, reportId, isSubmitted, className = '' }) {
-  const { user } = useAuth()
-
   const [loadStatus, setLoadStatus] = useState('loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState(null)
   const [loadAttempt, setLoadAttempt] = useState(0) // bump to retry
@@ -282,7 +279,6 @@ export default function AttachmentsSection({ idrId, reportId, isSubmitted, class
         <AttachmentUploadModal
           idrId={idrId}
           reportId={reportId}
-          uploadedBy={user.id}
           onUploaded={handleUploaded}
           onClose={closeModals}
         />

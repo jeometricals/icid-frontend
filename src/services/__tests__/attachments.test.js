@@ -14,12 +14,12 @@ import {
   deleteAttachment,
 } from '../attachments'
 import { mockFetch, mockFetchNoContent, mockFetchSequence, fetchUrl, fetchInit } from '../../test/mockFetch'
-import { CURRENT_USER_ID } from '../session'
+import { TEST_USER_ID } from '../../test/users'
 
 const IDR_ID = '5a0e8c1d-0000-4000-8000-00000000000a'
 const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
 const ATTACHMENT_ID = 'c3d4e5f6-0000-4000-8000-0000000000a1'
-const UPLOADER_UUID = CURRENT_USER_ID
+const UPLOADER_UUID = TEST_USER_ID
 const BASE = `/v1/idrs/${IDR_ID}/reports/${REPORT_ID}/attachments`
 const UPLOAD_URL = 'https://storage.example.com/upload/sign/report-attachments/x?token=abc'
 
@@ -46,7 +46,6 @@ const ok = data => ({ status: 'success', message: 'ok', data })
 const jpeg = () => new File(['abcd'], 'crack.jpg', { type: 'image/jpeg' })
 const uploadArgs = overrides => ({
   file: jpeg(),
-  uploadedBy: UPLOADER_UUID,
   name: 'Crack at curb',
   description: 'North side, station 12+50',
   ...overrides,
@@ -111,8 +110,8 @@ describe('uploadAttachment', () => {
     const request = fetchCall(0)
     expect(request.url.pathname).toBe(`${BASE}/upload-request`)
     expect(request.init.method).toBe('POST')
+    // no uploader: the backend takes it from the session
     expect(JSON.parse(request.init.body)).toEqual({
-      uploaded_by: UPLOADER_UUID,
       file_name: 'crack.jpg',
       file_type: 'image/jpeg',
       file_size_bytes: 4,

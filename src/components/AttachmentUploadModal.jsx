@@ -19,9 +19,9 @@ const STEP_LABELS = {
 /**
  * Modal for attaching a file to a report: file chooser plus the required name and description.
  * Checks the file as soon as it is picked; stays open with a spinner while uploading and with the error if it fails.
- * Props: idrId, reportId, uploadedBy (the uploader's user uuid), onUploaded(attachment), onClose.
+ * Props: idrId, reportId, onUploaded(attachment), onClose.
  */
-export default function AttachmentUploadModal({ idrId, reportId, uploadedBy, onUploaded, onClose }) {
+export default function AttachmentUploadModal({ idrId, reportId, onUploaded, onClose }) {
   const fileInputId = useId()
   const [file, setFile] = useState(null)
   const [fileError, setFileError] = useState(null)
@@ -46,7 +46,6 @@ export default function AttachmentUploadModal({ idrId, reportId, uploadedBy, onU
     try {
       const attachment = await uploadAttachment(idrId, reportId, {
         file,
-        uploadedBy,
         name,
         description,
         onProgress: ({ step: current }) => setStep(current),

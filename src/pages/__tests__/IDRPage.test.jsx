@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
-import { CURRENT_USER_ID } from '../../services/session'
+import * as AuthContext from '../../contexts/AuthContext'
+import { DEMO_USER, TEST_USER, TEST_USER_ID } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" so the refetch after each change sees that change
@@ -30,7 +31,7 @@ function draftIdr(overrides = {}) {
   return {
     idr_id: IDR_ID,
     project_id: 'HWS0023',
-    reporter_uuid: CURRENT_USER_ID,
+    reporter_uuid: TEST_USER_ID,
     report_date: '2026-09-27',
     work_start_time: '07:00:00',
     work_end_time: null,
@@ -63,6 +64,7 @@ vi.mock('../../services/api', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: TEST_USER })
   server = draftIdr()
   api.getIdr.mockImplementation(async () => structuredClone(server))
   api.saveIdrHeader.mockImplementation(async (_, changes) => {
@@ -547,5 +549,56 @@ describe('IDRPage — refetch after changes', () => {
     await user.click(within(screen.getByRole('alert')).getByRole('button', { name: /retry/i }))
     await waitFor(() => expect(screen.queryByText(/Couldn't refresh/)).not.toBeInTheDocument())
     expect(screen.getByText('No reports yet. Add one below.')).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Demo mode: everything but Submit
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — demo user', () => {
+  const DEMO_HINT = 'Demo mode — submit is disabled'
+
+  beforeEach(() => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: DEMO_USER })
+  })
+
+  it('disables Submit with a tooltip and a visible note, even with reports to submit', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    expect(submitButton()).toBeDisabled()
+    expect(submitButton().closest('[title]')).toHaveAttribute('title', DEMO_HINT)
+    expect(screen.getByText(DEMO_HINT)).toBeInTheDocument()
+    await user.click(submitButton())
+    expect(screen.queryByRole('dialog', { name: 'Certification' })).not.toBeInTheDocument()
+    expect(api.submitIdr).not.toHaveBeenCalled()
+  })
+
+  it('shows the demo note instead of the "add a report" hint on an empty IDR', async () => {
+    server = draftIdr({ reports: [] })
+    renderPage()
+    await ready()
+    expect(screen.getByText(DEMO_HINT)).toBeInTheDocument()
+    expect(screen.queryByText('Add at least one report before submitting.')).not.toBeInTheDocument()
+  })
+
+  it('still lets a demo user add reports and export the draft', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    expect(screen.getByRole('button', { name: /Export Draft/ })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: /Export Draft/ }))
+    expect(api.generateExport).toHaveBeenCalledWith(IDR_ID)
+  })
+})
+
+describe('IDRPage — signed-in user who is not a demo user', () => {
+  it('leaves Submit enabled with no tooltip or demo note', async () => {
+    renderPage()
+    await ready()
+    expect(submitButton()).toBeEnabled()
+    expect(submitButton().closest('[title]')).toBeNull()
+    expect(screen.queryByText('Demo mode — submit is disabled')).not.toBeInTheDocument()
   })
 })

@@ -5,18 +5,18 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import DraftsListPage from '../DraftsListPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { CURRENT_USER_ID } from '../../services/session'
+import { TEST_USER_ID } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // Shared mocks
 // ---------------------------------------------------------------------------
 
-const DEV_USER = { id: CURRENT_USER_ID, email: 'KhanG@magnoleng.pc' }
+const DEV_USER = { uuid: TEST_USER_ID, email: 'KhanG@magnoleng.pc' }
 
 const DRAFTS = [
   {
     idr_id: 'idr-aaaa',
-    reporter_uuid: DEV_USER.id,
+    reporter_uuid: DEV_USER.uuid,
     report_date: '2026-09-23',
     status: 'draft',
     report_count: 3,
@@ -26,7 +26,7 @@ const DRAFTS = [
   },
   {
     idr_id: 'idr-bbbb',
-    reporter_uuid: DEV_USER.id,
+    reporter_uuid: DEV_USER.uuid,
     report_date: '2025-09-16',
     status: 'draft',
     report_count: 0,
@@ -75,7 +75,7 @@ describe('DraftsListPage', () => {
     await screen.findByText('Sep 23, 2026')
     expect(api.listIdrs).toHaveBeenCalledWith({
       projectId: 'HWS0023',
-      reporterUuid: DEV_USER.id,
+      reporterUuid: DEV_USER.uuid,
       status: 'draft',
     })
   })

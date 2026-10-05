@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { listUsers } from '../users'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
-import { CURRENT_USER_ID } from '../session'
+import { TEST_USER_ID } from '../../test/users'
 
 beforeEach(() => {
   vi.restoreAllMocks()
 })
 
 const USERS = [
-  { user_id: CURRENT_USER_ID, email: 'KhanG@magnoleng.pc', first_name: 'Genghis', last_name: 'Khan' },
+  { user_id: TEST_USER_ID, email: 'KhanG@magnoleng.pc', first_name: 'Genghis', last_name: 'Khan' },
   { user_id: '5246b39d-87fe-4e21-92a3-2804c899e8b3', email: 'Nadir.shah@goorkaneng.com', first_name: 'Nadir', last_name: 'Shah' },
 ]
 

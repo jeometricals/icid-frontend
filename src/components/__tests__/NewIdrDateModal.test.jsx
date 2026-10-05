@@ -13,7 +13,7 @@ const SUBMITTED_AT = '2026-09-25T21:10:00Z'
 
 function renderModal() {
   const handlers = { onOpen: vi.fn(), onClose: vi.fn() }
-  render(<NewIdrDateModal projectId="HWS0023" reporterUuid="user-28" {...handlers} />)
+  render(<NewIdrDateModal projectId="HWS0023" {...handlers} />)
   return handlers
 }
 
@@ -44,7 +44,7 @@ describe('NewIdrDateModal — picking a date', () => {
     const { onOpen } = renderModal()
     await pickDate('2026-09-24')
     await submit()
-    expect(api.createOrGetIdr).toHaveBeenCalledWith({ projectId: 'HWS0023', reporterUuid: 'user-28', reportDate: '2026-09-24' })
+    expect(api.createOrGetIdr).toHaveBeenCalledWith({ projectId: 'HWS0023', reportDate: '2026-09-24' })
     expect(onOpen).toHaveBeenCalledWith('idr-new')
   })
 

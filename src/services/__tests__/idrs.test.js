@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { format } from 'date-fns'
 import { createIdr, createOrGetIdr, listIdrs, getIdr, saveIdrHeader, submitIdr } from '../idrs'
 import { mockFetch, mockFetchFailure, mockFetchSequence, fetchUrl, fetchInit } from '../../test/mockFetch'
-import { CURRENT_USER_ID } from '../session'
+import { TEST_USER_ID } from '../../test/users'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -10,7 +10,7 @@ beforeEach(() => {
 
 const IDR_ID = '5a0e8c1d-0000-4000-8000-00000000000a'
 const REPORT_ID = '9b1c2f3e-0000-4000-8000-000000000001'
-const REPORTER_UUID = CURRENT_USER_ID
+const REPORTER_UUID = TEST_USER_ID
 
 const MOCK_IDR = {
   idr_id: IDR_ID,
@@ -56,27 +56,24 @@ describe('error body', () => {
 describe('createIdr', () => {
   it('POSTs to /v1/idrs/ with a snake_case body and JSON header', async () => {
     mockFetch(201, { status: 'success', data: MOCK_IDR })
-    await createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' })
+    await createIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' })
     expect(fetchUrl().pathname).toBe('/v1/idrs/')
     const init = fetchInit()
     expect(init.method).toBe('POST')
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
-    expect(JSON.parse(init.body)).toEqual({
-      project_id: 'HWS0023',
-      reporter_uuid: REPORTER_UUID,
-      report_date: '2026-09-25',
-    })
+    // no reporter: the backend takes it from the session
+    expect(JSON.parse(init.body)).toEqual({ project_id: 'HWS0023', report_date: '2026-09-25' })
   })
 
   it('returns the created IDR', async () => {
     mockFetch(201, { status: 'success', data: MOCK_IDR })
-    const result = await createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' })
+    const result = await createIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' })
     expect(result).toEqual(MOCK_IDR)
   })
 
   it('exposes existing_idr_id on a 409 (IDR already exists for that day)', async () => {
     mockFetch(409, { detail: 'An IDR already exists for this date', existing_idr_id: IDR_ID })
-    const err = await createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' })
+    const err = await createIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' })
       .catch(e => e)
     expect(err).toMatchObject({ message: 'An IDR already exists for this date', status: 409 })
     expect(err.body.existing_idr_id).toBe(IDR_ID)
@@ -84,13 +81,13 @@ describe('createIdr', () => {
 
   it('throws the backend message on 403 (reporter not on project)', async () => {
     mockFetch(403, { detail: 'Reporter is not assigned to this project' })
-    await expect(createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' }))
+    await expect(createIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' }))
       .rejects.toMatchObject({ message: 'Reporter is not assigned to this project', status: 403 })
   })
 
   it('throws when fetch itself fails', async () => {
     mockFetchFailure('Network error')
-    await expect(createIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' }))
+    await expect(createIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' }))
       .rejects.toThrow('Network error')
   })
 })
@@ -100,14 +97,14 @@ describe('createOrGetIdr', () => {
 
   it('creates the IDR for the given date and says it is new', async () => {
     mockFetch(201, { status: 'success', data: MOCK_IDR })
-    const result = await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-24' })
+    const result = await createOrGetIdr({ projectId: 'HWS0023', reportDate: '2026-09-24' })
     expect(JSON.parse(fetchInit().body).report_date).toBe('2026-09-24')
     expect(result).toEqual({ idr: MOCK_IDR, isNew: true })
   })
 
   it('defaults the date to today, local time', async () => {
     mockFetch(201, { status: 'success', data: MOCK_IDR })
-    await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID })
+    await createOrGetIdr({ projectId: 'HWS0023' })
     expect(JSON.parse(fetchInit().body).report_date).toBe(format(new Date(), 'yyyy-MM-dd'))
   })
 
@@ -116,7 +113,7 @@ describe('createOrGetIdr', () => {
       [409, { detail: 'IDR already exists for this project and date', existing_idr_id: IDR_ID }],
       [200, { status: 'success', data: SUBMITTED }],
     ])
-    const result = await createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' })
+    const result = await createOrGetIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' })
     expect(new URL(fetch.mock.calls[1][0]).pathname).toBe(`/v1/idrs/${IDR_ID}`)
     expect(result.isNew).toBe(false)
     expect(result.idr).toMatchObject({ idr_id: IDR_ID, status: 'submitted', submitted_at: '2026-09-25T21:10:00Z' })
@@ -124,7 +121,7 @@ describe('createOrGetIdr', () => {
 
   it('throws any other failure', async () => {
     mockFetch(403, { detail: 'Reporter is not assigned to this project' })
-    await expect(createOrGetIdr({ projectId: 'HWS0023', reporterUuid: REPORTER_UUID, reportDate: '2026-09-25' }))
+    await expect(createOrGetIdr({ projectId: 'HWS0023', reportDate: '2026-09-25' }))
       .rejects.toMatchObject({ status: 403 })
     expect(fetch).toHaveBeenCalledTimes(1)
   })

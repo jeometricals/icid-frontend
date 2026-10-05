@@ -1,3 +1,5 @@
+import { clearToken, getToken, UNAUTHORIZED_EVENT } from './session'
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://icid-backend.vercel.app'
 
 /**
@@ -21,18 +23,31 @@ function parseJson(text) {
 
 /**
  * Calls the ICID backend and returns the parsed JSON response.
- * Takes a path plus optional {method, body}; a body is sent as JSON. Returns null for 204 No Content.
+ * Takes a path plus optional {method, body, redirectOn401}; a body is sent as JSON, and the stored session token,
+ * when there is one, as a Bearer Authorization header. Returns null for 204 No Content.
  * Throws on non-2xx responses, with the HTTP code on `error.status` and the parsed error body on `error.body`
  * (network failures throw without either). A 2xx response that isn't JSON throws with the status and a
  * preview of the body instead of a bare SyntaxError.
+ * A 401 means the session is over: the token is cleared and UNAUTHORIZED_EVENT fires (AuthContext then sends the
+ * user to /login), and the returned promise never settles, so the caller shows no error on the way out. Pass
+ * redirectOn401: false to get the 401 thrown like any other error (the sign-in calls do).
  */
-export async function apiFetch(path, { method = 'GET', body } = {}) {
+export async function apiFetch(path, { method = 'GET', body, redirectOn401 = true } = {}) {
   const init = { method }
+  const headers = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) {
-    init.headers = { 'Content-Type': 'application/json' }
+    headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
+  if (Object.keys(headers).length > 0) init.headers = headers
   const res = await fetch(`${BASE_URL}${path}`, init)
+  if (res.status === 401 && redirectOn401) {
+    clearToken()
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+    return new Promise(() => {})
+  }
   if (!res.ok) {
     const errorBody = parseJson(await res.text()) ?? {}
     const error = new Error(errorMessage(errorBody, res.status))

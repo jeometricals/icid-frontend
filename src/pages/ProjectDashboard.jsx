@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { HardHat, LogOut, ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { getProjectById } from '../services/api'
 import NewIdrDateModal from '../components/NewIdrDateModal'
+import AppHeader from '../components/AppHeader'
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()
   const navigate = useNavigate()
-  const { signOut, user, isDemoMode } = useAuth()
   const [project, setProject] = useState(null)
   const [loadingProject, setLoadingProject] = useState(true)
   const [loadError, setLoadError] = useState(null) // the thrown Error; status 404 means the project doesn't exist
@@ -25,11 +24,6 @@ export default function ProjectDashboard() {
       .finally(() => { if (!ignore) setLoadingProject(false) })
     return () => { ignore = true }
   }, [projectId, attempt])
-
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
 
 
   if (loadingProject) {
@@ -74,44 +68,7 @@ export default function ProjectDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <div className="bg-construction-600 p-2 rounded-lg">
-                <HardHat className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-construction-900">ICID Co.</h1>
-                <p className="text-xs text-gray-500">Integrated Construction Information Database</p>
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-3">
-                <div className="text-right hidden sm:block">
-                  <div className="text-sm font-medium text-gray-900">
-                    {user?.user_metadata?.full_name || user?.email || 'User'}
-                  </div>
-                  {isDemoMode && (
-                    <div className="text-xs text-construction-600 font-medium">Demo Mode</div>
-                  )}
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -197,7 +154,6 @@ export default function ProjectDashboard() {
       {pickingIdrDate && (
         <NewIdrDateModal
           projectId={projectId}
-          reporterUuid={user.id}
           onOpen={(idrId) => navigate(`/project/${projectId}/idr/${idrId}`)}
           onClose={() => setPickingIdrDate(false)}
         />

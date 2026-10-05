@@ -14,14 +14,14 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (hardcoded dev user).
-- `src/services/` — all backend access. One file per resource (`projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
-  Exception: `session.js` holds the hardcoded dev-user constants (`CURRENT_USER_ID`), not backend calls; components
-  still get the current user from `useAuth()`.
+- `src/contexts/` — React context providers. Currently just `AuthContext.jsx` (the signed-in user; see Sign-in below).
+- `src/services/` — all backend access. One file per resource (`auth.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+  Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
+  `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers) and `useReportForm.js` (the hook every report page uses for load/save/state). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
-- `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
+- `src/components/` — shared UI components (the app header, `ProtectedRoute`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -53,15 +53,31 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 ## Rules for Claude Code
 
 - **Propose which files you'll change before changing them**, so scope creep gets caught early.
-- **Auth is hardcoded on purpose.** `AuthContext.jsx` always signs in as dev user #28, and every current page
-  assumes it. Do NOT try to fix auth until we tackle it deliberately as its own slice.
+- **Sign-in.** The backend requires a bearer token on every `/v1` route except login, demo and logout.
+  - `AuthContext` holds `user` (`{uuid, email, first_name, last_name, role, is_demo}`), `isLoading`, `error`, and
+    `login(email, password)`, `loginDemo()`, `logout()`. On startup it restores the session from the stored token
+    with `GET /v1/auth/me`. It must sit inside the Router (it navigates on sign-out).
+  - `apiFetch` adds `Authorization: Bearer <token>` to every request. A 401 clears the token and fires
+    `UNAUTHORIZED_EVENT`; `AuthContext` then signs the user out and sends them to `/login`. The caller's promise
+    never settles, so pages show no error on the way out. Only the calls in `services/auth.js` opt out
+    (`redirectOn401: false`), because a 401 there means wrong credentials or a stale token.
+  - Every route except `/login` sits inside `<ProtectedRoute>` in `App.jsx`; a new page goes there too.
+  - **The user never goes in a URL or a request body.** The backend takes the project list's user, an IDR's
+    reporter and an attachment's uploader from the token. `?reporter_uuid=` on the IDR list is only a filter.
+  - **Demo mode.** "Try Demo Mode" makes a throwaway user (`user.is_demo`) on the demo project. For them: the header
+    shows a Demo Mode badge; Sign Out asks first, because it deletes everything they made (`logout()` calls the
+    backend for a demo user only); Submit on the IDR page is disabled with a tooltip and a note; the archive skips
+    the user list. The backend enforces all of this itself (403 on submit and on `/v1/users/`, 404 on anything
+    that isn't theirs), so a new demo restriction needs the backend change first.
+  - Tests mock `useAuth()` with `TEST_USER` or `DEMO_USER` from `src/test/users.js`.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.
 - **If a change needs a matching backend change (new endpoint, changed response shape), STOP and tell me.** Don't
   make backend changes from this repo and don't invent endpoints that don't exist yet. Endpoints currently used:
   <!-- Update this list when endpoints change -->
-  - `GET /v1/projects/?user_id=`
+  - `POST /v1/auth/login` · `POST /v1/auth/demo` · `GET /v1/auth/me` · `POST /v1/auth/logout`
+  - `GET /v1/projects/` (the signed-in user's projects)
   - `GET /v1/projects/{id}`
-  - `GET /v1/users/` (Archive resolves reporter_uuid → name)
+  - `GET /v1/users/` (Archive resolves reporter_uuid → name; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` · `GET /v1/idrs/{id}`
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
@@ -81,4 +97,3 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **README's Project Structure tree is outdated** — it lists only three pages and omits `src/services/`, `src/data/` and `src/test/`.
 - **`ProjectDashboard` swallows all errors as "not found"** — fix pending Slice 1 work.
 - **No ESLint config** — `npm run lint` will fail.
-- **Some pages lack tests** (`LoginPage`).

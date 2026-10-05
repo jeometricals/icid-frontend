@@ -1,10 +1,10 @@
 import { apiFetch } from './apiClient'
 
 /**
- * Lists the projects a user is assigned to ({project_id, project_name, borough, status, user_role}).
+ * Lists the projects the signed-in user is assigned to ({project_id, project_name, borough, status, user_role}).
  */
-export async function getProjectsForUser(userId) {
-  const json = await apiFetch(`/v1/projects/?user_id=${userId}`)
+export async function getProjectsForUser() {
+  const json = await apiFetch('/v1/projects/')
   return json.data
 }
 
