@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { HardHat, LogOut } from 'lucide-react'
+import { HardHat, LogOut, PenLine } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
 import ConfirmDialog from './ConfirmDialog'
+import SignatureSetupModal from './SignatureSetupModal'
 
 /**
  * The app's top bar, on every signed-in page: the ICID Co. logo (a link to the project list), the signed-in user's
- * first name (or email), a "Demo Mode" badge for a demo user, and Sign Out. A demo user is asked to confirm first,
- * since signing out deletes their test data. Leaving through the logo or Sign Out goes through the page's leave
+ * first name (or email), a "Demo Mode" badge for a demo user, a button to set up or update their signature (not for
+ * demo users, who can't submit), and Sign Out. A demo user is asked to confirm first, since signing out deletes their
+ * test data. Leaving through the logo or Sign Out goes through the page's leave
  * guard, so a report form saves unsaved edits first.
  * Takes no props; reads the user from AuthContext.
  */
@@ -18,6 +21,8 @@ export default function AppHeader() {
   const leave = useGuardedLeave()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [signatureOpen, setSignatureOpen] = useState(false)
+  const hasSignature = Boolean(user?.has_signature)
 
   const signOut = async () => {
     setSigningOut(true)
@@ -57,6 +62,18 @@ export default function AppHeader() {
                 <div className="text-xs text-construction-600 font-medium">Demo Mode</div>
               )}
             </div>
+            {user && !user.is_demo && (
+              <button
+                onClick={() => setSignatureOpen(true)}
+                title={hasSignature && user.signature_set_at
+                  ? `Signature on file, set ${format(parseISO(user.signature_set_at), 'MMM d, yyyy')}`
+                  : 'No signature on file yet'}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              >
+                <PenLine className="h-4 w-4" />
+                <span className="hidden sm:inline">{hasSignature ? 'Update signature' : 'Set up signature'}</span>
+              </button>
+            )}
             <button
               onClick={user?.is_demo ? () => setConfirmOpen(true) : () => leave(signOut)}
               disabled={signingOut}
@@ -68,6 +85,12 @@ export default function AppHeader() {
           </div>
         </div>
       </div>
+
+      <SignatureSetupModal
+        isOpen={signatureOpen}
+        onClose={() => setSignatureOpen(false)}
+        title={hasSignature ? 'Update Your Signature' : 'Set Up Your Signature'}
+      />
 
       {confirmOpen && (
         <ConfirmDialog

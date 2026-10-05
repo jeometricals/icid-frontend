@@ -25,10 +25,13 @@ export const useAuth = () => {
 }
 
 /**
- * Holds the signed-in user ({uuid, email, first_name, last_name, role, is_demo}) for the whole app. On startup it
- * restores the session from the stored token (isLoading is true meanwhile). Must sit inside the Router.
+ * Holds the signed-in user ({uuid, email, first_name, last_name, role, is_demo, has_signature, signature_set_at}) for
+ * the whole app. On startup it restores the session from the stored token (isLoading is true meanwhile). Must sit
+ * inside the Router.
  * Provides: user (null when signed out), isLoading, error (why the last sign-in or restore failed, else null),
- * login(email, password) and loginDemo() (both resolve to true on success, false with error set), and logout().
+ * login(email, password) and loginDemo() (both resolve to true on success, false with error set), logout(), and
+ * refreshUser() (re-reads the user from the backend, e.g. after they set a signature; resolves to the user, rejects
+ * if the request fails, leaving the current user as it was).
  */
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate()
@@ -97,7 +100,13 @@ export const AuthProvider = ({ children }) => {
     navigate('/login', { replace: true })
   }
 
-  const value = { user, isLoading, error, login, loginDemo, logout }
+  const refreshUser = async () => {
+    const fresh = await fetchCurrentUser()
+    setUser(fresh)
+    return fresh
+  }
+
+  const value = { user, isLoading, error, login, loginDemo, logout, refreshUser }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

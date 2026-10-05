@@ -22,10 +22,13 @@ import SubmittedBanner from '../components/SubmittedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
 import GoToProjectButton from '../components/GoToProjectButton'
+import SignatureSetupModal from '../components/SignatureSetupModal'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
 const DEMO_SUBMIT_DISABLED = 'Demo mode — submit is disabled'
+const ATTESTATION_STATEMENT =
+  'I attest that the information in this IDR is accurate and complete to the best of my knowledge.'
 const CERTIFICATION_STATEMENT =
   'The above described work was incorporated into this project and was constructed in conformance with all plans, ' +
   'specifications, and standards unless otherwise noted.'
@@ -69,6 +72,7 @@ export default function IDRPage() {
   const [actionError, setActionError] = useState(null) // { scope: 'reports' | 'submit', message }
   const [refreshError, setRefreshError] = useState(null)
   const [certifyOpen, setCertifyOpen] = useState(false) // the certification dialog shown before submitting
+  const [signatureSetupOpen, setSignatureSetupOpen] = useState(false) // shown first when the user has no signature yet
 
   // Puts a getIdr response into state. resetForm replaces the typed header (initial load only).
   const applyIdr = useCallback((data, { resetForm }) => {
@@ -186,11 +190,16 @@ export default function IDRPage() {
       message => setActionError({ scope: 'reports', message: `Couldn't delete report: ${message}` }))
   }
 
-  // Blocks on unsaved header edits so what gets submitted is what's on screen, then asks for certification
+  // Blocks on unsaved header edits so what gets submitted is what's on screen, then asks for certification.
+  // Submitting signs the IDR, so a user without a signature sets one up first and goes on to certify from there.
   const openCertify = () => {
     if (busy || reports.length === 0) return
     if (headerDirty) {
       window.alert(SAVE_HEADER_BEFORE_SUBMIT)
+      return
+    }
+    if (!user?.has_signature) {
+      setSignatureSetupOpen(true)
       return
     }
     setCertifyOpen(true)
@@ -344,10 +353,16 @@ export default function IDRPage() {
             )}
           </div>
         )}
+        <SignatureSetupModal
+          isOpen={signatureSetupOpen}
+          onClose={() => setSignatureSetupOpen(false)}
+          onSuccess={() => setCertifyOpen(true)}
+        />
         {certifyOpen && (
           <ConfirmDialog
             title="Certification"
             message={CERTIFICATION_STATEMENT}
+            note={ATTESTATION_STATEMENT}
             confirmLabel="Submit"
             cancelLabel="Cancel"
             confirmClassName="btn-primary"

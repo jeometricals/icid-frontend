@@ -15,10 +15,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers) and `useReportForm.js` (the hook every report page uses for load/save/state). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `useReportForm.js` (the hook every report page uses for load/save/state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -78,12 +78,27 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     backend for a demo user only); Submit on the IDR page is disabled with a tooltip and a note; the archive skips
     the user list. The backend enforces all of this itself (403 on submit and on `/v1/users/`, 404 on anything
     that isn't theirs), so a new demo restriction needs the backend change first.
-  - Tests mock `useAuth()` with `TEST_USER` or `DEMO_USER` from `src/test/users.js`.
+  - Tests mock `useAuth()` with `TEST_USER` (has a signature), `UNSIGNED_USER` or `DEMO_USER` from `src/test/users.js`.
+- **Signatures.** Submitting an IDR signs it with the user's signature, which the backend stamps on the export.
+  - `user.has_signature` and `user.signature_set_at` come with the user; `refreshUser()` on `AuthContext` re-reads
+    them after a change.
+  - `SignatureSetupModal` is the one place a signature is set or replaced: draw it (`react-signature-canvas`) or
+    upload a PNG. `saveSignature` in `services/signatures.js` does the three steps: `upload-request`, a PUT of the
+    PNG straight to the signed Storage URL (not through `apiFetch`), then `confirm`. PNG only, 500 KB at most.
+  - A drawing is cropped to its ink before upload (`lib/signatureImage.js`), so it fills the signature line on
+    the printed form.
+  - On the IDR page, Submit opens the modal first for a user without a signature, then the certification dialog
+    (which now carries the attestation sentence under the certification statement). The header has a
+    "Set up signature" / "Update signature" button.
+  - Demo users never see any of it: no header button, and Submit is disabled for them. The backend refuses them
+    too (403).
+  - Tests don't have a real canvas: they mock `react-signature-canvas`, and pages mock `SignatureSetupModal`.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.
 - **If a change needs a matching backend change (new endpoint, changed response shape), STOP and tell me.** Don't
   make backend changes from this repo and don't invent endpoints that don't exist yet. Endpoints currently used:
   <!-- Update this list when endpoints change -->
   - `POST /v1/auth/login` · `POST /v1/auth/demo` · `GET /v1/auth/me` · `POST /v1/auth/logout`
+  - `POST /v1/signatures/upload-request` · `POST /v1/signatures/confirm` (the PNG itself is PUT to the Storage signed URL)
   - `GET /v1/projects/` (the signed-in user's projects)
   - `GET /v1/projects/{id}`
   - `GET /v1/users/` (Archive resolves reporter_uuid → name; not available to demo users)

@@ -5,7 +5,17 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
-import { DEMO_USER, TEST_USER, TEST_USER_ID } from '../../test/users'
+import { DEMO_USER, TEST_USER, TEST_USER_ID, UNSIGNED_USER } from '../../test/users'
+
+// The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
+vi.mock('../../components/SignatureSetupModal', () => ({
+  default: ({ isOpen, onClose, onSuccess, title }) => (isOpen ? (
+    <div role="dialog" aria-label={title ?? 'Set Up Your Signature'}>
+      <button onClick={() => { onSuccess?.(); onClose() }}>finish signature</button>
+      <button onClick={onClose}>cancel signature</button>
+    </div>
+  ) : null),
+}))
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" so the refetch after each change sees that change
@@ -635,5 +645,98 @@ describe('IDRPage — Go to Project Page', () => {
     renderPage('archive')
     await ready()
     expect(goToProject()).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Submitting signs the IDR: the signature comes first
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — signature before submit', () => {
+  const ATTESTATION = 'I attest that the information in this IDR is accurate and complete to the best of my knowledge.'
+  const certifyDialog = () => screen.queryByRole('dialog', { name: 'Certification' })
+  const signatureDialog = () => screen.queryByRole('dialog', { name: 'Set Up Your Signature' })
+
+  it('shows the attestation under the certification statement, above Submit', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    const dialog = certifyDialog()
+    const attestation = within(dialog).getByText(ATTESTATION)
+    const certification = within(dialog).getByText(/The above described work was incorporated/)
+    expect(certification.compareDocumentPosition(attestation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const submit = within(dialog).getByRole('button', { name: 'Submit' })
+    expect(attestation.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('goes straight to certification for a user with a signature', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(certifyDialog()).toBeInTheDocument()
+    expect(signatureDialog()).not.toBeInTheDocument()
+  })
+
+  it('asks a user without a signature to set one up first, not to certify yet', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: UNSIGNED_USER })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(signatureDialog()).toBeInTheDocument()
+    expect(certifyDialog()).not.toBeInTheDocument()
+    expect(api.submitIdr).not.toHaveBeenCalled()
+  })
+
+  it('opens certification once the signature is set, and submits from there', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: UNSIGNED_USER })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    await user.click(screen.getByRole('button', { name: 'finish signature' }))
+    expect(signatureDialog()).not.toBeInTheDocument()
+    const dialog = certifyDialog()
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByText(ATTESTATION)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(api.submitIdr).toHaveBeenCalledWith(IDR_ID))
+  })
+
+  it('goes back to the page, with nothing submitted, when signature setup is cancelled', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: UNSIGNED_USER })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    await user.click(screen.getByRole('button', { name: 'cancel signature' }))
+    expect(signatureDialog()).not.toBeInTheDocument()
+    expect(certifyDialog()).not.toBeInTheDocument()
+    expect(api.submitIdr).not.toHaveBeenCalled()
+    expect(submitButton()).toBeEnabled()
+  })
+
+  it('still asks for unsaved header changes to be saved before anything else', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: UNSIGNED_USER })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    fireEvent.change(screen.getByLabelText('Daily Temp Low (°F)'), { target: { value: '48' } })
+    await user.click(submitButton())
+    expect(window.alert).toHaveBeenCalledWith('Please save the header before submitting.')
+    expect(signatureDialog()).not.toBeInTheDocument()
+  })
+
+  it('never offers signature setup to a demo user: Submit stays disabled', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: DEMO_USER })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(signatureDialog()).not.toBeInTheDocument()
+    expect(certifyDialog()).not.toBeInTheDocument()
   })
 })

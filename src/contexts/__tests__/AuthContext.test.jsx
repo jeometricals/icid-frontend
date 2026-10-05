@@ -5,7 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth, CANT_REACH_SERVER, INVALID_CREDENTIALS, SESSION_EXPIRED } from '../AuthContext'
 import * as api from '../../services/api'
 import { TOKEN_KEY, UNAUTHORIZED_EVENT } from '../../services/session'
-import { DEMO_USER, TEST_USER, sessionFor } from '../../test/users'
+import { DEMO_USER, TEST_USER, UNSIGNED_USER, sessionFor } from '../../test/users'
 
 vi.mock('../../services/api', () => ({
   signIn: vi.fn(),
@@ -18,18 +18,20 @@ const httpError = (status, message) => Object.assign(new Error(message), { statu
 
 // Shows AuthContext's values in the DOM, with a button per method
 function AuthConsumer() {
-  const { user, isLoading, error, login, loginDemo, logout } = useAuth()
+  const { user, isLoading, error, login, loginDemo, logout, refreshUser } = useAuth()
   const location = useLocation()
   return (
     <div>
       <div data-testid="user">{user ? user.email : 'null'}</div>
       <div data-testid="demo">{String(Boolean(user?.is_demo))}</div>
+      <div data-testid="signature">{String(Boolean(user?.has_signature))}</div>
       <div data-testid="loading">{String(isLoading)}</div>
       <div data-testid="error">{error ?? 'null'}</div>
       <div data-testid="url">{location.pathname}</div>
       <button onClick={() => login('KhanG@magnoleng.pc', 'secret-pw')}>login</button>
       <button onClick={() => loginDemo()}>demo</button>
       <button onClick={() => logout()}>logout</button>
+      <button onClick={() => refreshUser().catch(() => {})}>refresh</button>
     </div>
   )
 }
@@ -265,5 +267,48 @@ describe('useAuth outside provider', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => renderHook(() => useAuth())).toThrow('useAuth must be used within an AuthProvider')
     spy.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// refreshUser
+// ---------------------------------------------------------------------------
+
+describe('refreshUser', () => {
+  it('re-reads the user, picking up a signature set since sign-in', async () => {
+    api.signIn.mockResolvedValue(sessionFor(UNSIGNED_USER))
+    api.fetchCurrentUser.mockResolvedValue(TEST_USER)
+    renderAuth()
+    await click('login')
+    expect(shown('signature')).toBe('false')
+    await click('refresh')
+    expect(api.fetchCurrentUser).toHaveBeenCalledTimes(1)
+    expect(shown('signature')).toBe('true')
+    expect(shown('user')).toBe(TEST_USER.email)
+  })
+
+  it('resolves to the fresh user', async () => {
+    api.signIn.mockResolvedValue(sessionFor(UNSIGNED_USER))
+    api.fetchCurrentUser.mockResolvedValue(TEST_USER)
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <MemoryRouter><AuthProvider>{children}</AuthProvider></MemoryRouter>,
+    })
+    await act(async () => { await result.current.login('a@b.c', 'secret-pw') })
+    let fresh
+    await act(async () => { fresh = await result.current.refreshUser() })
+    expect(fresh).toEqual(TEST_USER)
+    expect(result.current.user).toEqual(TEST_USER)
+  })
+
+  it('rejects and leaves the user as they were when the request fails', async () => {
+    api.signIn.mockResolvedValue(sessionFor(UNSIGNED_USER))
+    api.fetchCurrentUser.mockRejectedValue(new Error('Failed to fetch'))
+    renderAuth()
+    await click('login')
+    await click('refresh')
+    expect(shown('user')).toBe(UNSIGNED_USER.email)
+    expect(shown('signature')).toBe('false')
+    expect(shown('error')).toBe('null')
+    expect(localStorage.getItem(TOKEN_KEY)).not.toBeNull()
   })
 })

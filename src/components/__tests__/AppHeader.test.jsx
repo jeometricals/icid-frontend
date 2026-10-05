@@ -4,7 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import AppHeader from '../AppHeader'
 import * as AuthContext from '../../contexts/AuthContext'
-import { DEMO_USER, TEST_USER } from '../../test/users'
+import { DEMO_USER, TEST_USER, UNSIGNED_USER } from '../../test/users'
+
+// The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
+vi.mock('../SignatureSetupModal', () => ({
+  default: ({ isOpen, onClose, onSuccess, title }) => (isOpen ? (
+    <div role="dialog" aria-label={title ?? 'Set Up Your Signature'}>
+      <button onClick={() => { onSuccess?.(); onClose() }}>finish signature</button>
+      <button onClick={onClose}>cancel signature</button>
+    </div>
+  ) : null),
+}))
 
 let logout
 
@@ -123,5 +133,50 @@ describe('AppHeader logo', () => {
     expect(screen.getByTestId('url')).toHaveTextContent(/^\/projects$/)
     expect(confirmDialog()).not.toBeInTheDocument()
     expect(logout).not.toHaveBeenCalled()
+  })
+})
+
+describe('AppHeader signature button', () => {
+  const signatureDialog = name => screen.queryByRole('dialog', { name })
+
+  it('offers "Set up signature" to a user without one, opening the setup dialog', async () => {
+    renderHeader(UNSIGNED_USER)
+    const button = screen.getByRole('button', { name: 'Set up signature' })
+    expect(button).toHaveAttribute('title', 'No signature on file yet')
+    expect(screen.queryByRole('button', { name: 'Update signature' })).not.toBeInTheDocument()
+    await userEvent.click(button)
+    expect(signatureDialog('Set Up Your Signature')).toBeInTheDocument()
+  })
+
+  it('offers "Update signature" to a user with one, saying when it was set', async () => {
+    renderHeader(TEST_USER)
+    const button = screen.getByRole('button', { name: 'Update signature' })
+    expect(button).toHaveAttribute('title', 'Signature on file, set Oct 1, 2026')
+    expect(screen.queryByRole('button', { name: 'Set up signature' })).not.toBeInTheDocument()
+    await userEvent.click(button)
+    expect(signatureDialog('Update Your Signature')).toBeInTheDocument()
+  })
+
+  it('closes the dialog when it is finished or cancelled, without signing out or leaving the page', async () => {
+    renderHeader(UNSIGNED_USER, '/project/HWS0023')
+    await userEvent.click(screen.getByRole('button', { name: 'Set up signature' }))
+    await userEvent.click(screen.getByRole('button', { name: 'cancel signature' }))
+    expect(signatureDialog('Set Up Your Signature')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Set up signature' }))
+    await userEvent.click(screen.getByRole('button', { name: 'finish signature' }))
+    expect(signatureDialog('Set Up Your Signature')).not.toBeInTheDocument()
+    expect(logout).not.toHaveBeenCalled()
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023')
+  })
+
+  it('shows neither to a demo user, who cannot submit', () => {
+    renderHeader(DEMO_USER)
+    expect(screen.queryByRole('button', { name: /signature/i })).not.toBeInTheDocument()
+    expect(signOutButton()).toBeInTheDocument()
+  })
+
+  it('keeps Sign Out beside it', () => {
+    renderHeader(TEST_USER)
+    expect(screen.getByRole('button', { name: 'Update signature' }).nextElementSibling).toBe(signOutButton())
   })
 })

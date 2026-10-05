@@ -59,3 +59,18 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Only draft IDRs can be edited')
   })
 })
+
+describe('ConfirmDialog note', () => {
+  it('shows an optional second paragraph under the message', () => {
+    render(<ConfirmDialog title="Certification" message="First statement." note="Second statement."
+      onConfirm={() => {}} onCancel={() => {}} />)
+    const message = screen.getByText('First statement.')
+    const note = screen.getByText('Second statement.')
+    expect(message.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('adds nothing when no note is given', () => {
+    render(<ConfirmDialog title="Delete?" message="Only this." onConfirm={() => {}} onCancel={() => {}} />)
+    expect(screen.getByRole('dialog').querySelectorAll('p')).toHaveLength(1)
+  })
+})
