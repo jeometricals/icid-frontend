@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { format, parseISO } from 'date-fns'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
@@ -70,6 +71,7 @@ vi.mock('../../services/api', () => ({
   deleteReport: vi.fn(),
   submitIdr: vi.fn(),
   generateExport: vi.fn(),
+  listUsers: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -410,7 +412,7 @@ describe('IDRPage — submit', () => {
 
     finishSubmit()
     await waitFor(() => expect(certifyDialog()).not.toBeInTheDocument())
-    expect(await screen.findByText(/^Submitted at /)).toBeInTheDocument()
+    expect(await screen.findByText(/^Submitted on /)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
     expect(screen.getByText('Page 1 of 1')).toBeInTheDocument()
   })
@@ -465,7 +467,7 @@ describe('IDRPage — read-only', () => {
     server = submitted()
     renderPage('archive')
     await ready()
-    expect(screen.getByText(/^Submitted at \d{2}:\d{2} on September 25, 2026$/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/^Submitted on Sep 25, 2026 at \d{1,2}:\d{2} [AP]M$/)
     for (const label of ['Work Activity Start', 'Daily Temp High (°F)', 'Weather AM']) {
       expect(screen.getByLabelText(label)).toBeDisabled()
     }
@@ -515,13 +517,14 @@ describe('IDRPage — export', () => {
     expect(api.generateExport).toHaveBeenCalledWith(IDR_ID)
   })
 
-  it('offers "Export (.xlsx)" beside the Submitted banner once submitted', async () => {
+  it('offers "Export (.xlsx)" in the page header once submitted, above the Submitted banner', async () => {
     server = draftIdr({ status: 'submitted', submitted_at: '2026-09-25T16:05:23Z', total_pages: 1 })
     renderPage('archive')
     await ready()
     expect(exportButton()).toHaveTextContent('Export (.xlsx)')
     expect(exportButton()).toBeEnabled()
-    expect(exportButton().closest('header')).toHaveTextContent(/Submitted at/)
+    expect(exportButton().closest('header')).not.toBeNull()
+    expect(exportButton().compareDocumentPosition(screen.getByRole('status')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('is disabled while the IDR has no reports', async () => {
@@ -738,5 +741,112 @@ describe('IDRPage — signature before submit', () => {
     await user.click(submitButton())
     expect(signatureDialog()).not.toBeInTheDocument()
     expect(certifyDialog()).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The signed-state banner on a submitted IDR
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — signed banner', () => {
+  const SIGNED_AT = '2026-10-05T15:52:10Z'
+  const OTHER = '5246b39d-87fe-4e21-92a3-2804c899e8b3'
+  const local = iso => format(parseISO(iso), "MMM d, yyyy 'at' h:mm a")
+  const signedIdr = (overrides = {}) => draftIdr({
+    status: 'submitted', submitted_at: '2026-10-05T15:52:09Z', total_pages: 1,
+    inspector_signature_path: 'idrs/idr-1/inspector_abc.png', inspector_signed_at: SIGNED_AT, ...overrides,
+  })
+  const banner = () => screen.getByRole('status')
+
+  it('says who submitted it and when, from the signed-in user when the IDR is their own', async () => {
+    server = signedIdr()
+    renderPage('archive')
+    await ready()
+    expect(banner()).toHaveTextContent(`Submitted by Genghis Khan on ${local(SIGNED_AT)}`)
+    expect(api.listUsers).not.toHaveBeenCalled()
+  })
+
+  it('sits at the top of the page, above the title, and the Submit area is gone', async () => {
+    server = signedIdr()
+    renderPage('archive')
+    const title = await ready()
+    expect(banner().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('status')).toHaveLength(1) // one banner, not the old lock notice as well
+  })
+
+  it('looks the name up in the user list for someone else\'s IDR', async () => {
+    server = signedIdr({ reporter_uuid: OTHER })
+    api.listUsers.mockResolvedValue([
+      { user_id: TEST_USER_ID, email: 'KhanG@magnoleng.pc', first_name: 'Genghis', last_name: 'Khan' },
+      { user_id: OTHER, email: 'Nadir.shah@goorkaneng.com', first_name: 'Nadir', last_name: 'Shah' },
+    ])
+    renderPage('archive')
+    await ready()
+    await waitFor(() => expect(banner()).toHaveTextContent(`Submitted by Nadir Shah on ${local(SIGNED_AT)}`))
+  })
+
+  it.each([
+    ['their first name when there is no last name', { first_name: 'Nadir', last_name: null }, 'Nadir'],
+    ['their email when there is no name', { first_name: null, last_name: null }, 'Nadir.shah@goorkaneng.com'],
+  ])('falls back to %s', async (_, names, shown) => {
+    server = signedIdr({ reporter_uuid: OTHER })
+    api.listUsers.mockResolvedValue([{ user_id: OTHER, email: 'Nadir.shah@goorkaneng.com', ...names }])
+    renderPage('archive')
+    await ready()
+    await waitFor(() => expect(banner()).toHaveTextContent(`Submitted by ${shown} on ${local(SIGNED_AT)}`))
+  })
+
+  it('uses the signed-in user\'s first name alone when they have no last name', async () => {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: { ...TEST_USER, last_name: null } })
+    server = signedIdr()
+    renderPage('archive')
+    await ready()
+    expect(banner()).toHaveTextContent(`Submitted by Genghis on ${local(SIGNED_AT)}`)
+  })
+
+  it.each([
+    ['the user list fails to load', () => api.listUsers.mockRejectedValue(new Error('Internal Server Error'))],
+    ['the signer is not in the user list', () => api.listUsers.mockResolvedValue([])],
+  ])('still says when, without a name, if %s', async (_, arrange) => {
+    arrange()
+    server = signedIdr({ reporter_uuid: OTHER })
+    renderPage('archive')
+    await ready()
+    await waitFor(() => expect(api.listUsers).toHaveBeenCalled())
+    expect(banner()).toHaveTextContent(`Submitted on ${local(SIGNED_AT)}`)
+    expect(banner()).not.toHaveTextContent(' by ')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument() // not an error worth showing
+  })
+
+  it('shows "Submitted on <submit time>" for an IDR submitted before signatures, without a name or a lookup', async () => {
+    server = draftIdr({ status: 'submitted', submitted_at: '2026-09-25T16:05:23Z', total_pages: 1,
+      reporter_uuid: OTHER })
+    renderPage('archive')
+    await ready()
+    expect(banner()).toHaveTextContent(`Submitted on ${local('2026-09-25T16:05:23Z')}`)
+    expect(banner()).not.toHaveTextContent(' by ')
+    expect(api.listUsers).not.toHaveBeenCalled()
+  })
+
+  it('shows no banner on a draft', async () => {
+    renderPage()
+    await ready()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(api.listUsers).not.toHaveBeenCalled()
+  })
+
+  it('appears once the IDR is submitted from this page', async () => {
+    api.submitIdr.mockImplementation(async () => {
+      server = signedIdr({ reports: server.reports.map((r, i) => ({ ...r, page_number: i + 1 })) })
+      return structuredClone(server)
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    await user.click(submitButton())
+    await user.click(within(screen.getByRole('dialog', { name: 'Certification' })).getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(banner()).toHaveTextContent(`Submitted by Genghis Khan on ${local(SIGNED_AT)}`))
   })
 })

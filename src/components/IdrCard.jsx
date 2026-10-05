@@ -1,9 +1,10 @@
-import { FileText } from 'lucide-react'
+import { Check, FileText } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 
 /**
  * Clickable card for one IDR in the Drafts or Archive list: date, report count and whether a General is included,
- * then "Last edited" for a draft or "Submitted" for a submitted IDR.
+ * then "Last edited" for a draft or "Submitted" for a submitted IDR. An IDR submitted with a signature carries a
+ * small "Signed" mark; one submitted before signatures existed shows nothing in its place.
  * Props: idr (a listIdrs row), onOpen (click handler), reporterName (optional; shown when given, e.g. in the Archive).
  */
 export default function IdrCard({ idr, onOpen, reporterName }) {
@@ -22,12 +23,27 @@ export default function IdrCard({ idr, onOpen, reporterName }) {
             {format(parseISO(idr.report_date), 'MMM d, yyyy')}
           </h3>
           <p className="text-sm text-gray-600 mb-2">{contentsSummary(idr)}</p>
-          {reporterName && <p className="text-sm text-gray-600 mb-2">Inspector: {reporterName}</p>}
+          {(reporterName || isSigned(idr)) && (
+            <p className="text-sm text-gray-600 mb-2 flex flex-wrap items-center gap-x-2">
+              {reporterName && <span>Inspector: {reporterName}</span>}
+              {isSigned(idr) && (
+                <span className="inline-flex items-center text-xs font-medium text-emerald-700">
+                  <Check className="h-3.5 w-3.5 mr-0.5" aria-hidden="true" />
+                  Signed
+                </span>
+              )}
+            </p>
+          )}
           <p className="text-xs text-gray-500">{timestampLabel(idr)}</p>
         </div>
       </div>
     </button>
   )
+}
+
+// Submitted with the inspector's signature (the IDR keeps its own copy of it)
+function isSigned(idr) {
+  return idr.status === 'submitted' && Boolean(idr.inspector_signature_path)
 }
 
 // "3 reports · With General", "1 report · General only", "2 reports · No General", or "No reports yet"

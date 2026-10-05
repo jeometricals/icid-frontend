@@ -170,3 +170,23 @@ describe('ReportArchivePage for a demo user', () => {
     expect(api.listUsers).not.toHaveBeenCalled()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Signed mark
+// ---------------------------------------------------------------------------
+
+describe('ReportArchivePage — signed IDRs', () => {
+  it('marks only the IDRs that were submitted with a signature', async () => {
+    const [first, second] = SUBMITTED
+    api.listIdrs.mockResolvedValue([
+      { ...first, inspector_signature_path: 'idrs/a/inspector_1.png', inspector_signed_at: first.submitted_at },
+      { ...second, inspector_signature_path: null, inspector_signed_at: null },
+    ])
+    renderPage()
+    await screen.findAllByText(/Inspector:/)
+    const [signedCard, legacyCard] = cards()
+    expect(signedCard).toHaveTextContent('Signed')
+    expect(legacyCard).not.toHaveTextContent('Signed')
+    expect(legacyCard).not.toHaveTextContent(/unsigned/i)
+  })
+})

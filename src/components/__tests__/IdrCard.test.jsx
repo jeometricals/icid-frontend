@@ -71,3 +71,44 @@ describe('IdrCard', () => {
     expect(onOpen).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('IdrCard — Signed mark', () => {
+  const SIGNED = { ...SUBMITTED, inspector_signature_path: 'idrs/idr-1/inspector_abc.png',
+    inspector_signed_at: '2026-09-25T16:05:23Z' }
+
+  it('shows "Signed" beside the inspector for an IDR submitted with a signature', () => {
+    render(<IdrCard idr={SIGNED} onOpen={() => {}} reporterName="Reza Golestani" />)
+    const mark = screen.getByText('Signed')
+    expect(mark).toBeInTheDocument()
+    expect(mark.querySelector('svg')).toBeInTheDocument()
+    expect(mark.parentElement).toHaveTextContent('Inspector: Reza Golestani')
+  })
+
+  it('shows nothing extra for an IDR submitted before signatures: no mark, and no "Unsigned"', () => {
+    render(<IdrCard idr={SUBMITTED} onOpen={() => {}} reporterName="Reza Golestani" />)
+    expect(screen.getByText('Inspector: Reza Golestani')).toBeInTheDocument()
+    expect(screen.queryByText('Signed')).not.toBeInTheDocument()
+    expect(screen.queryByText(/unsigned/i)).not.toBeInTheDocument()
+  })
+
+  it('treats a null path the same way', () => {
+    render(<IdrCard idr={{ ...SUBMITTED, inspector_signature_path: null }} onOpen={() => {}} reporterName="Reza" />)
+    expect(screen.queryByText('Signed')).not.toBeInTheDocument()
+  })
+
+  it('never marks a draft as signed', () => {
+    render(<IdrCard idr={{ ...DRAFT, inspector_signature_path: 'idrs/idr-1/inspector_abc.png' }} onOpen={() => {}} />)
+    expect(screen.queryByText('Signed')).not.toBeInTheDocument()
+  })
+
+  it('still shows the mark when no inspector name is given', () => {
+    render(<IdrCard idr={SIGNED} onOpen={() => {}} />)
+    expect(screen.getByText('Signed')).toBeInTheDocument()
+    expect(screen.queryByText(/Inspector:/)).not.toBeInTheDocument()
+  })
+
+  it('leaves a card without a name or a signature as it was', () => {
+    const { container } = render(<IdrCard idr={SUBMITTED} onOpen={() => {}} />)
+    expect(container.querySelectorAll('p')).toHaveLength(2) // contents and timestamp only
+  })
+})

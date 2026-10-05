@@ -11,13 +11,11 @@ import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { listIdrs, listUsers } from '../services/api'
 import IdrCard from '../components/IdrCard'
+import { personName } from '../lib/personName'
 
 // Maps user_id (= an IDR's reporter_uuid) to a display name, falling back to email when a name is missing
 function namesById(users) {
-  return Object.fromEntries(users.map(u => [
-    u.user_id,
-    [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email,
-  ]))
+  return Object.fromEntries(users.map(u => [u.user_id, personName(u)]))
 }
 
 export default function ReportArchivePage() {

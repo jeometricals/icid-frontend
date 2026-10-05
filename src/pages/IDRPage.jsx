@@ -1,7 +1,8 @@
 /**
  * One IDR (Inspector Daily Report) at /project/:projectId/idr/:idrId: the shared header form, the reports
  * inside the IDR (add, open, delete), Export (.xlsx) and Submit. Every change is followed by a silent refetch, so
- * the page always shows what the server has. A submitted IDR renders read-only with a "Submitted at" banner, and
+ * the page always shows what the server has. A submitted IDR renders read-only under a banner saying who submitted
+ * it and when, and
  * keeps its Export button.
  */
 import { useCallback, useEffect, useState } from 'react'
@@ -9,8 +10,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
-import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr } from '../services/api'
+import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
+import { personName } from '../lib/personName'
 import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
 import IdrHeaderForm from '../components/IdrHeaderForm'
 import IdrReportRow from '../components/IdrReportRow'
@@ -18,7 +20,7 @@ import AddReportControl from '../components/AddReportControl'
 import SaveDraftButton from '../components/SaveDraftButton'
 import SubmitReportButton from '../components/SubmitReportButton'
 import SaveStatusText from '../components/SaveStatusText'
-import SubmittedBanner from '../components/SubmittedBanner'
+import SignedBanner from '../components/SignedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
 import GoToProjectButton from '../components/GoToProjectButton'
@@ -73,6 +75,30 @@ export default function IDRPage() {
   const [refreshError, setRefreshError] = useState(null)
   const [certifyOpen, setCertifyOpen] = useState(false) // the certification dialog shown before submitting
   const [signatureSetupOpen, setSignatureSetupOpen] = useState(false) // shown first when the user has no signature yet
+  const [signerName, setSignerName] = useState('') // who signed a submitted IDR, for its banner; '' until known
+
+  // A signed IDR's banner names its signer: the IDR's reporter. Usually that is the signed-in user; otherwise the name
+  // comes from the user list. Until (or unless) it is known, the banner reads "Submitted on <date>".
+  const reporterUuid = idr?.reporter_uuid
+  const isSigned = idr?.status === 'submitted' && Boolean(idr?.inspector_signed_at)
+  const isOwnIdr = reporterUuid !== undefined && reporterUuid === user?.uuid
+  const ownName = personName(user)
+  useEffect(() => {
+    if (!isSigned) {
+      setSignerName('')
+      return
+    }
+    if (isOwnIdr) {
+      setSignerName(ownName)
+      return
+    }
+    if (isDemo) return // demo users aren't allowed the user list (and never reach a signed IDR)
+    let ignore = false
+    listUsers()
+      .then(users => { if (!ignore) setSignerName(personName(users.find(u => u.user_id === reporterUuid))) })
+      .catch(() => { if (!ignore) setSignerName('') }) // not worth an error: the banner still says when
+    return () => { ignore = true }
+  }, [isSigned, isOwnIdr, ownName, reporterUuid, isDemo])
 
   // Puts a getIdr response into state. resetForm replaces the typed header (initial load only).
   const applyIdr = useCallback((data, { resetForm }) => {
@@ -239,16 +265,17 @@ export default function IDRPage() {
               {back !== BACK_TO_PROJECT && <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />}
             </div>
             {readOnly && (
-              <div className="flex items-start space-x-3">
-                <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />
-                <SubmittedBanner submittedAt={idr.submitted_at} />
-              </div>
+              <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />
             )}
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {readOnly && (
+          <SignedBanner signedAt={idr.inspector_signed_at} submittedAt={idr.submitted_at} signerName={signerName} />
+        )}
+
         {/* Title */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Inspector Daily Report</h1>

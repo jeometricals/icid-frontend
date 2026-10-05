@@ -18,7 +18,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `useReportForm.js` (the hook every report page uses for load/save/state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -94,6 +94,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - On the IDR page, Submit opens the modal first for a user without a signature, then the certification dialog
     (which now carries the attestation sentence under the certification statement). The user menu in the header
     has "Set up signature" / "Update signature".
+  - **Showing it.** A submitted IDR's page opens with `SignedBanner`: "Submitted by <name> on <date>", from the
+    IDR's `inspector_signed_at` in the viewer's time zone. The name is the IDR's reporter: the signed-in user's
+    own name when it is their IDR, otherwise looked up in `GET /v1/users/`; `lib/personName.js` gives first and
+    last name, else email. An IDR submitted before signatures (no `inspector_signed_at`), or one whose name can't
+    be found, reads "Submitted on <date>". In the Archive, `IdrCard` adds a small "Signed" mark when the IDR
+    has an `inspector_signature_path`, and nothing for older IDRs (never "Unsigned").
   - Demo users never see any of it: no menu item, and Submit is disabled for them. The backend refuses them
     too (403).
   - Tests don't have a real canvas: they mock `react-signature-canvas`, and pages mock `SignatureSetupModal`.
