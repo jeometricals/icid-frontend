@@ -4,14 +4,18 @@
  * all of it; this only decides what to show.
  */
 
-// The statuses an IDR moves through, in order, with the text shown for each
+// The statuses an IDR moves through, in order, with the text shown for each; 'deleted' is an admin's soft delete
 export const STATUS_LABELS = {
   draft: 'Draft',
   submitted: 'Submitted',
   stage1_review: 'IDR Check',
   stage2_review: 'RE Review',
   approved: 'Approved',
+  deleted: 'Deleted',
 }
+
+// The statuses an admin can unlock an IDR from (the backend refuses any other with a 400)
+export const ADMIN_UNLOCKABLE_STATUSES = ['approved', 'stage2_review']
 
 // The review queues: Stage 1 holds IDRs waiting to be picked up as well as those being reviewed
 const STAGE_ONE_QUEUE = { id: 'stage1', label: 'IDR Check Queue', statuses: ['submitted', 'stage1_review'] }

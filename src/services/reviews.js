@@ -60,3 +60,24 @@ export async function returnIdr(idrId, { to, comment }) {
   const json = await apiFetch(`/v1/idrs/${idrId}/return`, { method: 'POST', body: { to, comment } })
   return json.data
 }
+
+/**
+ * Admin only: unlocks an approved IDR (or one already in Stage 2 review) for the RE to review again. It goes to
+ * stage2_review with the RE's signature and the RE reviewer cleared; its IDR number stays. Fails with 400 for an
+ * IDR at any other status.
+ * Returns the updated IDR.
+ */
+export async function adminUnlockIdr(idrId) {
+  const json = await apiFetch(`/v1/idrs/${idrId}/admin/unlock`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only: soft-deletes an IDR at any status. The record is kept (status 'deleted') but leaves every list, and
+ * its day and IDR number become free again. Deleting one that is already deleted succeeds and changes nothing.
+ * Returns the deleted IDR.
+ */
+export async function adminDeleteIdr(idrId) {
+  const json = await apiFetch(`/v1/idrs/${idrId}/admin/delete`, { method: 'POST' })
+  return json.data
+}

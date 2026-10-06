@@ -268,11 +268,16 @@ describe('UserMenu — My Tasks', () => {
   it.each([
     ['an OE on one project', TEST_USER, { HWS0023: ['inspector'], SE384: ['oe'] }],
     ['an RE on one project', TEST_USER, { HWS0023: ['inspector', 're'] }],
-    ['an admin with no project roles', { ...TEST_USER, role: 'admin' }, {}],
   ])('is the first item for %s', async (_, user, roles) => {
     renderMenu(user, roles)
     await open()
     expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Sign Out'])
+  })
+
+  it('is the first item for an admin with no project roles', async () => {
+    renderMenu({ ...TEST_USER, role: 'admin' }, {})
+    await open()
+    expect(itemNames()[0]).toBe('My Tasks')
   })
 
   it('stays hidden while the roles are still loading', async () => {
@@ -292,6 +297,34 @@ describe('UserMenu — My Tasks', () => {
     await open()
     await userEvent.click(item('My Tasks'))
     expect(screen.getByTestId('url')).toHaveTextContent('/review')
+    expect(menu()).not.toBeInTheDocument()
+  })
+})
+
+describe('UserMenu — All IDRs (Admin)', () => {
+  const ADMIN = { ...TEST_USER, role: 'admin' }
+
+  it('sits after the signature item for an admin', async () => {
+    renderMenu(ADMIN)
+    await open()
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'All IDRs (Admin)', 'Sign Out'])
+  })
+
+  it.each([
+    ['an inspector', TEST_USER, { HWS0023: ['inspector'] }],
+    ['an RE', TEST_USER, { HWS0023: ['re'] }],
+    ['a demo user', DEMO_USER, { DEMO01: ['inspector'] }],
+  ])('is hidden for %s', async (_, user, roles) => {
+    renderMenu(user, roles)
+    await open()
+    expect(itemNames()).not.toContain('All IDRs (Admin)')
+  })
+
+  it('opens the admin list and closes the menu', async () => {
+    renderMenu(ADMIN)
+    await open()
+    await userEvent.click(item('All IDRs (Admin)'))
+    expect(screen.getByTestId('url')).toHaveTextContent('/admin/idrs')
     expect(menu()).not.toBeInTheDocument()
   })
 })

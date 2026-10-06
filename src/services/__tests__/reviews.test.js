@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { acceptStage1, acceptStage2, approveStage1, approveStage2, getReviewQueue, returnIdr } from '../reviews'
+import {
+  acceptStage1, acceptStage2, adminDeleteIdr, adminUnlockIdr, approveStage1, approveStage2, getReviewQueue, returnIdr,
+} from '../reviews'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
@@ -71,13 +73,15 @@ describe('acceptStage1', () => {
 })
 
 // ---------------------------------------------------------------------------
-// approveStage1, acceptStage2, approveStage2
+// approveStage1, acceptStage2, approveStage2, and the admin's unlock and soft delete
 // ---------------------------------------------------------------------------
 
 describe.each([
   ['approveStage1', approveStage1, 'approve-stage1'],
   ['acceptStage2', acceptStage2, 'accept-stage2'],
   ['approveStage2', approveStage2, 'approve-stage2'],
+  ['adminUnlockIdr', adminUnlockIdr, 'admin/unlock'],
+  ['adminDeleteIdr', adminDeleteIdr, 'admin/delete'],
 ])('%s', (_, call, segment) => {
   it(`POSTs to /${segment} with no body and returns the updated IDR`, async () => {
     mockFetch(200, { status: 'success', data: MOCK_IDR })

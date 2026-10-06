@@ -149,6 +149,16 @@ describe('listIdrs', () => {
     expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ project_id: 'HWS0023', status: 'submitted' })
   })
 
+  it('asks for deleted IDRs and all drafts only when told to (admin only on the backend)', async () => {
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ includeDeleted: true, includeAllDrafts: true })
+    expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ include_deleted: 'true', include_all_drafts: 'true' })
+
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ projectId: 'HWS0023', includeDeleted: false, includeAllDrafts: false })
+    expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ project_id: 'HWS0023' })
+  })
+
   it('returns the data array', async () => {
     mockFetch(200, { status: 'success', data: ROWS })
     expect(await listIdrs({ projectId: 'HWS0023' })).toEqual(ROWS)

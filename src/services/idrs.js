@@ -27,16 +27,19 @@ export async function createOrGetIdr({ projectId, reportDate = format(new Date()
 
 /**
  * Lists IDRs, most recently edited first. projectId, reporterUuid and status ('draft' | 'submitted' |
- * 'stage1_review' | 'stage2_review' | 'approved') are optional filters. The backend never lists another person's
- * drafts.
+ * 'stage1_review' | 'stage2_review' | 'approved') are optional filters. The backend leaves out deleted IDRs and
+ * other people's drafts unless an admin asks for them with includeDeleted and includeAllDrafts (a 400 for anyone
+ * else); a deleted IDR has status 'deleted'.
  * Returns an array of IDR rows, each with report_count, has_general, reporter_name, stage1_reviewer_name and
  * re_reviewer_name.
  */
-export async function listIdrs({ projectId, reporterUuid, status } = {}) {
+export async function listIdrs({ projectId, reporterUuid, status, includeDeleted, includeAllDrafts } = {}) {
   const params = new URLSearchParams()
   if (projectId) params.set('project_id', projectId)
   if (reporterUuid) params.set('reporter_uuid', reporterUuid)
   if (status) params.set('status', status)
+  if (includeDeleted) params.set('include_deleted', 'true')
+  if (includeAllDrafts) params.set('include_all_drafts', 'true')
   const json = await apiFetch(`/v1/idrs/?${params}`)
   return json.data
 }

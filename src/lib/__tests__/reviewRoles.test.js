@@ -23,7 +23,7 @@ describe('isAdmin', () => {
 
 describe('STATUS_LABELS', () => {
   it('names every status an IDR can be listed in', () => {
-    expect(Object.keys(STATUS_LABELS)).toEqual(['draft', 'submitted', 'stage1_review', 'stage2_review', 'approved'])
+    expect(Object.keys(STATUS_LABELS)).toEqual(['draft', 'submitted', 'stage1_review', 'stage2_review', 'approved', 'deleted'])
   })
 })
 

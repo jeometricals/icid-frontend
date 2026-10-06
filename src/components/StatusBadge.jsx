@@ -6,11 +6,12 @@ const STATUS_STYLES = {
   stage1_review: 'bg-construction-100 text-construction-800',
   stage2_review: 'bg-purple-100 text-purple-800',
   approved: 'bg-emerald-100 text-emerald-800',
+  deleted: 'bg-gray-700 text-white',
 }
 
 /**
- * Pill naming where an IDR is in review: Draft, Submitted, IDR Check, RE Review or Approved. A draft that
- * a reviewer sent back reads "Returned". Props: status (the IDR's status), returned (true for a draft with a return
+ * Pill naming where an IDR is in review: Draft, Submitted, IDR Check, RE Review or Approved; Deleted for one an
+ * admin soft-deleted. A draft that a reviewer sent back reads "Returned". Props: status (the IDR's status), returned (true for a draft with a return
  * reason).
  */
 export default function StatusBadge({ status, returned = false }) {
