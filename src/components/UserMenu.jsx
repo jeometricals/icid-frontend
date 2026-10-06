@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, CircleUserRound, LogOut, PenLine } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronDown, CircleUserRound, ClipboardCheck, LogOut, PenLine } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
+import { useProjectRoles } from '../contexts/ProjectRolesContext'
+import { reviewQueuesFor } from '../lib/reviewRoles'
 import ConfirmDialog from './ConfirmDialog'
 import SignatureSetupModal from './SignatureSetupModal'
 
 /**
  * The signed-in user's menu in the app header: their first name (or email), with a "Demo Mode" badge for a demo
- * user, opening a dropdown with their signature (set up or update; not for demo users, who can't submit) and
- * Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
+ * user, opening a dropdown with My queue (only for someone who reviews IDRs: an OE or RE on some project, or an
+ * admin), their signature (set up or update; not for demo users, who can't submit) and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
  * the page's leave guard, so a report form saves unsaved edits first.
  * Opens on click; closes on a pick, Escape or a click elsewhere. Arrow keys, Home and End move between items.
  * Takes no props; reads the user from AuthContext.
  */
 export default function UserMenu() {
   const { user, logout } = useAuth()
+  const { rolesByProject } = useProjectRoles()
+  const navigate = useNavigate()
   const leave = useGuardedLeave()
   const [open, setOpen] = useState(false)
   const [signatureOpen, setSignatureOpen] = useState(false)
@@ -47,6 +52,12 @@ export default function UserMenu() {
 
   // The menu, top to bottom. A new entry is one more object here; dividerAbove draws a line over it.
   const items = [
+    reviewQueuesFor(user, rolesByProject).length > 0 && {
+      id: 'queue',
+      label: 'My queue',
+      icon: ClipboardCheck,
+      onSelect: () => leave(() => navigate('/review')),
+    },
     !user.is_demo && {
       id: 'signature',
       label: hasSignature ? 'Update signature' : 'Set up signature',

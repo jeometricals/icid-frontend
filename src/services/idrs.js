@@ -26,8 +26,11 @@ export async function createOrGetIdr({ projectId, reportDate = format(new Date()
 }
 
 /**
- * Lists IDRs, most recently edited first. projectId, reporterUuid and status ('draft' | 'submitted') are optional filters.
- * Returns an array of IDR rows, each with report_count and has_general.
+ * Lists IDRs, most recently edited first. projectId, reporterUuid and status ('draft' | 'submitted' |
+ * 'stage1_review' | 'stage2_review' | 'approved') are optional filters. The backend never lists another person's
+ * drafts.
+ * Returns an array of IDR rows, each with report_count, has_general, reporter_name, stage1_reviewer_name and
+ * re_reviewer_name.
  */
 export async function listIdrs({ projectId, reporterUuid, status } = {}) {
   const params = new URLSearchParams()

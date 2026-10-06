@@ -2,14 +2,15 @@
  * One IDR (Inspector Daily Report) at /project/:projectId/idr/:idrId: the shared header form, the reports
  * inside the IDR (add, open, delete), Export (.xlsx) and Submit. Every change is followed by a silent refetch, so
  * the page always shows what the server has. A submitted IDR renders read-only under a banner saying who submitted
- * it and when, and
- * keeps its Export button.
+ * it and when, and keeps its Export button. The title carries the IDR's status and number. From submission on, a
+ * reviewer gets the review toolbar (accept, approve, return); an IDR carrying a return comment shows it.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
+import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
@@ -25,6 +26,10 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
 import GoToProjectButton from '../components/GoToProjectButton'
 import SignatureSetupModal from '../components/SignatureSetupModal'
+import ReviewToolbar from '../components/ReviewToolbar'
+import ReturnNotice from '../components/ReturnNotice'
+import StatusBadge from '../components/StatusBadge'
+import IDRNumberBadge from '../components/IDRNumberBadge'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
@@ -35,10 +40,12 @@ const CERTIFICATION_STATEMENT =
   'The above described work was incorporated into this project and was constructed in conformance with all plans, ' +
   'specifications, and standards unless otherwise noted.'
 
-// Where "Back" goes, keyed by the list page that opened the IDR (router state.from)
+// Where "Back" goes, keyed by the list page that opened the IDR (router state.from): a path under the project, or,
+// for the review queue, which spans projects, a path of its own
 const BACK_TARGETS = {
   drafts: { path: '/drafts', label: 'Back to Drafts' },
   archive: { path: '/archive', label: 'Back to Archive' },
+  review: { to: '/review', label: 'Back to My Queue' },
 }
 const BACK_TO_PROJECT = { path: '', label: 'Back to Project Dashboard' }
 
@@ -54,8 +61,10 @@ export default function IDRPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const { rolesByProject } = useProjectRoles()
   const isDemo = Boolean(user?.is_demo)
   const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
+  const backPath = back.to || `/project/${projectId}${back.path}`
 
   // Initial load; only this shows a spinner
   const [loadStatus, setLoadStatus] = useState('loading') // 'loading' | 'ready' | 'error'
@@ -80,7 +89,7 @@ export default function IDRPage() {
   // A signed IDR's banner names its signer: the IDR's reporter. Usually that is the signed-in user; otherwise the name
   // comes from the user list. Until (or unless) it is known, the banner reads "Submitted on <date>".
   const reporterUuid = idr?.reporter_uuid
-  const isSigned = idr?.status === 'submitted' && Boolean(idr?.inspector_signed_at)
+  const isSigned = Boolean(idr) && idr.status !== 'draft' && Boolean(idr.inspector_signed_at)
   const isOwnIdr = reporterUuid !== undefined && reporterUuid === user?.uuid
   const ownName = personName(user)
   useEffect(() => {
@@ -173,7 +182,7 @@ export default function IDRPage() {
             <button onClick={() => setLoadAttempt(a => a + 1)} className="btn-primary">
               Retry
             </button>
-            <button onClick={() => navigate(`/project/${projectId}${back.path}`)} className="btn-secondary">
+            <button onClick={() => navigate(backPath)} className="btn-secondary">
               {back.label}
             </button>
           </div>
@@ -255,7 +264,7 @@ export default function IDRPage() {
           <div className="flex items-center justify-between">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <button
-                onClick={() => navigate(`/project/${projectId}${back.path}`)}
+                onClick={() => navigate(backPath)}
                 className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -276,14 +285,29 @@ export default function IDRPage() {
           <SignedBanner signedAt={idr.inspector_signed_at} submittedAt={idr.submitted_at} signerName={signerName} />
         )}
 
+        {idr.return_reason && <ReturnNotice reason={idr.return_reason} returnedFrom={idr.returned_from} />}
+
         {/* Title */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Inspector Daily Report</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Inspector Daily Report</h1>
+            <StatusBadge status={idr.status} returned={Boolean(idr.return_reason)} />
+            {(readOnly || idr.idr_number) && <IDRNumberBadge number={idr.idr_number} />}
+          </div>
           <p className="text-gray-600 mt-1">
             {/* parseISO keeps a date-only string in local time (new Date() would shift it a day in US zones) */}
             {format(parseISO(idr.report_date), 'EEEE, MMMM d, yyyy')} · Project {projectId}
           </p>
+          {idr.status === 'approved' && idr.re_signed_at && (
+            <p className="text-sm text-emerald-700 mt-1">
+              Approved on {format(parseISO(idr.re_signed_at), "MMM d, yyyy 'at' h:mm a")}
+            </p>
+          )}
         </div>
+
+        {readOnly && (
+          <ReviewToolbar idr={idr} roles={rolesByProject?.[projectId] || []} onChanged={refresh} disabled={busy} />
+        )}
 
         {refreshError && (
           <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6 flex items-center justify-between">

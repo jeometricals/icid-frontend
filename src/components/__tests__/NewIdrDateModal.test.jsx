@@ -122,3 +122,17 @@ describe('NewIdrDateModal — the day is already submitted', () => {
     expect(onOpen).not.toHaveBeenCalled()
   })
 })
+
+describe('NewIdrDateModal — the day is already in review or approved', () => {
+  it.each(['stage1_review', 'stage2_review', 'approved'])('asks before opening a %s IDR, like a submitted one', async (status) => {
+    const idr = { idr_id: 'idr-done', status, report_date: '2026-09-25', submitted_at: SUBMITTED_AT }
+    api.createOrGetIdr.mockResolvedValue({ idr, isNew: false })
+    const onOpen = vi.fn()
+    render(<NewIdrDateModal projectId="HWS0023" onOpen={onOpen} onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Open / Create' }))
+    expect(await screen.findByText(/view-only\)\. Open it\?/)).toBeInTheDocument()
+    expect(onOpen).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }))
+    expect(onOpen).toHaveBeenCalledWith('idr-done')
+  })
+})

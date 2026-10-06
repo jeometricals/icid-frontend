@@ -1,7 +1,8 @@
 import { apiFetch } from './apiClient'
 
 /**
- * Lists the projects the signed-in user is assigned to ({project_id, project_name, borough, status, user_role}).
+ * Lists the projects the signed-in user is assigned to, once each ({project_id, project_name, borough, status,
+ * user_role, roles}). roles is the list of project roles they hold there: any of 'inspector', 'oe', 're'.
  */
 export async function getProjectsForUser() {
   const json = await apiFetch('/v1/projects/')

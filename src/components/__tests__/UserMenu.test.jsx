@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import UserMenu from '../UserMenu'
 import * as AuthContext from '../../contexts/AuthContext'
+import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
 import { DEMO_USER, TEST_USER, UNSIGNED_USER } from '../../test/users'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
@@ -17,13 +19,23 @@ vi.mock('../SignatureSetupModal', () => ({
 
 let logout
 
-function renderMenu(user) {
+function CurrentUrl() {
+  return <div data-testid="url">{useLocation().pathname}</div>
+}
+
+// rolesByProject: the roles the user holds on each project; none unless a test says so
+function renderMenu(user, rolesByProject = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user, logout })
   return render(
-    <div>
-      <UserMenu />
-      <button>elsewhere on the page</button>
-    </div>
+    <MemoryRouter initialEntries={['/projects']}>
+      <ProjectRolesContext.Provider value={{ rolesByProject, error: null, reload: () => {} }}>
+        <div>
+          <UserMenu />
+          <button>elsewhere on the page</button>
+        </div>
+      </ProjectRolesContext.Provider>
+      <CurrentUrl />
+    </MemoryRouter>
   )
 }
 
@@ -240,5 +252,43 @@ describe('UserMenu — Sign Out', () => {
     expect(within(confirmDialog()).getByRole('button', { name: 'Cancel' })).toBeDisabled()
     expect(trigger()).toBeDisabled()
     await act(async () => finish())
+  })
+})
+
+describe('UserMenu — My queue', () => {
+  it('is hidden for a user who only inspects', async () => {
+    renderMenu(TEST_USER, { HWS0023: ['inspector'], SE384: ['inspector'] })
+    await open()
+    expect(itemNames()).toEqual(['Update signature', 'Sign Out'])
+  })
+
+  it.each([
+    ['an OE on one project', TEST_USER, { HWS0023: ['inspector'], SE384: ['oe'] }],
+    ['an RE on one project', TEST_USER, { HWS0023: ['inspector', 're'] }],
+    ['an admin with no project roles', { ...TEST_USER, role: 'admin' }, {}],
+  ])('is the first item for %s', async (_, user, roles) => {
+    renderMenu(user, roles)
+    await open()
+    expect(itemNames()).toEqual(['My queue', 'Update signature', 'Sign Out'])
+  })
+
+  it('stays hidden while the roles are still loading', async () => {
+    renderMenu(TEST_USER, null)
+    await open()
+    expect(itemNames()).not.toContain('My queue')
+  })
+
+  it('is hidden for a demo user', async () => {
+    renderMenu(DEMO_USER, { DEMO01: ['inspector'] })
+    await open()
+    expect(itemNames()).toEqual(['Sign Out'])
+  })
+
+  it('opens the review queue and closes the menu', async () => {
+    renderMenu(TEST_USER, { HWS0023: ['oe'] })
+    await open()
+    await userEvent.click(item('My queue'))
+    expect(screen.getByTestId('url')).toHaveTextContent('/review')
+    expect(menu()).not.toBeInTheDocument()
   })
 })

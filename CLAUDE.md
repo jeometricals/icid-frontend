@@ -12,16 +12,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -103,17 +103,41 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Demo users never see any of it: no menu item, and Submit is disabled for them. The backend refuses them
     too (403).
   - Tests don't have a real canvas: they mock `react-signature-canvas`, and pages mock `SignatureSetupModal`.
+- **Review.** After an inspector submits, an IDR goes `submitted` → `stage1_review` → `stage2_review` → `approved`;
+  a reviewer can send it back (to `draft` for the inspector, or from Stage 2 to `stage1_review` for the OE).
+  - **Roles.** `GET /v1/projects/` lists each project once with `roles` (any of `inspector`, `oe`, `re`).
+    `ProjectRolesProvider` (inside `AuthProvider` in `App.jsx`) reads that once per sign-in; `useProjectRoles()`
+    gives `rolesByProject` (`null` while loading), `error` and `reload()`. Outside a provider the hook gives no
+    roles, so a component rendered alone in a test needs none. Admin is `user.role === 'admin'`, not a project role.
+  - `lib/reviewRoles.js` decides what to show: `reviewQueuesFor(user, rolesByProject)` (Stage 1 for an OE or RE,
+    Stage 2 for an RE, both for an admin) and `reviewActionsFor(idr, user, roles)`. Only the reviewer who accepted
+    an IDR at a stage can approve or return it there; an admin can stand in. The backend enforces all of it, so
+    these only hide what would be refused.
+  - **`/review`** (`ReviewQueuePage`, "My queue" in the user menu for anyone with a queue): one tab per queue.
+    Stage 1 merges the `submitted` and `stage1_review` queues. An IDR opened from it carries
+    `state.from = 'review'`, so the IDR page's Back returns there.
+  - **On the IDR page**, the title carries `StatusBadge` and `IDRNumberBadge`; `ReviewToolbar` sits under the
+    submitted banner and runs the review calls itself, then asks the page to refetch. Accepting at Stage 1 asks
+    for the IDR # (`AcceptStage1Modal`) unless the IDR already has one; a 409 there links to the IDR that holds
+    the number. Every return goes through `ReturnCommentModal` (comment required). Approving at Stage 2 signs,
+    so a reviewer without a signature sets one up first. An IDR with a `return_reason` shows `ReturnNotice`.
+  - Every status but `draft` is read-only, for everyone: there are no reviewer or admin edits yet.
+  - **The Archive** is a table (`IdrTable`, shared with the queue) of every IDR past draft, sorted by work date,
+    with names from the list itself (`reporter_name`, `stage1_reviewer_name`, `re_reviewer_name`); it no longer
+    calls `GET /v1/users/`. No filters yet.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.
 - **If a change needs a matching backend change (new endpoint, changed response shape), STOP and tell me.** Don't
   make backend changes from this repo and don't invent endpoints that don't exist yet. Endpoints currently used:
   <!-- Update this list when endpoints change -->
   - `POST /v1/auth/login` · `POST /v1/auth/demo` · `GET /v1/auth/me` · `POST /v1/auth/logout`
   - `POST /v1/signatures/upload-request` · `POST /v1/signatures/confirm` (the PNG itself is PUT to the Storage signed URL)
-  - `GET /v1/projects/` (the signed-in user's projects)
+  - `GET /v1/projects/` (the signed-in user's projects, each with `roles`)
   - `GET /v1/projects/{id}`
-  - `GET /v1/users/` (Archive resolves reporter_uuid → name; not available to demo users)
+  - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` · `GET /v1/idrs/{id}`
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
+  - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
+    `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
   - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·
     `GET` (list) · `GET /{attachment_id}/download-url` · `PUT /{attachment_id}` · `DELETE /{attachment_id}`

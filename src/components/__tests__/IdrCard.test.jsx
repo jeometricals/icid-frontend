@@ -112,3 +112,11 @@ describe('IdrCard — Signed mark', () => {
     expect(container.querySelectorAll('p')).toHaveLength(2) // contents and timestamp only
   })
 })
+
+describe('IdrCard — an IDR in review', () => {
+  it.each(['stage1_review', 'stage2_review', 'approved'])('keeps the Signed mark and submit time at %s', (status) => {
+    render(<IdrCard idr={{ ...SUBMITTED, status, inspector_signature_path: 'idrs/a/inspector_1.png' }} onOpen={() => {}} />)
+    expect(screen.getByText('Signed')).toBeInTheDocument()
+    expect(screen.getByText(/^Submitted /)).toBeInTheDocument()
+  })
+})

@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
+import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
 import { DEMO_USER, TEST_USER, TEST_USER_ID, UNSIGNED_USER } from '../../test/users'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
@@ -72,6 +73,11 @@ vi.mock('../../services/api', () => ({
   submitIdr: vi.fn(),
   generateExport: vi.fn(),
   listUsers: vi.fn(),
+  acceptStage1: vi.fn(),
+  approveStage1: vi.fn(),
+  acceptStage2: vi.fn(),
+  approveStage2: vi.fn(),
+  returnIdr: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -848,5 +854,163 @@ describe('IDRPage — signed banner', () => {
     await user.click(submitButton())
     await user.click(within(screen.getByRole('dialog', { name: 'Certification' })).getByRole('button', { name: 'Submit' }))
     await waitFor(() => expect(banner()).toHaveTextContent(`Submitted by Genghis Khan on ${local(SIGNED_AT)}`))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Review: status, IDR number, return comment, the toolbar and the way back to the queue
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — review', () => {
+  const OLIVE = '5246b39d-87fe-4e21-92a3-2804c899e8b3' // a reviewer who is not the inspector
+  const submitted = (overrides = {}) => draftIdr({
+    status: 'submitted', submitted_at: '2026-09-25T16:05:00Z', total_pages: 1, inspector_signed_at: '2026-09-25T16:05:00Z',
+    idr_number: null, stage1_reviewer_uuid: null, re_reviewer_uuid: null, return_reason: null, returned_from: null,
+    ...overrides,
+  })
+
+  // The page as a reviewer sees it: signed in as Olive, holding the given roles on the IDR's project
+  function renderAsReviewer(roles, from) {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: { ...TEST_USER, uuid: OLIVE, first_name: 'Olive', last_name: 'Engineer' } })
+    api.listUsers.mockResolvedValue([{ user_id: TEST_USER_ID, email: TEST_USER.email, first_name: 'Genghis', last_name: 'Khan' }])
+    return render(
+      <MemoryRouter initialEntries={[{ pathname: IDR_URL, state: from ? { from } : undefined }]}>
+        <ProjectRolesContext.Provider value={{ rolesByProject: { HWS0023: roles }, error: null, reload: () => {} }}>
+          <Routes>
+            <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
+            <Route path="*" element={<CurrentUrl />} />
+          </Routes>
+        </ProjectRolesContext.Provider>
+      </MemoryRouter>
+    )
+  }
+
+  const toolbar = () => screen.queryByRole('region', { name: 'Review' })
+  // The title card: the heading, its badges and the lines under it
+  const title = () => screen.getByRole('heading', { name: 'Inspector Daily Report' }).parentElement.parentElement
+
+  it('shows a draft as Draft, with no number badge and no toolbar', async () => {
+    renderPage()
+    await ready()
+    expect(title()).toHaveTextContent('Draft')
+    expect(title()).not.toHaveTextContent('IDR #')
+    expect(toolbar()).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Returned/)).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['submitted', 'Submitted'], ['stage1_review', 'Stage 1 Review'], ['stage2_review', 'Stage 2 Review'],
+    ['approved', 'Approved'],
+  ])('shows a %s IDR as "%s", read-only, under the submitted banner', async (status, label) => {
+    server = submitted({ status, idr_number: status === 'submitted' ? null : '005' })
+    renderPage()
+    await ready()
+    expect(title()).toHaveTextContent(label)
+    expect(title()).toHaveTextContent(status === 'submitted' ? 'No IDR # yet' : '005')
+    expect(screen.getByText(/^Submitted by Genghis Khan on/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save header/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument()
+  })
+
+  it('says when an approved IDR was approved', async () => {
+    server = submitted({ status: 'approved', idr_number: '005', re_signed_at: '2026-09-28T15:00:00Z' })
+    renderPage()
+    await ready()
+    expect(title()).toHaveTextContent(`Approved on ${format(parseISO('2026-09-28T15:00:00Z'), "MMM d, yyyy 'at' h:mm a")}`)
+  })
+
+  it("shows the inspector the reviewer's comment on a returned draft, which is editable again", async () => {
+    server = draftIdr({ return_reason: 'fix the pay-item quantity', returned_from: 'stage1', idr_number: '005' })
+    renderPage()
+    await ready()
+    const notice = screen.getByText('Returned from Stage 1 review').closest('[role="status"]')
+    expect(notice).toHaveTextContent('fix the pay-item quantity')
+    expect(title()).toHaveTextContent('Returned')
+    expect(title()).toHaveTextContent('005') // the number it will keep
+    expect(submitButton()).toBeEnabled()
+    expect(toolbar()).not.toBeInTheDocument()
+  })
+
+  it('shows the OE the comment on an IDR the RE sent back to Stage 1', async () => {
+    server = submitted({ status: 'stage1_review', idr_number: '005', stage1_reviewer_uuid: OLIVE,
+      return_reason: 'check the station', returned_from: 'stage2' })
+    renderAsReviewer(['oe'])
+    await ready()
+    expect(screen.getByText('Returned from Stage 2 review').closest('[role="status"]')).toHaveTextContent('check the station')
+    expect(title()).toHaveTextContent('Stage 1 Review')
+  })
+
+  it('gives the inspector no toolbar on their own submitted IDR', async () => {
+    server = submitted()
+    renderPage()
+    await ready()
+    expect(toolbar()).not.toBeInTheDocument()
+  })
+
+  it('puts the toolbar under the submitted banner for a reviewer', async () => {
+    server = submitted()
+    renderAsReviewer(['oe'])
+    await ready()
+    const banner = await screen.findByText(/^Submitted by Genghis Khan on/) // the name comes from the user list
+    expect(banner.compareDocumentPosition(toolbar()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(toolbar()).getByRole('button', { name: 'Accept for Stage 1' })).toBeEnabled()
+  })
+
+  it('accepts for Stage 1 with a number and shows where the IDR now stands', async () => {
+    server = submitted()
+    api.acceptStage1.mockImplementation(async (_, number) => {
+      server = { ...server, status: 'stage1_review', idr_number: number, stage1_reviewer_uuid: OLIVE }
+      return structuredClone(server)
+    })
+    const user = userEvent.setup()
+    renderAsReviewer(['oe'])
+    await ready()
+    await user.click(within(toolbar()).getByRole('button', { name: 'Accept for Stage 1' }))
+    await user.type(screen.getByLabelText('IDR #'), '005')
+    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    await waitFor(() => expect(title()).toHaveTextContent('Stage 1 Review'))
+    expect(api.acceptStage1).toHaveBeenCalledWith(IDR_ID, '005')
+    expect(title()).toHaveTextContent('005')
+    expect(within(toolbar()).getAllByRole('button').map(b => b.textContent)).toEqual([
+      'Approve → Stage 2', 'Return to Inspector',
+    ])
+  })
+
+  it('drops the toolbar once the reviewer returns the IDR to its inspector', async () => {
+    server = submitted({ status: 'stage1_review', idr_number: '005', stage1_reviewer_uuid: OLIVE })
+    api.returnIdr.mockImplementation(async (_, { comment }) => {
+      server = { ...server, status: 'draft', return_reason: comment, returned_from: 'stage1' }
+      return structuredClone(server)
+    })
+    const user = userEvent.setup()
+    renderAsReviewer(['oe'])
+    await ready()
+    await user.click(within(toolbar()).getByRole('button', { name: 'Return to Inspector' }))
+    await user.type(screen.getByLabelText('Comment for the inspector'), 'fix the pay-item quantity')
+    await user.click(screen.getByRole('button', { name: 'Return' }))
+    await waitFor(() => expect(title()).toHaveTextContent('Returned'))
+    expect(api.returnIdr).toHaveBeenCalledWith(IDR_ID, { to: 'inspector', comment: 'fix the pay-item quantity' })
+    expect(toolbar()).not.toBeInTheDocument()
+  })
+
+  it('keeps an approved IDR read-only with no toolbar, for a reviewer too', async () => {
+    server = submitted({ status: 'approved', idr_number: '005', stage1_reviewer_uuid: OLIVE, re_reviewer_uuid: OLIVE,
+      re_signed_at: '2026-09-28T15:00:00Z' })
+    renderAsReviewer(['oe', 're'])
+    await ready()
+    expect(toolbar()).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /save header/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add report/i })).not.toBeInTheDocument()
+  })
+
+  it('goes back to the queue when opened from it, and still offers the project page', async () => {
+    server = submitted()
+    const user = userEvent.setup()
+    renderAsReviewer(['oe'], 'review')
+    await ready()
+    expect(screen.getByRole('button', { name: /Go to Project Page/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Back to My Queue/ }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/review')
   })
 })

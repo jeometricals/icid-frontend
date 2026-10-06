@@ -13,6 +13,7 @@ vi.mock('../services/api', () => ({
   getProjectById: vi.fn(),
   getIdr: vi.fn(),
   listIdrs: vi.fn(),
+  getReviewQueue: vi.fn(),
   signIn: vi.fn(),
   startDemo: vi.fn(),
   fetchCurrentUser: vi.fn(),
@@ -182,5 +183,36 @@ describe('signing out from the user menu', () => {
     expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/login')
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The review queue route, and where the menu gets the user's roles
+// ---------------------------------------------------------------------------
+
+describe('/review', () => {
+  it('opens the review queue for a reviewer, and puts My queue in their menu', async () => {
+    api.getProjectsForUser.mockResolvedValue([{ project_id: 'HWS0023', project_name: 'S/W Queens 2025', roles: ['oe'] }])
+    api.getReviewQueue.mockResolvedValue([])
+    window.history.pushState({}, '', '/review')
+    render(<App />)
+    await signIn()
+
+    expect(await screen.findByRole('heading', { name: 'My Queue' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Stage 1 (0)' })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/review')
+    await userEvent.click(screen.getByRole('button', { name: /^User menu:/ }))
+    expect(screen.getByRole('menuitem', { name: 'My queue' })).toBeInTheDocument()
+  })
+
+  it('leaves My queue out of an inspector\'s menu', async () => {
+    api.getProjectsForUser.mockResolvedValue([{ project_id: 'HWS0023', project_name: 'S/W Queens 2025', roles: ['inspector'] }])
+    window.history.pushState({}, '', '/projects')
+    render(<App />)
+    await signIn()
+
+    await userEvent.click(await screen.findByRole('button', { name: /^User menu:/ }))
+    expect(screen.queryByRole('menuitem', { name: 'My queue' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign Out' })).toBeInTheDocument()
   })
 })

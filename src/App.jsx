@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { ProjectRolesProvider } from './contexts/ProjectRolesContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
@@ -10,6 +11,7 @@ import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
 import IDRPage from './pages/IDRPage'
+import ReviewQueuePage from './pages/ReviewQueuePage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
@@ -32,6 +34,7 @@ function AppRoutes() {
         {/* Every signed-in page sits under the app header */}
         <Route element={<AppLayout />}>
           <Route path="/projects" element={<ProjectSelectionPage />} />
+          <Route path="/review" element={<ReviewQueuePage />} />
           <Route path="/project/:projectId" element={<ProjectDashboard />} />
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
@@ -54,7 +57,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <ProjectRolesProvider>
+          <AppRoutes />
+        </ProjectRolesProvider>
       </AuthProvider>
     </Router>
   )

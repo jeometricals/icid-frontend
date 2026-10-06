@@ -43,7 +43,7 @@ export default function IdrCard({ idr, onOpen, reporterName }) {
 
 // Submitted with the inspector's signature (the IDR keeps its own copy of it)
 function isSigned(idr) {
-  return idr.status === 'submitted' && Boolean(idr.inspector_signature_path)
+  return idr.status !== 'draft' && Boolean(idr.inspector_signature_path)
 }
 
 // "3 reports · With General", "1 report · General only", "2 reports · No General", or "No reports yet"

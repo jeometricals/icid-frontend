@@ -1,7 +1,7 @@
 /**
  * "Pick a report date" dialog behind the dashboard's New Inspector Daily Diary button. The inspector picks any day
  * (today by default) and the dialog creates that day's IDR or finds the existing one. A draft opens straight away;
- * an already-submitted IDR asks first, since it opens view-only.
+ * an already-submitted IDR (in review or approved included) asks first, since it opens view-only.
  * Props: projectId, onOpen(idrId), onClose.
  */
 import { useState } from 'react'
@@ -25,7 +25,7 @@ export default function NewIdrDateModal({ projectId, onOpen, onClose }) {
     setError(null)
     try {
       const { idr } = await createOrGetIdr({ projectId, reportDate })
-      if (idr.status === 'submitted') {
+      if (idr.status !== 'draft') {
         setSubmittedIdr(idr)
         setBusy(false)
       } else {
