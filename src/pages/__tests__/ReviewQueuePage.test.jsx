@@ -88,22 +88,22 @@ const asked = () => api.getReviewQueue.mock.calls.map(([status]) => status)
 describe('ReviewQueuePage — queues by role', () => {
   it('shows an OE the Stage 1 queue only, and asks for nothing else', async () => {
     renderPage({ rolesByProject: { HWS0023: ['inspector', 'oe'] } })
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
-    expect(tabs()).toEqual(['Stage 1 (3)'])
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
+    expect(tabs()).toEqual(['IDR Check Queue (3)'])
     expect(asked()).toEqual(['submitted', 'stage1_review'])
   })
 
   it('shows an RE Stage 1 and Stage 2', async () => {
     renderPage({ rolesByProject: { HWS0023: ['re'] } })
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
-    expect(tabs()).toEqual(['Stage 1 (3)', 'Stage 2 (1)'])
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
+    expect(tabs()).toEqual(['IDR Check Queue (3)', 'RE Review Queue (1)'])
     expect(asked()).toEqual(['submitted', 'stage1_review', 'stage2_review'])
   })
 
   it('shows an admin both, with no project role at all', async () => {
     renderPage({ user: ADMIN, rolesByProject: {} })
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
-    expect(tabs()).toEqual(['Stage 1 (3)', 'Stage 2 (1)'])
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
+    expect(tabs()).toEqual(['IDR Check Queue (3)', 'RE Review Queue (1)'])
   })
 
   it('tells a user who reviews nothing that their queue is empty, without asking the backend', async () => {
@@ -136,8 +136,8 @@ describe('ReviewQueuePage — queues by role', () => {
 describe('ReviewQueuePage — the queues', () => {
   it('opens on Stage 1: waiting and in-review IDRs together, oldest submission first', async () => {
     renderPage()
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
-    expect(screen.getByRole('tab', { name: 'Stage 1 (3)' })).toHaveAttribute('aria-selected', 'true')
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
+    expect(screen.getByRole('tab', { name: 'IDR Check Queue (3)' })).toHaveAttribute('aria-selected', 'true')
     expect(rows().map(row => within(row).getByRole('button').textContent)).toEqual([
       'Sep 30, 2026', 'Oct 2, 2026', 'Oct 4, 2026',
     ])
@@ -145,7 +145,7 @@ describe('ReviewQueuePage — the queues', () => {
 
   it('shows each IDR with its project, number, status, inspector and reviewer', async () => {
     renderPage()
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
     expect(screen.getAllByRole('columnheader').map(th => th.textContent)).toEqual([
       'Work date', 'Project', 'IDR #', 'Status', 'Inspector', 'Reviewer', 'Submitted',
     ])
@@ -163,8 +163,8 @@ describe('ReviewQueuePage — the queues', () => {
   it('switches to Stage 2 without asking the backend again', async () => {
     const user = userEvent.setup()
     renderPage()
-    await user.click(await screen.findByRole('tab', { name: 'Stage 2 (1)' }))
-    expect(screen.getByRole('tab', { name: 'Stage 2 (1)' })).toHaveAttribute('aria-selected', 'true')
+    await user.click(await screen.findByRole('tab', { name: 'RE Review Queue (1)' }))
+    expect(screen.getByRole('tab', { name: 'RE Review Queue (1)' })).toHaveAttribute('aria-selected', 'true')
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toHaveTextContent('Rex Resident')
     expect(rows()[0]).toHaveTextContent('Stage 2 Review')
@@ -174,8 +174,8 @@ describe('ReviewQueuePage — the queues', () => {
   it('says a queue is empty', async () => {
     api.getReviewQueue.mockResolvedValue([])
     renderPage()
-    expect(await screen.findByText('Nothing is waiting in Stage 1.')).toBeInTheDocument()
-    expect(tabs()).toEqual(['Stage 1 (0)', 'Stage 2 (0)'])
+    expect(await screen.findByText('Nothing is waiting in the IDR Check Queue.')).toBeInTheDocument()
+    expect(tabs()).toEqual(['IDR Check Queue (0)', 'RE Review Queue (0)'])
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
@@ -190,7 +190,7 @@ describe('ReviewQueuePage — the queues', () => {
   it('goes back to the project list', async () => {
     const user = userEvent.setup()
     renderPage()
-    await screen.findByRole('tab', { name: 'Stage 1 (3)' })
+    await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })
     await user.click(screen.getByRole('button', { name: /Back to Projects/ }))
     expect(screen.getByTestId('url')).toHaveTextContent('/projects')
   })
@@ -212,11 +212,11 @@ describe('ReviewQueuePage — loading and errors', () => {
     api.getReviewQueue.mockRejectedValueOnce(new Error('Failed to list the review queue'))
     const user = userEvent.setup()
     renderPage()
-    expect(await screen.findByText(/Couldn't load your queue: Failed to list the review queue/)).toBeInTheDocument()
+    expect(await screen.findByText(/Couldn't load your tasks: Failed to list the review queue/)).toBeInTheDocument()
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByRole('tab', { name: 'Stage 1 (3)' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'IDR Check Queue (3)' })).toBeInTheDocument()
     expect(api.getReviewQueue).toHaveBeenCalledTimes(6)
   })
 })

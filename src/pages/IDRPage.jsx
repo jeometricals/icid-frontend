@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
+import { useTaskCount } from '../contexts/TaskCountContext'
 import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
@@ -45,7 +46,7 @@ const CERTIFICATION_STATEMENT =
 const BACK_TARGETS = {
   drafts: { path: '/drafts', label: 'Back to Drafts' },
   archive: { path: '/archive', label: 'Back to Archive' },
-  review: { to: '/review', label: 'Back to My Queue' },
+  review: { to: '/review', label: 'Back to My Tasks' },
 }
 const BACK_TO_PROJECT = { path: '', label: 'Back to Project Dashboard' }
 
@@ -62,6 +63,7 @@ export default function IDRPage() {
   const location = useLocation()
   const { user } = useAuth()
   const { rolesByProject } = useProjectRoles()
+  const { refresh: refreshTaskCount } = useTaskCount()
   const isDemo = Boolean(user?.is_demo)
   const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
   const backPath = back.to || `/project/${projectId}${back.path}`
@@ -247,7 +249,10 @@ export default function IDRPage() {
       submitFailed = true
       setActionError({ scope: 'submit', message: `Submit failed: ${message}` })
     })
-    if (!submitFailed) setCertifyOpen(false)
+    if (!submitFailed) {
+      setCertifyOpen(false)
+      refreshTaskCount() // a submitted IDR is a new task for whoever reviews on this project, the submitter included
+    }
   }
 
   // Each report type has its own form page; only types with a page can be opened (see isReportTypeAvailable)

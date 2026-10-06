@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom'
 import UserMenu from '../UserMenu'
 import * as AuthContext from '../../contexts/AuthContext'
 import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
+import { TaskCountContext } from '../../contexts/TaskCountContext'
 import { DEMO_USER, TEST_USER, UNSIGNED_USER } from '../../test/users'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
@@ -23,16 +24,18 @@ function CurrentUrl() {
   return <div data-testid="url">{useLocation().pathname}</div>
 }
 
-// rolesByProject: the roles the user holds on each project; none unless a test says so
-function renderMenu(user, rolesByProject = {}) {
+// rolesByProject: the roles the user holds on each project; taskCount: the IDRs waiting on them. None unless a test says so.
+function renderMenu(user, rolesByProject = {}, taskCount = 0) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user, logout })
   return render(
     <MemoryRouter initialEntries={['/projects']}>
       <ProjectRolesContext.Provider value={{ rolesByProject, error: null, reload: () => {} }}>
-        <div>
-          <UserMenu />
-          <button>elsewhere on the page</button>
-        </div>
+        <TaskCountContext.Provider value={{ total: taskCount, refresh: async () => {} }}>
+          <div>
+            <UserMenu />
+            <button>elsewhere on the page</button>
+          </div>
+        </TaskCountContext.Provider>
       </ProjectRolesContext.Provider>
       <CurrentUrl />
     </MemoryRouter>
@@ -255,7 +258,7 @@ describe('UserMenu — Sign Out', () => {
   })
 })
 
-describe('UserMenu — My queue', () => {
+describe('UserMenu — My Tasks', () => {
   it('is hidden for a user who only inspects', async () => {
     renderMenu(TEST_USER, { HWS0023: ['inspector'], SE384: ['inspector'] })
     await open()
@@ -269,13 +272,13 @@ describe('UserMenu — My queue', () => {
   ])('is the first item for %s', async (_, user, roles) => {
     renderMenu(user, roles)
     await open()
-    expect(itemNames()).toEqual(['My queue', 'Update signature', 'Sign Out'])
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Sign Out'])
   })
 
   it('stays hidden while the roles are still loading', async () => {
     renderMenu(TEST_USER, null)
     await open()
-    expect(itemNames()).not.toContain('My queue')
+    expect(itemNames()).not.toContain('My Tasks')
   })
 
   it('is hidden for a demo user', async () => {
@@ -287,8 +290,50 @@ describe('UserMenu — My queue', () => {
   it('opens the review queue and closes the menu', async () => {
     renderMenu(TEST_USER, { HWS0023: ['oe'] })
     await open()
-    await userEvent.click(item('My queue'))
+    await userEvent.click(item('My Tasks'))
     expect(screen.getByTestId('url')).toHaveTextContent('/review')
     expect(menu()).not.toBeInTheDocument()
+  })
+})
+
+describe('UserMenu — task badges', () => {
+  const REVIEWER_ROLES = { HWS0023: ['oe'] }
+  const dot = () => screen.queryByTestId('task-dot')
+  const tasksItem = () => screen.getByRole('menuitem', { name: /^My Tasks/ })
+
+  it('shows neither badge when nothing is waiting', async () => {
+    renderMenu(TEST_USER, REVIEWER_ROLES, 0)
+    expect(dot()).not.toBeInTheDocument()
+    await open()
+    expect(tasksItem()).toHaveTextContent(/^My Tasks$/)
+  })
+
+  it('puts a red dot, with no number, on the name while tasks are waiting', () => {
+    renderMenu(TEST_USER, REVIEWER_ROLES, 3)
+    expect(trigger()).toContainElement(dot())
+    expect(dot()).toHaveClass('bg-red-500')
+    expect(dot()).toHaveTextContent('You have tasks waiting') // for screen readers only
+    expect(trigger()).not.toHaveTextContent('3')
+  })
+
+  it.each([[1, '1'], [42, '42'], [99, '99'], [100, '99+'], [731, '99+']])(
+    'shows %i waiting as "%s" beside My Tasks', async (count, text) => {
+      renderMenu(TEST_USER, REVIEWER_ROLES, count)
+      await open()
+      const badge = within(tasksItem()).getByLabelText(`${count} waiting`)
+      expect(badge).toHaveTextContent(text)
+      expect(badge).toHaveClass('bg-construction-600')
+    })
+
+  it('shows no dot to someone without the My Tasks item, whatever the count says', () => {
+    renderMenu(TEST_USER, { HWS0023: ['inspector'] }, 5)
+    expect(dot()).not.toBeInTheDocument()
+  })
+
+  it('still opens My Tasks with a badge on it', async () => {
+    renderMenu(TEST_USER, REVIEWER_ROLES, 2)
+    await open()
+    await userEvent.click(tasksItem())
+    expect(screen.getByTestId('url')).toHaveTextContent('/review')
   })
 })

@@ -7,6 +7,7 @@ import IDRPage from '../IDRPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
+import { TaskCountContext } from '../../contexts/TaskCountContext'
 import { DEMO_USER, TEST_USER, TEST_USER_ID, UNSIGNED_USER } from '../../test/users'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
@@ -954,7 +955,7 @@ describe('IDRPage — review', () => {
     await ready()
     const banner = await screen.findByText(/^Submitted by Genghis Khan on/) // the name comes from the user list
     expect(banner.compareDocumentPosition(toolbar()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(toolbar()).getByRole('button', { name: 'Accept for Stage 1' })).toBeEnabled()
+    expect(within(toolbar()).getByRole('button', { name: 'Accept Task - IDR Check' })).toBeEnabled()
   })
 
   it('accepts for Stage 1 with a number and shows where the IDR now stands', async () => {
@@ -966,14 +967,14 @@ describe('IDRPage — review', () => {
     const user = userEvent.setup()
     renderAsReviewer(['oe'])
     await ready()
-    await user.click(within(toolbar()).getByRole('button', { name: 'Accept for Stage 1' }))
+    await user.click(within(toolbar()).getByRole('button', { name: 'Accept Task - IDR Check' }))
     await user.type(screen.getByLabelText('IDR #'), '005')
     await user.click(screen.getByRole('button', { name: 'Accept' }))
     await waitFor(() => expect(title()).toHaveTextContent('Stage 1 Review'))
     expect(api.acceptStage1).toHaveBeenCalledWith(IDR_ID, '005')
     expect(title()).toHaveTextContent('005')
     expect(within(toolbar()).getAllByRole('button').map(b => b.textContent)).toEqual([
-      'Approve → Stage 2', 'Return to Inspector',
+      'Approve → RE Review', 'Return to Inspector',
     ])
   })
 
@@ -1010,7 +1011,48 @@ describe('IDRPage — review', () => {
     renderAsReviewer(['oe'], 'review')
     await ready()
     expect(screen.getByRole('button', { name: /Go to Project Page/ })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Back to My Queue/ }))
+    await user.click(screen.getByRole('button', { name: /Back to My Tasks/ }))
     expect(screen.getByTestId('url')).toHaveTextContent('/review')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The task count: a submit is a new task for whoever reviews on the project
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — task count', () => {
+  function renderCounted(refresh) {
+    return render(
+      <MemoryRouter initialEntries={[IDR_URL]}>
+        <TaskCountContext.Provider value={{ total: 0, refresh }}>
+          <Routes>
+            <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
+          </Routes>
+        </TaskCountContext.Provider>
+      </MemoryRouter>
+    )
+  }
+
+  it('refreshes the count once a submit goes through', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCounted(refresh)
+    await ready()
+    await user.click(submitButton())
+    expect(refresh).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('dialog', { name: 'Certification' })).getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+  })
+
+  it('leaves the count alone when the submit fails', async () => {
+    api.submitIdr.mockRejectedValue(new Error('Signature required before submitting'))
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderCounted(refresh)
+    await ready()
+    await user.click(submitButton())
+    await user.click(within(screen.getByRole('dialog', { name: 'Certification' })).getByRole('button', { name: 'Submit' }))
+    expect(await screen.findAllByText(/Submit failed: Signature required before submitting/)).not.toHaveLength(0)
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

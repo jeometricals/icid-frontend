@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTaskCount } from '../contexts/TaskCountContext'
 import { acceptStage1, acceptStage2, approveStage1, approveStage2, returnIdr } from '../services/api'
 import { reviewActionsFor } from '../lib/reviewRoles'
 import AcceptStage1Modal from './AcceptStage1Modal'
@@ -8,10 +9,10 @@ import ReturnCommentModal from './ReturnCommentModal'
 import SignatureSetupModal from './SignatureSetupModal'
 
 const LABELS = {
-  'accept-stage1': 'Accept for Stage 1',
-  'approve-stage1': 'Approve → Stage 2',
-  'accept-stage2': 'Accept for Stage 2',
-  'approve-stage2': 'Approve + Sign (final)',
+  'accept-stage1': 'Accept Task - IDR Check',
+  'approve-stage1': 'Approve → RE Review',
+  'accept-stage2': 'Accept for RE Review',
+  'approve-stage2': 'Final Approve & Sign',
   'return-oe': 'Return to OE',
   'return-inspector': 'Return to Inspector',
 }
@@ -26,14 +27,16 @@ const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped
 
 /**
  * The review actions on an IDR's page: the buttons the signed-in user may use at the IDR's current status, given
- * the roles they hold on its project (Accept for Stage 1, Approve → Stage 2, Accept for Stage 2, Approve + Sign,
- * Return to OE, Return to Inspector). It runs each action itself and then calls onChanged, whether it worked or
- * not, so the page shows where the IDR now stands. Renders nothing for someone with nothing to do here.
+ * the roles they hold on its project (Accept Task - IDR Check, Approve → RE Review, Accept for RE Review, Final
+ * Approve & Sign, Return to OE, Return to Inspector). It runs each action itself, then calls onChanged and refreshes
+ * the task count, whether it worked or not, so the page and the header badge show where things now stand. Renders
+ * nothing for someone with nothing to do here.
  * Props: idr, roles (the user's roles on the IDR's project), onChanged (async; refetches the IDR), disabled (the
  * page is busy with something else).
  */
 export default function ReviewToolbar({ idr, roles, onChanged, disabled = false }) {
   const { user } = useAuth()
+  const { refresh: refreshTaskCount } = useTaskCount()
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState(null) // the action whose dialog is open, or 'signature'
   const [error, setError] = useState(null) // { message, conflictIdrId }
@@ -52,7 +55,7 @@ export default function ReviewToolbar({ idr, roles, onChanged, disabled = false 
       failed = true
       setError({ message: err.message, conflictIdrId: err.status === 409 ? err.body?.existing_idr_id ?? null : null })
     }
-    await onChanged()
+    await Promise.all([onChanged(), refreshTaskCount()])
     setBusy(false)
     if (!failed) setDialog(null)
   }
@@ -111,7 +114,7 @@ export default function ReviewToolbar({ idr, roles, onChanged, disabled = false 
       )}
       {dialog === 'approve-stage1' && (
         <ConfirmDialog
-          title="Approve for Stage 2"
+          title="Approve for RE Review"
           message={APPROVE_STAGE1_MESSAGE}
           confirmLabel="Approve"
           cancelLabel="Cancel"
@@ -129,9 +132,9 @@ export default function ReviewToolbar({ idr, roles, onChanged, disabled = false 
       />
       {dialog === 'approve-stage2' && (
         <ConfirmDialog
-          title="Final approval"
+          title="Final Approve & Sign"
           message={APPROVE_STAGE2_MESSAGE}
-          confirmLabel="Approve + Sign"
+          confirmLabel="Approve & Sign"
           cancelLabel="Cancel"
           confirmClassName="btn-primary"
           onConfirm={() => run(() => approveStage2(idr.idr_id))}

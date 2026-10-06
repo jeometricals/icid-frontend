@@ -5,14 +5,16 @@ import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
-import { reviewQueuesFor } from '../lib/reviewRoles'
+import { useTaskCount } from '../contexts/TaskCountContext'
+import { countBadgeText, reviewQueuesFor } from '../lib/reviewRoles'
 import ConfirmDialog from './ConfirmDialog'
 import SignatureSetupModal from './SignatureSetupModal'
 
 /**
  * The signed-in user's menu in the app header: their first name (or email), with a "Demo Mode" badge for a demo
- * user, opening a dropdown with My queue (only for someone who reviews IDRs: an OE or RE on some project, or an
- * admin), their signature (set up or update; not for demo users, who can't submit) and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
+ * user, opening a dropdown with My Tasks (only for someone who reviews IDRs: an OE or RE on some project, or an
+ * admin; it carries the number of IDRs waiting on them, and the name gets a red dot while there are any), their
+ * signature (set up or update; not for demo users, who can't submit) and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
  * the page's leave guard, so a report form saves unsaved edits first.
  * Opens on click; closes on a pick, Escape or a click elsewhere. Arrow keys, Home and End move between items.
  * Takes no props; reads the user from AuthContext.
@@ -20,6 +22,7 @@ import SignatureSetupModal from './SignatureSetupModal'
 export default function UserMenu() {
   const { user, logout } = useAuth()
   const { rolesByProject } = useProjectRoles()
+  const { total: taskCount } = useTaskCount()
   const navigate = useNavigate()
   const leave = useGuardedLeave()
   const [open, setOpen] = useState(false)
@@ -54,8 +57,10 @@ export default function UserMenu() {
   const items = [
     reviewQueuesFor(user, rolesByProject).length > 0 && {
       id: 'queue',
-      label: 'My queue',
+      label: 'My Tasks',
       icon: ClipboardCheck,
+      badge: countBadgeText(taskCount),
+      badgeLabel: `${taskCount} waiting`,
       onSelect: () => leave(() => navigate('/review')),
     },
     !user.is_demo && {
@@ -116,6 +121,7 @@ export default function UserMenu() {
   }
 
   const name = user.first_name || user.email || 'User'
+  const hasTasks = items.some(item => item.badge)
 
   return (
     <div ref={rootRef} className="relative">
@@ -130,7 +136,14 @@ export default function UserMenu() {
         disabled={signingOut}
         className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
       >
-        <CircleUserRound className="h-5 w-5 text-gray-500" />
+        <span className="relative">
+          <CircleUserRound className="h-5 w-5 text-gray-500" />
+          {hasTasks && (
+            <span data-testid="task-dot" className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white">
+              <span className="sr-only">You have tasks waiting</span>
+            </span>
+          )}
+        </span>
         <span className="text-right hidden sm:block">
           <span className="block text-sm font-medium text-gray-900">{name}</span>
           {user.is_demo && (
@@ -161,6 +174,14 @@ export default function UserMenu() {
               >
                 <item.icon className="h-4 w-4 text-gray-500" />
                 <span>{item.label}</span>
+                {item.badge && (
+                  <span
+                    aria-label={item.badgeLabel}
+                    className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] rounded-full bg-construction-600 px-1.5 py-0.5 text-xs font-semibold text-white"
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </button>
             </div>
           ))}

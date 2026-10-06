@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProjectRolesProvider } from './contexts/ProjectRolesContext'
+import { TaskCountProvider } from './contexts/TaskCountContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
@@ -58,7 +59,9 @@ function App() {
     <Router>
       <AuthProvider>
         <ProjectRolesProvider>
-          <AppRoutes />
+          <TaskCountProvider>
+            <AppRoutes />
+          </TaskCountProvider>
         </ProjectRolesProvider>
       </AuthProvider>
     </Router>

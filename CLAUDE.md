@@ -14,7 +14,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
+- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
@@ -113,7 +113,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Stage 2 for an RE, both for an admin) and `reviewActionsFor(idr, user, roles)`. Only the reviewer who accepted
     an IDR at a stage can approve or return it there; an admin can stand in. The backend enforces all of it, so
     these only hide what would be refused.
-  - **`/review`** (`ReviewQueuePage`, "My queue" in the user menu for anyone with a queue): one tab per queue.
+  - **`/review`** (`ReviewQueuePage`, "My Tasks" in the user menu for anyone with a queue): one tab per queue.
     Stage 1 merges the `submitted` and `stage1_review` queues. An IDR opened from it carries
     `state.from = 'review'`, so the IDR page's Back returns there.
   - **On the IDR page**, the title carries `StatusBadge` and `IDRNumberBadge`; `ReviewToolbar` sits under the
@@ -122,6 +122,19 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     the number. Every return goes through `ReturnCommentModal` (comment required). Approving at Stage 2 signs,
     so a reviewer without a signature sets one up first. An IDR with a `return_reason` shows `ReturnNotice`.
   - Every status but `draft` is read-only, for everyone: there are no reviewer or admin edits yet.
+  - **Wording.** The page and menu item are "My Tasks" (the route stays `/review`); the tabs are "IDR Check Queue"
+    and "RE Review Queue"; the buttons are "Accept Task - IDR Check", "Approve → RE Review", "Accept for RE Review"
+    and "Final Approve & Sign". The status badges still read "Stage 1 Review" / "Stage 2 Review".
+  - **At Stage 2 the only button is "Accept for RE Review"** until the signed-in user is the IDR's
+    `re_reviewer_uuid`; then it gives way to "Final Approve & Sign", "Return to OE" and "Return to Inspector".
+    That holds for an admin too.
+  - **Task count.** `TaskCountProvider` (inside `ProjectRolesProvider`) counts the IDRs the user can act on right
+    now (`isTaskFor` in `lib/reviewRoles.js`) from the same three `GET /v1/idrs/queue` calls the page makes:
+    once when their roles are known, and whenever `refresh()` is called. `ReviewToolbar` calls it after every
+    action and the IDR page after a submit. `useTaskCount()` gives `{submitted, stage1_review, stage2_review,
+    total, error, refresh}`. `UserMenu` shows a red dot on the name while `total > 0` and the number beside
+    "My Tasks" (`countBadgeText`: hidden at 0, "99+" past 99). Nothing polls, so a task created by someone
+    else shows up at the next sign-in, reload or action.
   - **The Archive** is a table (`IdrTable`, shared with the queue) of every IDR past draft, sorted by work date,
     with names from the list itself (`reporter_name`, `stage1_reviewer_name`, `re_reviewer_name`); it no longer
     calls `GET /v1/users/`. No filters yet.

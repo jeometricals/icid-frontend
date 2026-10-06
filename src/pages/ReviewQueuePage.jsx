@@ -1,6 +1,7 @@
 /**
- * The signed-in reviewer's queues at /review, across every project they review on: a Stage 1 tab (IDRs waiting to
- * be picked up and those in Stage 1 review) for an OE or RE, and a Stage 2 tab for an RE; an admin sees both, for
+ * The signed-in reviewer's tasks at /review ("My Tasks"), across every project they review on: an IDR Check Queue
+ * tab (IDRs waiting to be picked up and those in Stage 1 review) for an OE or RE, and an RE Review Queue tab for an
+ * RE; an admin sees both, for
  * every project. Oldest submission first. Clicking an IDR opens its page, whose Back button returns here.
  * A user who reviews nothing is told so instead.
  */
@@ -71,7 +72,7 @@ export default function ReviewQueuePage() {
           <span className="font-medium">Back to Projects</span>
         </button>
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">My Queue</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">My Tasks</h2>
 
         {rolesLoading || (loading && queues.length > 0) ? (
           <div className="flex justify-center py-12">
@@ -84,16 +85,16 @@ export default function ReviewQueuePage() {
           </div>
         ) : queues.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-            You don't review IDRs on any project, so there is nothing in your queue.
+            You don't review IDRs on any project, so you have no tasks.
           </div>
         ) : error ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-red-600 mb-4">Couldn't load your queue: {error}</p>
+            <p className="text-red-600 mb-4">Couldn't load your tasks: {error}</p>
             <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
           </div>
         ) : (
           <>
-            <div role="tablist" aria-label="Review queues" className="flex space-x-2 border-b border-gray-200 mb-6">
+            <div role="tablist" aria-label="My Tasks" className="flex space-x-2 border-b border-gray-200 mb-6">
               {queues.map(queue => {
                 const isCurrent = queue.id === current.id
                 return (
@@ -112,10 +113,10 @@ export default function ReviewQueuePage() {
                 )
               })}
             </div>
-            <div role="tabpanel" aria-label={`${current.label} queue`}>
+            <div role="tabpanel" aria-label={current.label}>
               {rows.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-                  Nothing is waiting in {current.label}.
+                  Nothing is waiting in the {current.label}.
                 </div>
               ) : (
                 <IdrTable idrs={rows} onOpen={openIdr} showProject />

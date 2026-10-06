@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import ReviewToolbar from '../ReviewToolbar'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
+import { TaskCountContext } from '../../contexts/TaskCountContext'
 import { TEST_USER, UNSIGNED_USER } from '../../test/users'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
@@ -36,12 +37,15 @@ const STAGE2_MINE = { ...STAGE2_OPEN, re_reviewer_uuid: TEST_USER.uuid }
 const httpError = (status, message, body = {}) => Object.assign(new Error(message), { status, body: { detail: message, ...body } })
 
 let onChanged
+let refreshTaskCount
 
 function renderToolbar(idr, roles, { user = TEST_USER, disabled = false } = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
     <MemoryRouter>
-      <ReviewToolbar idr={idr} roles={roles} onChanged={onChanged} disabled={disabled} />
+      <TaskCountContext.Provider value={{ total: 0, refresh: refreshTaskCount }}>
+        <ReviewToolbar idr={idr} roles={roles} onChanged={onChanged} disabled={disabled} />
+      </TaskCountContext.Provider>
     </MemoryRouter>
   )
 }
@@ -54,6 +58,7 @@ const dialog = name => screen.queryByRole('dialog', { name })
 beforeEach(() => {
   vi.clearAllMocks()
   onChanged = vi.fn().mockResolvedValue(undefined)
+  refreshTaskCount = vi.fn().mockResolvedValue(undefined)
   for (const call of Object.values(api)) call.mockResolvedValue({})
 })
 
@@ -68,11 +73,11 @@ describe('ReviewToolbar — what it offers', () => {
   })
 
   it.each([
-    ['a submitted IDR, to an OE', SUBMITTED, ['oe'], ['Accept for Stage 1']],
-    ['their Stage 1 review, to its reviewer', STAGE1_MINE, ['oe'], ['Approve → Stage 2', 'Return to Inspector']],
-    ['an unaccepted Stage 2 IDR, to an RE', STAGE2_OPEN, ['re'], ['Accept for Stage 2']],
+    ['a submitted IDR, to an OE', SUBMITTED, ['oe'], ['Accept Task - IDR Check']],
+    ['their Stage 1 review, to its reviewer', STAGE1_MINE, ['oe'], ['Approve → RE Review', 'Return to Inspector']],
+    ['an unaccepted Stage 2 IDR, to an RE', STAGE2_OPEN, ['re'], ['Accept for RE Review']],
     ['their Stage 2 review, to its RE', STAGE2_MINE, ['re'],
-      ['Approve + Sign (final)', 'Return to OE', 'Return to Inspector']],
+      ['Final Approve & Sign', 'Return to OE', 'Return to Inspector']],
   ])('offers %s', (_, idr, roles, expected) => {
     renderToolbar(idr, roles)
     expect(buttonNames()).toEqual(expected)
@@ -80,7 +85,7 @@ describe('ReviewToolbar — what it offers', () => {
 
   it('explains to another reviewer why there is nothing to do', () => {
     renderToolbar({ ...STAGE1_MINE, stage1_reviewer_uuid: OTHER }, ['oe'])
-    expect(toolbar()).toHaveTextContent('Another reviewer accepted this IDR for Stage 1.')
+    expect(toolbar()).toHaveTextContent('Another reviewer accepted this IDR for the IDR check.')
     expect(within(toolbar()).queryAllByRole('button')).toHaveLength(0)
   })
 
@@ -96,15 +101,15 @@ describe('ReviewToolbar — what it offers', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Accept for Stage 1: the IDR number
+// Accept Task - IDR Check: the IDR number
 // ---------------------------------------------------------------------------
 
-describe('ReviewToolbar — Accept for Stage 1', () => {
+describe('ReviewToolbar — Accept Task - IDR Check', () => {
   it('asks for the IDR number, and Accept stays disabled until one is typed', async () => {
     const user = userEvent.setup()
     renderToolbar(SUBMITTED, ['oe'])
-    await user.click(button('Accept for Stage 1'))
-    const modal = dialog('Accept for Stage 1')
+    await user.click(button('Accept Task - IDR Check'))
+    const modal = dialog('Accept Task - IDR Check')
     expect(within(modal).getByLabelText('IDR #')).toHaveValue('')
     expect(within(modal).getByRole('button', { name: 'Accept' })).toBeDisabled()
     await user.type(within(modal).getByLabelText('IDR #'), '   ')
@@ -115,12 +120,12 @@ describe('ReviewToolbar — Accept for Stage 1', () => {
   it('accepts with the trimmed number, refreshes the page and closes', async () => {
     const user = userEvent.setup()
     renderToolbar(SUBMITTED, ['oe'])
-    await user.click(button('Accept for Stage 1'))
+    await user.click(button('Accept Task - IDR Check'))
     await user.type(screen.getByLabelText('IDR #'), ' 005 ')
     await user.click(screen.getByRole('button', { name: 'Accept' }))
     expect(api.acceptStage1).toHaveBeenCalledWith('idr-1', '005')
     expect(onChanged).toHaveBeenCalledTimes(1)
-    expect(dialog('Accept for Stage 1')).not.toBeInTheDocument()
+    expect(dialog('Accept Task - IDR Check')).not.toBeInTheDocument()
   })
 
   it('links to the IDR that already uses the number, and keeps the dialog open', async () => {
@@ -128,13 +133,13 @@ describe('ReviewToolbar — Accept for Stage 1', () => {
       httpError(409, 'This IDR number is already in use on this project', { existing_idr_id: 'idr-9' }))
     const user = userEvent.setup()
     renderToolbar(SUBMITTED, ['oe'])
-    await user.click(button('Accept for Stage 1'))
+    await user.click(button('Accept Task - IDR Check'))
     await user.type(screen.getByLabelText('IDR #'), '005')
     await user.click(screen.getByRole('button', { name: 'Accept' }))
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('This number is already in use on another IDR.')
     expect(within(alert).getByRole('link', { name: 'another IDR' })).toHaveAttribute('href', '/project/HWS0023/idr/idr-9')
-    expect(dialog('Accept for Stage 1')).toBeInTheDocument()
+    expect(dialog('Accept Task - IDR Check')).toBeInTheDocument()
     expect(screen.getByLabelText('IDR #')).toHaveValue('005') // still there to correct
   })
 
@@ -142,7 +147,7 @@ describe('ReviewToolbar — Accept for Stage 1', () => {
     api.acceptStage1.mockRejectedValue(httpError(409, 'Only a submitted IDR can be accepted for Stage 1'))
     const user = userEvent.setup()
     renderToolbar(SUBMITTED, ['oe'])
-    await user.click(button('Accept for Stage 1'))
+    await user.click(button('Accept Task - IDR Check'))
     await user.type(screen.getByLabelText('IDR #'), '005')
     await user.click(screen.getByRole('button', { name: 'Accept' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Only a submitted IDR can be accepted for Stage 1')
@@ -152,8 +157,8 @@ describe('ReviewToolbar — Accept for Stage 1', () => {
   it('accepts straight away, with no number asked, for a resubmitted IDR that has one', async () => {
     const user = userEvent.setup()
     renderToolbar({ ...SUBMITTED, idr_number: '005' }, ['re'])
-    await user.click(button('Accept for Stage 1'))
-    expect(dialog('Accept for Stage 1')).not.toBeInTheDocument()
+    await user.click(button('Accept Task - IDR Check'))
+    expect(dialog('Accept Task - IDR Check')).not.toBeInTheDocument()
     expect(api.acceptStage1).toHaveBeenCalledWith('idr-1')
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
@@ -161,9 +166,9 @@ describe('ReviewToolbar — Accept for Stage 1', () => {
   it('cancelling does nothing', async () => {
     const user = userEvent.setup()
     renderToolbar(SUBMITTED, ['oe'])
-    await user.click(button('Accept for Stage 1'))
+    await user.click(button('Accept Task - IDR Check'))
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(dialog('Accept for Stage 1')).not.toBeInTheDocument()
+    expect(dialog('Accept Task - IDR Check')).not.toBeInTheDocument()
     expect(api.acceptStage1).not.toHaveBeenCalled()
     expect(onChanged).not.toHaveBeenCalled()
   })
@@ -177,18 +182,18 @@ describe('ReviewToolbar — approving', () => {
   it('confirms, then passes the IDR to Stage 2', async () => {
     const user = userEvent.setup()
     renderToolbar(STAGE1_MINE, ['oe'])
-    await user.click(button('Approve → Stage 2'))
+    await user.click(button('Approve → RE Review'))
     expect(api.approveStage1).not.toHaveBeenCalled()
-    await user.click(within(dialog('Approve for Stage 2')).getByRole('button', { name: 'Approve' }))
+    await user.click(within(dialog('Approve for RE Review')).getByRole('button', { name: 'Approve' }))
     expect(api.approveStage1).toHaveBeenCalledWith('idr-1')
     expect(onChanged).toHaveBeenCalledTimes(1)
-    expect(dialog('Approve for Stage 2')).not.toBeInTheDocument()
+    expect(dialog('Approve for RE Review')).not.toBeInTheDocument()
   })
 
   it('accepts for Stage 2 in one click', async () => {
     const user = userEvent.setup()
     renderToolbar(STAGE2_OPEN, ['re'])
-    await user.click(button('Accept for Stage 2'))
+    await user.click(button('Accept for RE Review'))
     expect(api.acceptStage2).toHaveBeenCalledWith('idr-1')
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
@@ -197,17 +202,17 @@ describe('ReviewToolbar — approving', () => {
     api.acceptStage2.mockRejectedValue(httpError(403, 'Role required: re'))
     const user = userEvent.setup()
     renderToolbar(STAGE2_OPEN, ['re'])
-    await user.click(button('Accept for Stage 2'))
+    await user.click(button('Accept for RE Review'))
     expect(await within(toolbar()).findByRole('alert')).toHaveTextContent('Role required: re')
   })
 
   it('confirms the final approval, saying it signs, then approves', async () => {
     const user = userEvent.setup()
     renderToolbar(STAGE2_MINE, ['re'])
-    await user.click(button('Approve + Sign (final)'))
-    const confirm = dialog('Final approval')
+    await user.click(button('Final Approve & Sign'))
+    const confirm = dialog('Final Approve & Sign')
     expect(confirm).toHaveTextContent('Your signature will be stamped on every page of its export.')
-    await user.click(within(confirm).getByRole('button', { name: 'Approve + Sign' }))
+    await user.click(within(confirm).getByRole('button', { name: 'Approve & Sign' }))
     expect(api.approveStage2).toHaveBeenCalledWith('idr-1')
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
@@ -215,19 +220,19 @@ describe('ReviewToolbar — approving', () => {
   it('has a reviewer without a signature set one up first, then confirm', async () => {
     const user = userEvent.setup()
     renderToolbar({ ...STAGE2_MINE, re_reviewer_uuid: UNSIGNED_USER.uuid }, ['re'], { user: UNSIGNED_USER })
-    await user.click(button('Approve + Sign (final)'))
-    expect(dialog('Final approval')).not.toBeInTheDocument()
+    await user.click(button('Final Approve & Sign'))
+    expect(dialog('Final Approve & Sign')).not.toBeInTheDocument()
     await user.click(within(dialog('Set Up Your Signature')).getByRole('button', { name: 'finish signature' }))
-    expect(dialog('Final approval')).toBeInTheDocument()
+    expect(dialog('Final Approve & Sign')).toBeInTheDocument()
     expect(api.approveStage2).not.toHaveBeenCalled() // still theirs to confirm
   })
 
   it('goes no further when the signature setup is cancelled', async () => {
     const user = userEvent.setup()
     renderToolbar(STAGE2_MINE, ['re'], { user: UNSIGNED_USER })
-    await user.click(button('Approve + Sign (final)'))
+    await user.click(button('Final Approve & Sign'))
     await user.click(screen.getByRole('button', { name: 'cancel signature' }))
-    expect(dialog('Final approval')).not.toBeInTheDocument()
+    expect(dialog('Final Approve & Sign')).not.toBeInTheDocument()
     expect(dialog('Set Up Your Signature')).not.toBeInTheDocument()
     expect(api.approveStage2).not.toHaveBeenCalled()
   })
@@ -236,9 +241,9 @@ describe('ReviewToolbar — approving', () => {
     api.approveStage2.mockRejectedValue(httpError(502, 'Could not copy the signature for this IDR'))
     const user = userEvent.setup()
     renderToolbar(STAGE2_MINE, ['re'])
-    await user.click(button('Approve + Sign (final)'))
-    await user.click(within(dialog('Final approval')).getByRole('button', { name: 'Approve + Sign' }))
-    expect(await within(dialog('Final approval')).findByRole('alert')).toHaveTextContent(
+    await user.click(button('Final Approve & Sign'))
+    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
+    expect(await within(dialog('Final Approve & Sign')).findByRole('alert')).toHaveTextContent(
       'Could not copy the signature for this IDR')
   })
 })
@@ -292,11 +297,80 @@ describe('ReviewToolbar — returning', () => {
 describe('ReviewToolbar — an admin', () => {
   it('can act at any review stage without a project role', () => {
     renderToolbar({ ...STAGE1_MINE, stage1_reviewer_uuid: OTHER }, [], { user: ADMIN })
-    expect(buttonNames()).toEqual(['Approve → Stage 2', 'Return to Inspector'])
+    expect(buttonNames()).toEqual(['Approve → RE Review', 'Return to Inspector'])
   })
 
-  it('can accept or decide an unaccepted Stage 2 IDR', () => {
-    renderToolbar(STAGE2_OPEN, [], { user: ADMIN })
-    expect(buttonNames()).toEqual(['Accept for Stage 2', 'Approve + Sign (final)', 'Return to OE', 'Return to Inspector'])
+  it('must accept at Stage 2 like an RE before Final Approve & Sign shows', () => {
+    const { unmount } = renderToolbar(STAGE2_OPEN, [], { user: ADMIN })
+    expect(buttonNames()).toEqual(['Accept for RE Review'])
+    unmount()
+    renderToolbar(STAGE2_MINE, [], { user: ADMIN })
+    expect(buttonNames()).toEqual(['Final Approve & Sign', 'Return to OE', 'Return to Inspector'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Stage 2: nothing but Accept until this user has accepted
+// ---------------------------------------------------------------------------
+
+describe('ReviewToolbar — Final Approve & Sign stays hidden until accepted', () => {
+  it.each([
+    ['nobody has accepted', STAGE2_OPEN],
+    ['another RE has accepted', { ...STAGE2_OPEN, re_reviewer_uuid: OTHER }],
+  ])('shows an RE only Accept for RE Review while %s', (_, idr) => {
+    renderToolbar(idr, ['re'])
+    expect(buttonNames()).toEqual(['Accept for RE Review'])
+    expect(screen.queryByRole('button', { name: 'Final Approve & Sign' })).not.toBeInTheDocument() // hidden, not disabled
+    expect(screen.queryByRole('button', { name: /Return to/ })).not.toBeInTheDocument()
+  })
+
+  it('swaps Accept for the three decisions once the IDR is theirs', () => {
+    const { rerender } = renderToolbar(STAGE2_OPEN, ['re'])
+    rerender(
+      <MemoryRouter>
+        <ReviewToolbar idr={STAGE2_MINE} roles={['re']} onChanged={onChanged} />
+      </MemoryRouter>
+    )
+    expect(buttonNames()).toEqual(['Final Approve & Sign', 'Return to OE', 'Return to Inspector'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The task count follows every action
+// ---------------------------------------------------------------------------
+
+describe('ReviewToolbar — refreshing the task count', () => {
+  it('refreshes after an accept', async () => {
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_OPEN, ['re'])
+    await user.click(button('Accept for RE Review'))
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes after an approval', async () => {
+    const user = userEvent.setup()
+    renderToolbar(STAGE1_MINE, ['oe'])
+    await user.click(button('Approve → RE Review'))
+    expect(refreshTaskCount).not.toHaveBeenCalled() // not until it is confirmed
+    await user.click(within(dialog('Approve for RE Review')).getByRole('button', { name: 'Approve' }))
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes after a return', async () => {
+    const user = userEvent.setup()
+    renderToolbar(STAGE1_MINE, ['oe'])
+    await user.click(button('Return to Inspector'))
+    await user.type(screen.getByLabelText('Comment for the inspector'), 'fix it')
+    await user.click(screen.getByRole('button', { name: 'Return' }))
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes after a refused action too, since the IDR may have moved', async () => {
+    api.acceptStage2.mockRejectedValue(httpError(409, 'IDR changed during review; reload and try again'))
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_OPEN, ['re'])
+    await user.click(button('Accept for RE Review'))
+    await within(toolbar()).findByRole('alert')
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
   })
 })

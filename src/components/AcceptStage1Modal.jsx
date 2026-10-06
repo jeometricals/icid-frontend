@@ -21,7 +21,7 @@ export default function AcceptStage1Modal({ projectId, onConfirm, onCancel, busy
 
   return (
     <Modal
-      title="Accept for Stage 1"
+      title="Accept Task - IDR Check"
       onClose={onCancel}
       busy={busy}
       footer={

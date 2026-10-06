@@ -191,28 +191,28 @@ describe('signing out from the user menu', () => {
 // ---------------------------------------------------------------------------
 
 describe('/review', () => {
-  it('opens the review queue for a reviewer, and puts My queue in their menu', async () => {
+  it('opens the review queue for a reviewer, and puts My Tasks in their menu', async () => {
     api.getProjectsForUser.mockResolvedValue([{ project_id: 'HWS0023', project_name: 'S/W Queens 2025', roles: ['oe'] }])
     api.getReviewQueue.mockResolvedValue([])
     window.history.pushState({}, '', '/review')
     render(<App />)
     await signIn()
 
-    expect(await screen.findByRole('heading', { name: 'My Queue' })).toBeInTheDocument()
-    expect(await screen.findByRole('tab', { name: 'Stage 1 (0)' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'My Tasks' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'IDR Check Queue (0)' })).toBeInTheDocument()
     expect(window.location.pathname).toBe('/review')
     await userEvent.click(screen.getByRole('button', { name: /^User menu:/ }))
-    expect(screen.getByRole('menuitem', { name: 'My queue' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'My Tasks' })).toBeInTheDocument()
   })
 
-  it('leaves My queue out of an inspector\'s menu', async () => {
+  it('leaves My Tasks out of an inspector\'s menu', async () => {
     api.getProjectsForUser.mockResolvedValue([{ project_id: 'HWS0023', project_name: 'S/W Queens 2025', roles: ['inspector'] }])
     window.history.pushState({}, '', '/projects')
     render(<App />)
     await signIn()
 
     await userEvent.click(await screen.findByRole('button', { name: /^User menu:/ }))
-    expect(screen.queryByRole('menuitem', { name: 'My queue' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'My Tasks' })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Sign Out' })).toBeInTheDocument()
   })
 })
