@@ -9,7 +9,7 @@ const STATUS_STYLES = {
 }
 
 /**
- * Pill naming where an IDR is in review: Draft, Submitted, Stage 1 Review, Stage 2 Review or Approved. A draft that
+ * Pill naming where an IDR is in review: Draft, Submitted, IDR Check, RE Review or Approved. A draft that
  * a reviewer sent back reads "Returned". Props: status (the IDR's status), returned (true for a draft with a return
  * reason).
  */

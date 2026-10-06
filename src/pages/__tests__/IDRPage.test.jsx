@@ -900,7 +900,7 @@ describe('IDRPage — review', () => {
   })
 
   it.each([
-    ['submitted', 'Submitted'], ['stage1_review', 'Stage 1 Review'], ['stage2_review', 'Stage 2 Review'],
+    ['submitted', 'Submitted'], ['stage1_review', 'IDR Check'], ['stage2_review', 'RE Review'],
     ['approved', 'Approved'],
   ])('shows a %s IDR as "%s", read-only, under the submitted banner', async (status, label) => {
     server = submitted({ status, idr_number: status === 'submitted' ? null : '005' })
@@ -925,7 +925,7 @@ describe('IDRPage — review', () => {
     server = draftIdr({ return_reason: 'fix the pay-item quantity', returned_from: 'stage1', idr_number: '005' })
     renderPage()
     await ready()
-    const notice = screen.getByText('Returned from Stage 1 review').closest('[role="status"]')
+    const notice = screen.getByText('Returned from IDR Check').closest('[role="status"]')
     expect(notice).toHaveTextContent('fix the pay-item quantity')
     expect(title()).toHaveTextContent('Returned')
     expect(title()).toHaveTextContent('005') // the number it will keep
@@ -938,8 +938,8 @@ describe('IDRPage — review', () => {
       return_reason: 'check the station', returned_from: 'stage2' })
     renderAsReviewer(['oe'])
     await ready()
-    expect(screen.getByText('Returned from Stage 2 review').closest('[role="status"]')).toHaveTextContent('check the station')
-    expect(title()).toHaveTextContent('Stage 1 Review')
+    expect(screen.getByText('Returned from RE Review').closest('[role="status"]')).toHaveTextContent('check the station')
+    expect(title()).toHaveTextContent('IDR Check')
   })
 
   it('gives the inspector no toolbar on their own submitted IDR', async () => {
@@ -970,7 +970,7 @@ describe('IDRPage — review', () => {
     await user.click(within(toolbar()).getByRole('button', { name: 'Accept Task - IDR Check' }))
     await user.type(screen.getByLabelText('IDR #'), '005')
     await user.click(screen.getByRole('button', { name: 'Accept' }))
-    await waitFor(() => expect(title()).toHaveTextContent('Stage 1 Review'))
+    await waitFor(() => expect(title()).toHaveTextContent('IDR Check'))
     expect(api.acceptStage1).toHaveBeenCalledWith(IDR_ID, '005')
     expect(title()).toHaveTextContent('005')
     expect(within(toolbar()).getAllByRole('button').map(b => b.textContent)).toEqual([

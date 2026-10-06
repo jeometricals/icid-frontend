@@ -124,7 +124,7 @@ describe('ReportArchivePage', () => {
     expect(submitted).toHaveTextContent('Nadir Shah')
     expect(submitted).toHaveTextContent(/Sep 23, 2026 at \d{1,2}:\d{2} [AP]M/)
     expect(stageOne).toHaveTextContent('005')
-    expect(stageOne).toHaveTextContent('Stage 1 Review')
+    expect(stageOne).toHaveTextContent('IDR Check')
     expect(stageOne).toHaveTextContent('Olive Engineer')
     expect(approved).toHaveTextContent('004')
     expect(approved).toHaveTextContent('Approved')

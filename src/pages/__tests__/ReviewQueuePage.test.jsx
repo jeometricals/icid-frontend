@@ -152,7 +152,7 @@ describe('ReviewQueuePage — the queues', () => {
     const [inReview, waiting, otherProject] = rows()
     expect(inReview).toHaveTextContent('HWS0023')
     expect(inReview).toHaveTextContent('005')
-    expect(inReview).toHaveTextContent('Stage 1 Review')
+    expect(inReview).toHaveTextContent('IDR Check')
     expect(inReview).toHaveTextContent('Olive Engineer')
     expect(waiting).toHaveTextContent('No IDR # yet')
     expect(waiting).toHaveTextContent('Submitted')
@@ -167,7 +167,7 @@ describe('ReviewQueuePage — the queues', () => {
     expect(screen.getByRole('tab', { name: 'RE Review Queue (1)' })).toHaveAttribute('aria-selected', 'true')
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toHaveTextContent('Rex Resident')
-    expect(rows()[0]).toHaveTextContent('Stage 2 Review')
+    expect(rows()[0]).toHaveTextContent('RE Review')
     expect(api.getReviewQueue).toHaveBeenCalledTimes(3)
   })
 

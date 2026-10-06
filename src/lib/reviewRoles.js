@@ -8,8 +8,8 @@
 export const STATUS_LABELS = {
   draft: 'Draft',
   submitted: 'Submitted',
-  stage1_review: 'Stage 1 Review',
-  stage2_review: 'Stage 2 Review',
+  stage1_review: 'IDR Check',
+  stage2_review: 'RE Review',
   approved: 'Approved',
 }
 

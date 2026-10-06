@@ -1,6 +1,6 @@
 import { CornerUpLeft } from 'lucide-react'
 
-const FROM = { stage1: 'Stage 1 review', stage2: 'Stage 2 review' }
+const FROM = { stage1: 'IDR Check', stage2: 'RE Review' }
 
 /**
  * The notice across an IDR's page while it carries a reviewer's return comment: on a draft sent back to its

@@ -124,7 +124,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Every status but `draft` is read-only, for everyone: there are no reviewer or admin edits yet.
   - **Wording.** The page and menu item are "My Tasks" (the route stays `/review`); the tabs are "IDR Check Queue"
     and "RE Review Queue"; the buttons are "Accept Task - IDR Check", "Approve → RE Review", "Accept for RE Review"
-    and "Final Approve & Sign". The status badges still read "Stage 1 Review" / "Stage 2 Review".
+    and "Final Approve & Sign". The status badges read "IDR Check" / "RE Review",
+    and a return notice "Returned from IDR Check" / "Returned from RE Review". Only the displayed text changed: the
+    keys (`stage1_review`, `stage2_review`, `stage1`, `stage2`) are the backend's.
   - **At Stage 2 the only button is "Accept for RE Review"** until the signed-in user is the IDR's
     `re_reviewer_uuid`; then it gives way to "Final Approve & Sign", "Return to OE" and "Return to Inspector".
     That holds for an admin too.
