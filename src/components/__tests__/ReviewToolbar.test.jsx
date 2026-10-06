@@ -458,18 +458,46 @@ describe('ReviewToolbar — un-approved pay items', () => {
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
 
-  it('takes the backend\'s word over its own count after a refusal', async () => {
-    // The page thought everything was approved (the approvals are from before the stage was accepted again)
-    const stale = [approved(1, 'rep-1', 'a', '60.00'), approved(2, 'rep-1', 'b', '29.00'), approved(3, 'rep-2', 'c', '5')]
-    api.approveStage2.mockRejectedValue(httpError(400, GATE, { untouched: UNTOUCHED }))
-    const user = userEvent.setup()
-    const idr = STAGE2_MINE
-    renderToolbar(idr, ['re'], { reports: REPORTS, fieldEdits: stale.map(e => ({ ...e, editor_stage: 'stage2' })) })
-    expect(finalButton()).toHaveTextContent(/^Final Approve & Sign$/)
-    await user.click(finalButton())
-    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
-    await screen.findByRole('status')
-    expect(finalButton()).toHaveTextContent('2 un-approved items')
+  it('leaves out what the reviewer attested to before the stage was last accepted, from the first paint', () => {
+    // Accepted again on Oct 5; the approvals of a and b are from the round before, c's is from this one
+    const idr = { ...STAGE1_MINE, stage1_accepted_at: '2026-10-05T14:00:00Z', stage2_accepted_at: null }
+    renderToolbar(idr, ['oe'], {
+      reports: REPORTS,
+      fieldEdits: [
+        approved(1, 'rep-1', 'a', '60.00', { edited_at: '2026-10-01T09:00:00Z' }),
+        approved(2, 'rep-1', 'b', '29.00', { edited_at: '2026-10-01T09:05:00Z' }),
+        approved(3, 'rep-2', 'c', '5', { edited_at: '2026-10-05T15:00:00Z' }),
+      ],
+    })
+    expect(approveButton()).toHaveTextContent('2 un-approved items')
+  })
+
+  it('uses the Stage 2 accepted time at Stage 2', () => {
+    const idr = { ...STAGE2_MINE, stage1_accepted_at: '2026-10-01T08:00:00Z', stage2_accepted_at: '2026-10-06T10:00:00Z' }
+    const at = (n, itemId, reportId, quantity, editedAt) =>
+      approved(n, reportId, itemId, quantity, { editor_stage: 'stage2', edited_at: editedAt })
+    renderToolbar(idr, ['re'], {
+      reports: REPORTS,
+      fieldEdits: [
+        at(1, 'a', 'rep-1', '60.00', '2026-10-03T09:00:00Z'), // after Stage 1 was accepted, before Stage 2 was: an earlier round
+        at(2, 'b', 'rep-1', '29.00', '2026-10-06T10:30:00Z'),
+        at(3, 'c', 'rep-2', '5', '2026-10-06T10:31:00Z'),
+      ],
+    })
+    expect(finalButton()).toHaveTextContent(/1 un-approved item$/)
+  })
+
+  it('counts every attestation when the IDR carries no accepted time', () => {
+    const idr = { ...STAGE1_MINE, stage1_accepted_at: null, stage2_accepted_at: null }
+    renderToolbar(idr, ['oe'], {
+      reports: REPORTS,
+      fieldEdits: [
+        approved(1, 'rep-1', 'a', '60.00', { edited_at: '2020-01-01T00:00:00Z' }),
+        approved(2, 'rep-1', 'b', '29.00', { edited_at: '2020-01-01T00:00:00Z' }),
+        approved(3, 'rep-2', 'c', '5', { edited_at: '2020-01-01T00:00:00Z' }),
+      ],
+    })
+    expect(approveButton()).toHaveTextContent(/^Approve → RE Review$/)
   })
 
   it('treats any other 400 as an ordinary error', async () => {

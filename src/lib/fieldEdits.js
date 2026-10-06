@@ -64,12 +64,26 @@ export function reviewStage(status) {
   return { stage1_review: 'stage1', stage2_review: 'stage2' }[status] ?? null
 }
 
+/** When each stage of an IDR was last accepted ({stage1, stage2}; null where the backend doesn't know). */
+export function stageAcceptedTimes(idr) {
+  return { stage1: idr?.stage1_accepted_at ?? null, stage2: idr?.stage2_accepted_at ?? null }
+}
+
+// Whether an edit belongs to its stage's current round: made since the stage was last accepted. With no accepted
+// time (an IDR from before the backend kept them) there is no round to be outside of.
+function inCurrentRound(edit, acceptedAt) {
+  const since = acceptedAt?.[edit.editor_stage]
+  if (!since || !edit.edited_at) return true
+  return Date.parse(edit.edited_at) >= Date.parse(since)
+}
+
 /**
  * The edits by which reviewers have attested to one pay item, oldest first: each approval, each revision of its
- * quantity, and the edit that added it. Returns [{edit, current}]; current is false for an attestation to a
- * quantity the item no longer has, which no longer counts.
+ * quantity, and the edit that added it. acceptedAt is stageAcceptedTimes(idr). Returns [{edit, current}]; current
+ * is false for an attestation that no longer counts: to a quantity the item no longer has, or made in an earlier
+ * round (before its stage was last accepted).
  */
-export function payItemAttestations(edits, reportId, item) {
+export function payItemAttestations(edits, reportId, item, acceptedAt) {
   const itemPath = payItemPath(item.id)
   const quantityPath = payItemPath(item.id, 'payQuantity')
   const attested = (edit) => {
@@ -82,27 +96,26 @@ export function payItemAttestations(edits, reportId, item) {
     .filter(edit => (edit.report_id ?? null) === (reportId ?? null))
     .map(edit => ({ edit, quantity: attested(edit) }))
     .filter(entry => entry.quantity)
-    .map(({ edit, quantity }) => ({ edit, current: sameValue(quantity[0], item.payQuantity) }))
+    .map(({ edit, quantity }) => ({
+      edit, current: sameValue(quantity[0], item.payQuantity) && inCurrentRound(edit, acceptedAt),
+    }))
 }
 
 /**
- * Whether a reviewer has attested to a pay item as it now stands, at one stage: an approval, revision or add of
- * theirs, stamped with that stage, for the quantity the item has now. who is {userUuid, stage, refusal}; refusal
- * (see PayItemGateContext) is the backend's last word, so an item it named is only touched by an edit made since.
+ * Whether a reviewer has attested to a pay item as it now stands, at one stage, in its current round: an approval,
+ * revision or add of theirs, stamped with that stage, made since it was last accepted, for the quantity the item
+ * has now. who is {userUuid, stage, acceptedAt}.
  */
-export function isPayItemTouched(edits, reportId, item, { userUuid, stage, refusal = null }) {
-  const refused = Boolean(refusal?.itemIds.includes(item.id))
-  return payItemAttestations(edits, reportId, item).some(({ edit, current }) => current
-    && edit.editor_uuid === userUuid && edit.editor_stage === stage
-    && !(refused && refusal.knownEditIds.includes(edit.edit_id)))
+export function isPayItemTouched(edits, reportId, item, { userUuid, stage, acceptedAt }) {
+  return payItemAttestations(edits, reportId, item, acceptedAt).some(({ edit, current }) => current
+    && edit.editor_uuid === userUuid && edit.editor_stage === stage)
 }
 
 /**
  * The pay items a reviewer still has to approve or revise before they can approve the IDR's stage, as the backend's
  * gate counts them: every item with an id on every report but an auto-generated General. Takes the IDR's reports
  * (with report_data), its field_edits and who (as isPayItemTouched). Returns [{pay_item_id, report_id}] in report
- * and item order. The backend also drops attestations from before the stage was last accepted, which the page
- * can't see, so this can undercount until the backend refuses once.
+ * and item order.
  */
 export function untouchedPayItems(reports, edits, who) {
   return (reports || []).flatMap((report) => {

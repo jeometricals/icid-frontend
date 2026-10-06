@@ -7,22 +7,20 @@
  * Returns { mayEdit, editMode, toggleEditMode, toast, clearToast, saveField(reportId, fieldPath, newValue),
  * revise(itemId, quantity), addItem(reportId, item), approve(itemId), attesting }; the four calls resolve to
  * {ok: true}, {ok: false, message} or {ok: false, conflict: true}. attesting is who is attesting to pay items here
- * ({userUuid, stage, refusal}, as isPayItemTouched takes it), or null for someone who may not.
+ * ({userUuid, stage, acceptedAt}, as isPayItemTouched takes it), or null for someone who may not.
  */
 import { useState } from 'react'
 import { useOptionalAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
-import { usePayItemGate } from '../contexts/PayItemGateContext'
 import { useEditMode } from '../contexts/RedlineContext'
 import { addPayItem, approvePayItem, editIdrField, revisePayItem } from '../services/api'
-import { EDIT_CONFLICT, reviewStage } from './fieldEdits'
+import { EDIT_CONFLICT, reviewStage, stageAcceptedTimes } from './fieldEdits'
 import { canEditInReview } from './reviewRoles'
 
 export default function useReviewEditing({ idr, onIdrUpdated, refetch }) {
   const user = useOptionalAuth()?.user ?? null
   const { rolesByProject } = useProjectRoles()
   const [isOn, toggleEditMode] = useEditMode(idr?.idr_id)
-  const [refusal] = usePayItemGate(idr?.idr_id)
   const [toast, setToast] = useState(null)
 
   const roles = (idr && rolesByProject?.[idr.project_id]) || []
@@ -52,6 +50,8 @@ export default function useReviewEditing({ idr, onIdrUpdated, refetch }) {
     revise: (itemId, quantity) => run(() => revisePayItem(idr.idr_id, itemId, quantity)),
     addItem: (reportId, item) => run(() => addPayItem(idr.idr_id, { reportId, ...item })),
     approve: (itemId) => run(() => approvePayItem(idr.idr_id, itemId)),
-    attesting: mayEdit ? { userUuid: user?.uuid, stage: reviewStage(idr.status), refusal } : null,
+    attesting: mayEdit
+      ? { userUuid: user?.uuid, stage: reviewStage(idr.status), acceptedAt: stageAcceptedTimes(idr) }
+      : null,
   }
 }

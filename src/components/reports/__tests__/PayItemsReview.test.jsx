@@ -37,12 +37,16 @@ let revise
 let addItem
 let approve
 
-// attesting: who is approving pay items here ({userUuid, stage, refusal}); null for someone who may not
-function renderTable({ payItems = [SIDEWALK, CURB], edits = [], canEdit = false, attesting = null, highlightItemId = null } = {}) {
+// attesting: who is approving pay items here ({userUuid, stage, acceptedAt}); null for someone who may not.
+// acceptedAt: when each stage was last accepted, as every reader of the table gets it
+function renderTable({
+  payItems = [SIDEWALK, CURB], edits = [], canEdit = false, attesting = null, highlightItemId = null, acceptedAt,
+} = {}) {
   return render(
     <RedlineProvider
       value={{
         reportId: REPORT, edits, isDraft: false, canEdit, saveField: vi.fn(), revise, addItem, approve, attesting, highlightItemId,
+        acceptedAt: acceptedAt ?? attesting?.acceptedAt,
       }}
     >
       <PayItemsReview payItems={payItems} contractItems={MOCK_CONTRACT_ITEMS} />
@@ -286,7 +290,7 @@ describe('PayItemsReview — Add Pay Item', () => {
 })
 
 describe('PayItemsReview — Approve', () => {
-  const REVIEWER = { userUuid: ME, stage: 'stage1', refusal: null }
+  const REVIEWER = { userUuid: ME, stage: 'stage1', acceptedAt: { stage1: null, stage2: null } }
   const mine = (n, itemId, quantity, overrides) => approval(n, itemId, quantity, 'ME', { editor_uuid: ME, ...overrides })
   const approveButton = n => screen.queryByRole('button', { name: `Approve pay item ${n}` })
   const quantityCell = row => within(screen.getAllByRole('row')[row]).getAllByRole('cell')[2]
@@ -355,10 +359,26 @@ describe('PayItemsReview — Approve', () => {
     expect(approveButton(2)).toBeInTheDocument()
   })
 
-  it('comes back for an item the backend\'s gate named, whatever the page had worked out', () => {
-    const refusal = { itemIds: ['item-1'], knownEditIds: ['app-1'] }
-    renderTable({ edits: [mine(1, 'item-1', '60.00')], attesting: { ...REVIEWER, refusal } })
+  it('comes back for an item the reviewer approved in an earlier round, with that approval greyed out', () => {
+    const acceptedAt = { stage1: '2026-10-05T14:00:00Z', stage2: null }
+    renderTable({
+      edits: [mine(1, 'item-1', '60.00', { edited_at: '2026-10-01T09:00:00Z' }), mine(2, 'item-2', '29.00', { edited_at: '2026-10-05T15:00:00Z' })],
+      attesting: { ...REVIEWER, acceptedAt },
+    })
     expect(approveButton(1)).toBeInTheDocument()
+    expect(approveButton(2)).not.toBeInTheDocument()
+    const earlier = within(quantityCell(1)).getByText('ME')
+    expect(earlier).toHaveAttribute('data-stale', 'true')
+    expect(earlier).toHaveAttribute('title', 'Approval superseded — re-approve or revise to attest.')
+    expect(within(quantityCell(2)).getByText('ME')).not.toHaveAttribute('data-stale')
+  })
+
+  it('greys an earlier round\'s approval for every reader, not only the reviewer', () => {
+    renderTable({
+      edits: [approval(1, 'item-1', '60.00', 'RR', { editor_stage: 'stage2', edited_at: '2026-10-01T09:00:00Z' })],
+      acceptedAt: { stage1: null, stage2: '2026-10-05T14:00:00Z' },
+    })
+    expect(within(quantityCell(1)).getByText('RR')).toHaveAttribute('data-stale', 'true')
   })
 
   it('shows each approver\'s initials beside the quantity, side by side', () => {

@@ -16,8 +16,8 @@ const CELL = 'px-4 py-2 text-sm align-top'
  * quantity a reviewer revised keeps its inspector row, the quantity crossed out with no initials, and gets a blue
  * row underneath for each revision with the new quantity and the reviser's initials; the last is the quantity that
  * counts. An item a reviewer added is a blue row with the adder's initials. A reviewer who approved an item as it
- * stands has their initials beside its current quantity; an approval of a quantity the item no longer has is greyed
- * out ("Approval superseded"). The stage's reviewer gets an Approve button on each item they haven't approved,
+ * stands has their initials beside its current quantity; an approval that no longer counts (of a quantity the item
+ * no longer has, or from before its stage was last accepted) is greyed out ("Approval superseded"). The stage's reviewer gets an Approve button on each item they haven't approved,
  * revised or added at this stage, and, in edit mode, a Revise button on each item and an Add Pay Item button.
  * The item the backend's gate sent them here for is outlined and scrolled into view.
  * Reads the edits and the edit calls from the RedlineProvider around it.
@@ -97,6 +97,7 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
                   number={index + 1}
                   edits={redline?.edits}
                   reportId={redline?.reportId}
+                  acceptedAt={redline?.acceptedAt}
                   canEdit={canEdit && Boolean(item.id)}
                   canApprove={Boolean(attesting) && Boolean(item.id)
                     && !isPayItemTouched(redline.edits, redline.reportId, item, attesting)}
@@ -137,10 +138,10 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
 }
 
 // The approvals of one item to show beside its current quantity: each reviewer's latest at each stage, oldest first.
-// One for a quantity the item no longer has is stale.
-function approvalBadges(edits, reportId, item) {
+// One for a quantity the item no longer has, or from an earlier round of its stage, is stale.
+function approvalBadges(edits, reportId, item, acceptedAt) {
   const latest = new Map()
-  payItemAttestations(edits, reportId, item)
+  payItemAttestations(edits, reportId, item, acceptedAt)
     .filter(({ edit }) => edit.edit_type === 'pay_item_approve')
     .forEach(entry => latest.set(`${entry.edit.editor_uuid ?? entry.edit.editor_initials}:${entry.edit.editor_stage}`, entry))
   return [...latest.values()].map(({ edit, current }) => (
@@ -157,7 +158,7 @@ function approvalBadges(edits, reportId, item) {
 // One pay item: its own row, then a blue row per quantity revision, then a note row if its inspector changed the
 // quantity after the last revision. The approvals' initials go on whichever row holds the current quantity.
 function PayItemRows({
-  item, number, edits, reportId, canEdit, canApprove, approving, busy, highlighted, showActions, onApprove, onRevise,
+  item, number, edits, reportId, acceptedAt, canEdit, canApprove, approving, busy, highlighted, showActions, onApprove, onRevise,
 }) {
   const firstRow = useRef(null)
   // Sent here for this item and it is still waiting: bring it into view (once the row is on the page)
@@ -174,7 +175,7 @@ function PayItemRows({
   const firstQuantity = revisions.length > 0 ? revisions[0].old_value : item.payQuantity
   const tone = added ? `${REDLINE_TEXT} font-medium` : 'text-gray-900'
   const label = `pay item ${number}`
-  const approvals = item.id ? approvalBadges(edits, reportId, item) : []
+  const approvals = item.id ? approvalBadges(edits, reportId, item, acceptedAt) : []
   const outline = pointedAt ? 'outline outline-2 -outline-offset-2 outline-red-400 bg-red-50' : ''
 
   const field = (name, what) => item.id ? (

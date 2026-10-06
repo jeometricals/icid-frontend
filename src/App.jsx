@@ -3,7 +3,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProjectRolesProvider } from './contexts/ProjectRolesContext'
 import { TaskCountProvider } from './contexts/TaskCountContext'
 import { EditModeProvider } from './contexts/RedlineContext'
-import { PayItemGateProvider } from './contexts/PayItemGateContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
@@ -67,9 +66,7 @@ function App() {
         <ProjectRolesProvider>
           <TaskCountProvider>
             <EditModeProvider>
-              <PayItemGateProvider>
-                <AppRoutes />
-              </PayItemGateProvider>
+              <AppRoutes />
             </EditModeProvider>
           </TaskCountProvider>
         </ProjectRolesProvider>

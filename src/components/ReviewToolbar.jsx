@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
-import { usePayItemGate } from '../contexts/PayItemGateContext'
 import { acceptStage1, acceptStage2, approveStage1, approveStage2, returnIdr } from '../services/api'
-import { reviewStage, untouchedPayItems } from '../lib/fieldEdits'
+import { reviewStage, stageAcceptedTimes, untouchedPayItems } from '../lib/fieldEdits'
 import { reviewActionsFor } from '../lib/reviewRoles'
 import AcceptStage1Modal from './AcceptStage1Modal'
 import ConfirmDialog from './ConfirmDialog'
@@ -36,9 +35,10 @@ const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped
  * Approve & Sign, Return to OE, Return to Inspector). It runs each action itself, then calls onChanged and refreshes
  * the task count, whether it worked or not, so the page and the header badge show where things now stand. Renders
  * nothing for someone with nothing to do here.
- * The two approve buttons carry "N un-approved items" while the reviewer still has pay items to approve or revise.
- * They stay enabled: the backend is the gate. When it refuses (400 with untouched), the toolbar shows its reason
- * as a toast, remembers the items it named (PayItemGateContext) and calls onPayItemsUntouched.
+ * The two approve buttons carry "N un-approved items" while the reviewer still has pay items to approve or revise
+ * in this round of the stage (since the IDR's stage1_accepted_at / stage2_accepted_at). They stay enabled: the
+ * backend is the gate. When it refuses (400 with untouched), the toolbar shows its reason as a toast and calls
+ * onPayItemsUntouched.
  * Props: idr, roles (the user's roles on the IDR's project), reports and fieldEdits (the IDR's, for the count),
  * onChanged (async; refetches the IDR), onPayItemsUntouched({detail, untouched}) (optional), disabled (the page is
  * busy with something else).
@@ -52,14 +52,15 @@ export default function ReviewToolbar({
   const [dialog, setDialog] = useState(null) // the action whose dialog is open, or 'signature'
   const [error, setError] = useState(null) // { message, conflictIdrId }
   const [toast, setToast] = useState(null)
-  const [refusal, setRefusal] = usePayItemGate(idr.idr_id)
   const { actions, note } = reviewActionsFor(idr, user, roles)
 
   if (actions.length === 0 && !note) return null
 
-  // How many pay items the reviewer has yet to approve or revise at this stage, for the approve button's badge
+  // How many pay items the reviewer has yet to approve or revise in this round, for the approve button's badge
   const waiting = actions.some(action => GATED.includes(action))
-    ? untouchedPayItems(reports, fieldEdits, { userUuid: user?.uuid, stage: reviewStage(idr.status), refusal }).length
+    ? untouchedPayItems(reports, fieldEdits, {
+      userUuid: user?.uuid, stage: reviewStage(idr.status), acceptedAt: stageAcceptedTimes(idr),
+    }).length
     : 0
 
   // Runs one action; its dialog (if any) stays open on failure, showing the error
@@ -84,10 +85,6 @@ export default function ReviewToolbar({
     if (gate) {
       setDialog(null)
       setToast(gate.detail)
-      setRefusal({
-        itemIds: gate.untouched.map(item => item.pay_item_id),
-        knownEditIds: fieldEdits.map(edit => edit.edit_id),
-      })
       onPayItemsUntouched?.(gate)
     }
   }

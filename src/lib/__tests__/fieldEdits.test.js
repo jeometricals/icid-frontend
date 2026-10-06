@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   displayValue, editsForField, hasEdits, isPayItemTouched, payItemAddEdit, payItemAttestations, payItemPath,
-  reviewStage, revisedAfterReturn, sameValue, untouchedPayItems,
+  reviewStage, revisedAfterReturn, sameValue, stageAcceptedTimes, untouchedPayItems,
 } from '../fieldEdits'
 
 const edit = (overrides) => ({ edit_id: 'e', report_id: 'rep-1', field_path: 'description', edit_type: 'field_change',
@@ -146,12 +146,60 @@ describe('pay-item attestation', () => {
     expect(isPayItemTouched(edits, 'rep-1', ITEM, who)).toBe(false)
   })
 
-  it('lets the backend\'s refusal overrule an attestation it had already seen, until a newer one arrives', () => {
-    const refusal = { itemIds: ['item-1'], knownEditIds: ['before'] }
-    expect(isPayItemTouched([by({ edit_id: 'before' })], 'rep-1', ITEM, { ...who, refusal })).toBe(false)
-    expect(isPayItemTouched([by({ edit_id: 'before' }), by({ edit_id: 'after' })], 'rep-1', ITEM, { ...who, refusal })).toBe(true)
-    // an item the refusal didn't name is judged as usual
-    expect(isPayItemTouched([by({ edit_id: 'before' })], 'rep-1', ITEM, { ...who, refusal: { itemIds: ['item-9'], knownEditIds: ['before'] } })).toBe(true)
+  it('reads when each stage was last accepted off the IDR', () => {
+    expect(stageAcceptedTimes({ stage1_accepted_at: '2026-10-05T14:00:00Z', stage2_accepted_at: null })).toEqual({
+      stage1: '2026-10-05T14:00:00Z', stage2: null,
+    })
+    expect(stageAcceptedTimes({})).toEqual({ stage1: null, stage2: null })
+    expect(stageAcceptedTimes(null)).toEqual({ stage1: null, stage2: null })
+  })
+
+  describe('rounds', () => {
+    const ACCEPTED = '2026-10-05T14:00:00Z'
+    const round = { ...who, acceptedAt: { stage1: ACCEPTED, stage2: null } }
+
+    it.each([
+      ['an approval', by({ edited_at: '2026-10-05T13:59:59Z' })],
+      ['a revision', revision({ edited_at: '2026-10-01T09:00:00Z' })],
+      ['an add', added({ edited_at: '2026-10-01T09:00:00Z' })],
+    ])('does not count %s from before the stage was last accepted', (_, earlier) => {
+      expect(isPayItemTouched([earlier], 'rep-1', ITEM, round)).toBe(false)
+    })
+
+    it('counts one made at the moment of accepting, or after', () => {
+      expect(isPayItemTouched([by({ edited_at: ACCEPTED })], 'rep-1', ITEM, round)).toBe(true)
+      expect(isPayItemTouched([by({ edited_at: '2026-10-05T14:00:01Z' })], 'rep-1', ITEM, round)).toBe(true)
+    })
+
+    it('compares moments, not text: the two times may be written differently', () => {
+      const offset = { ...round, acceptedAt: { stage1: '2026-10-05T10:00:00-04:00', stage2: null } }
+      expect(isPayItemTouched([by({ edited_at: '2026-10-05T14:00:00.250000Z' })], 'rep-1', ITEM, offset)).toBe(true)
+      expect(isPayItemTouched([by({ edited_at: '2026-10-05T13:59:00+00:00' })], 'rep-1', ITEM, offset)).toBe(false)
+    })
+
+    it('counts every attestation at a stage whose accepted time is not known', () => {
+      const unknown = { ...who, acceptedAt: { stage1: null, stage2: null } }
+      expect(isPayItemTouched([by({ edited_at: '2020-01-01T00:00:00Z' })], 'rep-1', ITEM, unknown)).toBe(true)
+      expect(isPayItemTouched([by({ edited_at: '2020-01-01T00:00:00Z' })], 'rep-1', ITEM, who)).toBe(true)
+    })
+
+    it('still drops an approval of a quantity the item no longer has, round or no round', () => {
+      const inRound = by({ edited_at: '2026-10-05T15:00:00Z', new_value: '55.00' })
+      expect(isPayItemTouched([inRound], 'rep-1', ITEM, round)).toBe(false)
+      expect(isPayItemTouched([inRound], 'rep-1', ITEM, { ...who, acceptedAt: { stage1: null, stage2: null } })).toBe(false)
+    })
+
+    it('judges each edit by its own stage\'s accepted time', () => {
+      const acceptedAt = { stage1: '2026-10-01T00:00:00Z', stage2: '2026-10-06T00:00:00Z' }
+      const edits = [
+        by({ edit_id: 's1', edited_at: '2026-10-02T00:00:00Z' }),
+        by({ edit_id: 's2-old', editor_stage: 'stage2', edited_at: '2026-10-03T00:00:00Z' }),
+        by({ edit_id: 's2-new', editor_stage: 'stage2', edited_at: '2026-10-06T09:00:00Z' }),
+      ]
+      expect(payItemAttestations(edits, 'rep-1', ITEM, acceptedAt).map(a => [a.edit.edit_id, a.current])).toEqual([
+        ['s1', true], ['s2-old', false], ['s2-new', true],
+      ])
+    })
   })
 
   it('lists the untouched items of every report but an auto-generated General, in order', () => {
