@@ -12,7 +12,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue, project roles). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
@@ -140,6 +140,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **The Archive** is a table (`IdrTable`, shared with the queue) of every IDR past draft, sorted by work date,
     with names from the list itself (`reporter_name`, `stage1_reviewer_name`, `re_reviewer_name`); it no longer
     calls `GET /v1/users/`. No filters yet.
+- **Project roles (admin).** `/admin/projects/:projectId/roles` (`ProjectRolesPage`), reached from "Manage Roles"
+  on the project dashboard, which only an admin sees. One row per user and role with Revoke (confirmed first; it
+  warns when it is the user's only role there, since that takes them off the project), and an "Add role" row: any
+  user from `GET /v1/users/`, a role, Grant. Both calls answer with the project's roles as they now stand, and
+  both are safe to repeat (granting a role already held is a success). A failed change shows inline and leaves the
+  table alone. When an admin changes their own roles the page reloads `ProjectRolesContext` and the task count.
+  A non-admin who opens the URL is told it is for admins; the backend returns 403 to them anyway.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.
 - **If a change needs a matching backend change (new endpoint, changed response shape), STOP and tell me.** Don't
   make backend changes from this repo and don't invent endpoints that don't exist yet. Endpoints currently used:
@@ -148,7 +155,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `POST /v1/signatures/upload-request` · `POST /v1/signatures/confirm` (the PNG itself is PUT to the Storage signed URL)
   - `GET /v1/projects/` (the signed-in user's projects, each with `roles`)
   - `GET /v1/projects/{id}`
-  - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; not available to demo users)
+  - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
+  - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` · `GET /v1/idrs/{id}`
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·

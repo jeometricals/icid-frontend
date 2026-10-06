@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Users } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { getProjectById } from '../services/api'
+import { isAdmin } from '../lib/reviewRoles'
 import NewIdrDateModal from '../components/NewIdrDateModal'
 
 export default function ProjectDashboard() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [project, setProject] = useState(null)
   const [loadingProject, setLoadingProject] = useState(true)
   const [loadError, setLoadError] = useState(null) // the thrown Error; status 404 means the project doesn't exist
@@ -140,6 +143,17 @@ export default function ProjectDashboard() {
             <h3 className="font-bold text-lg">Report Archive</h3>
           </button>
         </div>
+
+        {/* Admin only: who holds which role on this project */}
+        {isAdmin(user) && (
+          <button
+            onClick={() => navigate(`/admin/projects/${projectId}/roles`)}
+            className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
+          >
+            <Users className="h-5 w-5" />
+            <span className="font-medium">Manage Roles</span>
+          </button>
+        )}
       </main>
 
       {pickingIdrDate && (

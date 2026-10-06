@@ -17,6 +17,9 @@ export const STATUS_LABELS = {
 const STAGE_ONE_QUEUE = { id: 'stage1', label: 'IDR Check Queue', statuses: ['submitted', 'stage1_review'] }
 const STAGE_TWO_QUEUE = { id: 'stage2', label: 'RE Review Queue', statuses: ['stage2_review'] }
 
+// The roles a user can hold on a project, with the text shown for each
+export const PROJECT_ROLE_LABELS = { inspector: 'Inspector', oe: 'OE', re: 'RE' }
+
 export function isAdmin(user) {
   return user?.role === 'admin'
 }

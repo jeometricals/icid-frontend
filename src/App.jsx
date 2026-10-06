@@ -13,6 +13,7 @@ import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
 import IDRPage from './pages/IDRPage'
 import ReviewQueuePage from './pages/ReviewQueuePage'
+import ProjectRolesPage from './pages/ProjectRolesPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
@@ -36,6 +37,7 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/projects" element={<ProjectSelectionPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
+          <Route path="/admin/projects/:projectId/roles" element={<ProjectRolesPage />} />
           <Route path="/project/:projectId" element={<ProjectDashboard />} />
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />

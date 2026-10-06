@@ -51,6 +51,7 @@ function renderDashboard(projectId = 'HWS0023') {
 beforeEach(() => {
   vi.restoreAllMocks()
   mockNavigate.mockReset()
+  mockAuth() // an inspector, unless a test signs someone else in
 })
 
 // ---------------------------------------------------------------------------
@@ -298,5 +299,26 @@ describe('ProjectDashboard report archive button', () => {
     renderDashboard()
     await userEvent.click(await screen.findByRole('button', { name: 'Report Archive' }))
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/archive')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Manage Roles: the admin's way to the project's roles page
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard — Manage Roles', () => {
+  it('is hidden from a user who is not an admin', async () => {
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await screen.findByText('Curb & Sidewalk Installation')
+    expect(screen.queryByRole('button', { name: /Manage Roles/ })).not.toBeInTheDocument()
+  })
+
+  it('takes an admin to the roles page of this project', async () => {
+    mockAuth({ user: { ...DEV_USER, role: 'admin' } })
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByRole('button', { name: /Manage Roles/ }))
+    expect(mockNavigate).toHaveBeenCalledWith('/admin/projects/HWS0023/roles')
   })
 })
