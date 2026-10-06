@@ -271,6 +271,17 @@ export default function IDRPage() {
   }
 
   // Each report type has its own form page; only types with a page can be opened (see isReportTypeAvailable)
+  // The backend refused to approve the stage: open the report holding the first pay item still waiting on the
+  // reviewer, which shows the reason and points at the item
+  const showUntouchedPayItem = ({ detail, untouched }) => {
+    const report = reports.find(r => r.report_id === untouched[0].report_id)
+    if (!report) return
+    const segment = reportTypeRoute(report.report_type) || 'general'
+    navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, {
+      state: { from: location.state?.from, payItemGate: { itemId: untouched[0].pay_item_id, message: detail } },
+    })
+  }
+
   const openReport = (report) => {
     const segment = reportTypeRoute(report.report_type) || 'general'
     navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, { state: { from: location.state?.from } })
@@ -326,7 +337,15 @@ export default function IDRPage() {
         </div>
 
         {readOnly && (
-          <ReviewToolbar idr={idr} roles={rolesByProject?.[projectId] || []} onChanged={refresh} disabled={busy} />
+          <ReviewToolbar
+            idr={idr}
+            roles={rolesByProject?.[projectId] || []}
+            reports={reports}
+            fieldEdits={fieldEdits}
+            onChanged={refresh}
+            onPayItemsUntouched={showUntouchedPayItem}
+            disabled={busy}
+          />
         )}
 
         {refreshError && (

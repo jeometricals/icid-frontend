@@ -124,13 +124,18 @@ export function RedlineStack({ chain, format = v => v, revised = false, current 
   )
 }
 
-/** A reviewer's initials beside their edit. Props: initials, name (the tooltip). */
-export function InitialsBadge({ initials, name }) {
+/**
+ * A reviewer's initials beside their edit or approval. Props: initials, name (the tooltip), stale (greyed and
+ * struck, with staleNote as the tooltip: an approval that no longer counts).
+ */
+export function InitialsBadge({ initials, name, stale = false, staleNote }) {
   if (!initials) return null
   return (
     <span
-      title={name || undefined}
-      className="ml-2 inline-block rounded bg-gray-100 px-1 text-[11px] font-normal text-gray-500 align-middle"
+      title={(stale ? staleNote : name) || undefined}
+      data-stale={stale || undefined}
+      className={`ml-2 inline-block rounded bg-gray-100 px-1 text-[11px] font-normal align-middle ${stale
+        ? 'text-gray-400 line-through opacity-60' : 'text-gray-500'}`}
     >
       {initials}
     </span>

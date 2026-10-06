@@ -39,12 +39,22 @@ const httpError = (status, message, body = {}) => Object.assign(new Error(messag
 let onChanged
 let refreshTaskCount
 
-function renderToolbar(idr, roles, { user = TEST_USER, disabled = false } = {}) {
+let onPayItemsUntouched
+
+function renderToolbar(idr, roles, { user = TEST_USER, disabled = false, reports, fieldEdits } = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
     <MemoryRouter>
       <TaskCountContext.Provider value={{ total: 0, refresh: refreshTaskCount }}>
-        <ReviewToolbar idr={idr} roles={roles} onChanged={onChanged} disabled={disabled} />
+        <ReviewToolbar
+          idr={idr}
+          roles={roles}
+          reports={reports}
+          fieldEdits={fieldEdits}
+          onChanged={onChanged}
+          onPayItemsUntouched={onPayItemsUntouched}
+          disabled={disabled}
+        />
       </TaskCountContext.Provider>
     </MemoryRouter>
   )
@@ -58,6 +68,7 @@ const dialog = name => screen.queryByRole('dialog', { name })
 beforeEach(() => {
   vi.clearAllMocks()
   onChanged = vi.fn().mockResolvedValue(undefined)
+  onPayItemsUntouched = vi.fn()
   refreshTaskCount = vi.fn().mockResolvedValue(undefined)
   for (const call of Object.values(api)) call.mockResolvedValue({})
 })
@@ -372,5 +383,102 @@ describe('ReviewToolbar — refreshing the task count', () => {
     await user.click(button('Accept for RE Review'))
     await within(toolbar()).findByRole('alert')
     expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Pay items still waiting on the reviewer
+// ---------------------------------------------------------------------------
+
+describe('ReviewToolbar — un-approved pay items', () => {
+  const item = (id, quantity) => ({ id, itemNo: `no-${id}`, budgetCode: '12345', payQuantity: quantity })
+  const REPORTS = [
+    { report_id: 'rep-auto', report_type: 'GEN', is_auto_generated: true, report_data: { payItems: [item('auto', '1')] } },
+    { report_id: 'rep-1', report_type: 'SWCB', is_auto_generated: false, report_data: { payItems: [item('a', '60.00'), item('b', '29.00')] } },
+    { report_id: 'rep-2', report_type: 'AC', is_auto_generated: false, report_data: { payItems: [item('c', '5')] } },
+  ]
+  const approved = (n, reportId, itemId, quantity, overrides = {}) => ({
+    edit_id: `app-${n}`, report_id: reportId, field_path: `payItems[${itemId}]`, edit_type: 'pay_item_approve',
+    old_value: quantity, new_value: quantity, editor_uuid: TEST_USER.uuid, editor_stage: 'stage1', ...overrides,
+  })
+  const GATE = '2 pay items still need your approval or revision before you can approve this IDR'
+  const UNTOUCHED = [
+    { pay_item_id: 'b', report_id: 'rep-1', item_no: 'no-b', budget_code: '12345' },
+    { pay_item_id: 'c', report_id: 'rep-2', item_no: 'no-c', budget_code: '12345' },
+  ]
+  const approveButton = () => within(toolbar()).getByRole('button', { name: /^Approve → RE Review/ })
+  const finalButton = () => within(toolbar()).getByRole('button', { name: /^Final Approve & Sign/ })
+
+  it('counts every pay item the reviewer has not touched, leaving out an auto-generated General', () => {
+    renderToolbar(STAGE1_MINE, ['oe'], { reports: REPORTS, fieldEdits: [] })
+    expect(approveButton()).toHaveTextContent('3 un-approved items')
+    expect(approveButton()).toBeEnabled()
+  })
+
+  it('drops as items are approved, reads "1 un-approved item" at one, and goes at none', () => {
+    const { unmount } = renderToolbar(STAGE1_MINE, ['oe'], {
+      reports: REPORTS, fieldEdits: [approved(1, 'rep-1', 'a', '60.00'), approved(2, 'rep-1', 'b', '29.00')],
+    })
+    expect(approveButton()).toHaveTextContent(/1 un-approved item$/)
+    unmount()
+    renderToolbar(STAGE1_MINE, ['oe'], {
+      reports: REPORTS,
+      fieldEdits: [approved(1, 'rep-1', 'a', '60.00'), approved(2, 'rep-1', 'b', '29.00'), approved(3, 'rep-2', 'c', '5')],
+    })
+    expect(approveButton()).toHaveTextContent(/^Approve → RE Review$/)
+  })
+
+  it('counts afresh for the RE at Stage 2: the OE\'s approvals are not theirs', () => {
+    renderToolbar(STAGE2_MINE, ['re'], {
+      reports: REPORTS,
+      fieldEdits: [
+        approved(1, 'rep-1', 'a', '60.00', { editor_uuid: OTHER }), approved(2, 'rep-1', 'b', '29.00', { editor_uuid: OTHER }),
+        approved(3, 'rep-2', 'c', '5', { editor_uuid: OTHER }), approved(4, 'rep-1', 'a', '60.00', { editor_stage: 'stage2' }),
+      ],
+    })
+    expect(finalButton()).toHaveTextContent('2 un-approved items')
+    expect(within(toolbar()).getByRole('button', { name: 'Return to OE' })).not.toHaveTextContent('un-approved')
+  })
+
+  it('shows no count before the reviewer has accepted at Stage 2', () => {
+    renderToolbar(STAGE2_OPEN, ['re'], { reports: REPORTS, fieldEdits: [] })
+    expect(button('Accept for RE Review')).not.toHaveTextContent('un-approved')
+  })
+
+  it('on the backend\'s refusal: closes the dialog, shows its reason as a toast and hands over the untouched items', async () => {
+    api.approveStage1.mockRejectedValue(httpError(400, GATE, { untouched: UNTOUCHED }))
+    const user = userEvent.setup()
+    renderToolbar(STAGE1_MINE, ['oe'], { reports: REPORTS, fieldEdits: [approved(1, 'rep-1', 'a', '60.00')] })
+    await user.click(approveButton())
+    await user.click(within(dialog('Approve for RE Review')).getByRole('button', { name: 'Approve' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(GATE)
+    expect(dialog('Approve for RE Review')).not.toBeInTheDocument()
+    expect(within(toolbar()).queryByRole('alert')).not.toBeInTheDocument()
+    expect(onPayItemsUntouched).toHaveBeenCalledWith({ detail: GATE, untouched: UNTOUCHED })
+    expect(onChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the backend\'s word over its own count after a refusal', async () => {
+    // The page thought everything was approved (the approvals are from before the stage was accepted again)
+    const stale = [approved(1, 'rep-1', 'a', '60.00'), approved(2, 'rep-1', 'b', '29.00'), approved(3, 'rep-2', 'c', '5')]
+    api.approveStage2.mockRejectedValue(httpError(400, GATE, { untouched: UNTOUCHED }))
+    const user = userEvent.setup()
+    const idr = STAGE2_MINE
+    renderToolbar(idr, ['re'], { reports: REPORTS, fieldEdits: stale.map(e => ({ ...e, editor_stage: 'stage2' })) })
+    expect(finalButton()).toHaveTextContent(/^Final Approve & Sign$/)
+    await user.click(finalButton())
+    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
+    await screen.findByRole('status')
+    expect(finalButton()).toHaveTextContent('2 un-approved items')
+  })
+
+  it('treats any other 400 as an ordinary error', async () => {
+    api.approveStage2.mockRejectedValue(httpError(400, 'Signature required before approving'))
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_MINE, ['re'], { reports: [], fieldEdits: [] })
+    await user.click(finalButton())
+    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
+    expect(await within(dialog('Final Approve & Sign')).findByRole('alert')).toHaveTextContent('Signature required before approving')
+    expect(onPayItemsUntouched).not.toHaveBeenCalled()
   })
 })

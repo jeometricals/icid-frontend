@@ -329,6 +329,8 @@ export default function useReportForm({
 
     // Reviewer edits: the IDR's edit history, and taking in an IDR an edit returned (or refetching it)
     fieldEdits, reloadFromIdr: loadForm, reloadSaved,
+    // Set when the IDR page sent the reviewer here for a pay item the backend's gate named: {itemId, message}
+    payItemGate: location.state?.payItemGate ?? null,
 
     // The project's contract items (for the pay-item picker)
     contractItems, contractItemsLoading, contractItemsError,

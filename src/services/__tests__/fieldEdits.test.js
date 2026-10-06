@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { addPayItem, editIdrField, revisePayItem } from '../fieldEdits'
+import { addPayItem, approvePayItem, editIdrField, revisePayItem } from '../fieldEdits'
 import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
@@ -86,5 +86,21 @@ describe('addPayItem', () => {
     await expect(addPayItem(IDR_ID, { reportId: REPORT_ID, itemNo: 'x', quantity: '1' })).rejects.toMatchObject({
       status: 400, message: 'This kind of report has no pay items',
     })
+  })
+})
+
+describe('approvePayItem', () => {
+  it('POSTs to the item\'s approve route with no body and returns the IDR with its edits', async () => {
+    mockFetch(200, { status: 'success', data: EDITED_IDR })
+    const idr = await approvePayItem(IDR_ID, ITEM_ID)
+    expect(fetchUrl().pathname).toBe(`/v1/idrs/${IDR_ID}/pay-items/${ITEM_ID}/approve`)
+    expect(fetchInit().method).toBe('POST')
+    expect(fetchInit().body).toBeUndefined()
+    expect(idr).toEqual(EDITED_IDR)
+  })
+
+  it('throws the backend message when the item can\'t be found', async () => {
+    mockFetch(404, { detail: 'Pay item not found in this IDR' })
+    await expect(approvePayItem(IDR_ID, ITEM_ID)).rejects.toMatchObject({ status: 404, message: 'Pay item not found in this IDR' })
   })
 })

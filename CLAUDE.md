@@ -14,7 +14,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue, project roles, the admin's all-IDRs list). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
+- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on), `PayItemGateContext.jsx` (the pay items the backend last said still need the reviewer's approval, per IDR) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
@@ -188,6 +188,28 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   first, a refusal shows in the dialog, and after a success the page reads the list again rather than patching
   the row, then refreshes the task count. Rows don't open the IDR page. A non-admin who opens the URL is told it
   is for admins; the backend returns 403 / 400 to them anyway.
+- **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
+  once the user approving has attested to every pay item on every report but an auto-generated General: approved
+  it, revised its quantity or added it, at this stage, for the quantity it has now. Otherwise it answers 400 with
+  `{detail, untouched: [{pay_item_id, report_id, item_no, budget_code}]}`.
+  - **`lib/fieldEdits.js`** mirrors the rule: `payItemAttestations`, `isPayItemTouched` and `untouchedPayItems`
+    read it from `field_edits` (an approval is `edit_type: 'pay_item_approve'` on `payItems[<id>]`, the quantity as
+    both `old_value` and `new_value`). `useReviewEditing` gives `approve(itemId)` and `attesting`
+    (`{userUuid, stage, refusal}`, null for anyone but the stage's reviewer or an admin).
+  - **On a report page** (`PayItemsReview`) the stage's reviewer has an Approve button on each item they haven't
+    touched, edit mode or not (Revise and Add Pay Item still need edit mode); it posts and takes the IDR from the
+    response. So the shell's fieldset lets go for that reviewer, not only in edit mode. Approvers' initials sit
+    beside the current quantity (each reviewer's latest at each stage); one for a quantity the item no longer
+    has is greyed and struck, with the tooltip "Approval superseded — re-approve or revise to attest."
+  - **On the IDR page** the two approve buttons in `ReviewToolbar` carry "N un-approved items" and stay enabled:
+    the backend is the gate. On its 400 the toolbar toasts the detail, and the page opens the report holding the
+    first untouched item with `state.payItemGate = {itemId, message}`; `useReportForm` passes that on, the shell
+    toasts the message and the item's row is outlined and scrolled into view.
+  - **The page can't see when a stage was last accepted**, and the backend ignores attestations from before then
+    (an IDR returned to its inspector and accepted again, or unlocked by an admin). So after a refusal the
+    backend's list wins: `PayItemGateContext` (`PayItemGateProvider` in `App.jsx`) keeps
+    `{itemIds, knownEditIds}` per IDR, and an item it named counts as untouched until an edit newer than the
+    refusal attests to it. Until the first refusal the count can read low on such an IDR.
 - **New API calls go in the appropriate service file first**, then the component imports them. Never call `fetch` from a component.
 - **If a change needs a matching backend change (new endpoint, changed response shape), STOP and tell me.** Don't
   make backend changes from this repo and don't invent endpoints that don't exist yet. Endpoints currently used:
@@ -204,7 +226,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
     `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`
   - Reviewer edits: `PATCH /v1/idrs/{id}/field` · `POST /v1/idrs/{id}/pay-items/{item id}/revise` ·
-    `POST /v1/idrs/{id}/pay-items/add` (each returns the IDR with `field_edits`, as `GET /v1/idrs/{id}` does)
+    `POST /v1/idrs/{id}/pay-items/add` ·
+    `POST /v1/idrs/{id}/pay-items/{item id}/approve` (each returns the IDR with `field_edits`, as `GET /v1/idrs/{id}` does)
   - Admin: `POST /v1/idrs/{id}/admin/unlock` · `POST /v1/idrs/{id}/admin/delete` (a soft delete)
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
   - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·

@@ -7,7 +7,9 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
  * Value: reportId (null for the header), edits (the IDR's field_edits), isDraft (the IDR is a draft, so the form's
  * own inputs are live and the history only reads beside them), canEdit (edit mode is on and the signed-in user is
  * this stage's reviewer), saveField(fieldPath, newValue) → {ok} | {ok: false, message} | {ok: false, conflict: true},
- * and for pay items revise(itemId, quantity) and addItem(item), which answer the same way.
+ * and for pay items revise(itemId, quantity) and addItem(item), which answer the same way. For the stage's reviewer
+ * (edit mode or not) it also carries attesting ({userUuid, stage, refusal}: who is approving pay items; null for
+ * anyone else), approve(itemId), and highlightItemId (the pay item the backend's gate sent them here for).
  */
 const RedlineContext = createContext(null)
 

@@ -893,6 +893,29 @@ describe('IDRPage — review', () => {
   // The title card: the heading, its badges and the lines under it
   const title = () => screen.getByRole('heading', { name: 'Inspector Daily Report' }).parentElement.parentElement
 
+  it('counts the reviewer\'s un-approved pay items and, when the backend refuses, opens the report holding the first', async () => {
+    const detail = '1 pay item still needs your approval or revision before you can approve this IDR'
+    server = submitted({
+      status: 'stage1_review', idr_number: '005', stage1_reviewer_uuid: OLIVE, field_edits: [],
+      reports: [{
+        report_id: 'rep-swcb', idr_id: IDR_ID, report_type: 'SWCB', is_addendum: false, parent_report_id: null,
+        page_number: 1, is_auto_generated: false, created_at: '2026-09-25T13:00:00Z', updated_at: '2026-09-25T13:00:00Z',
+        report_data: { payItems: [{ id: 'item-1', itemNo: '4.13 AAS', budgetCode: '12345', payQuantity: '60.00' }] },
+      }],
+    })
+    api.approveStage1.mockRejectedValue(Object.assign(new Error(detail), {
+      status: 400,
+      body: { detail, untouched: [{ pay_item_id: 'item-1', report_id: 'rep-swcb', item_no: '4.13 AAS', budget_code: '12345' }] },
+    }))
+    renderAsReviewer(['oe'])
+    await ready()
+    const approve = within(toolbar()).getByRole('button', { name: /^Approve → RE Review/ })
+    expect(approve).toHaveTextContent('1 un-approved item')
+    await userEvent.click(approve)
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Approve for RE Review' })).getByRole('button', { name: 'Approve' }))
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/idr/${IDR_ID}/swcb/rep-swcb`))
+  })
+
   it('shows a draft as Draft, with no number badge and no toolbar', async () => {
     renderPage()
     await ready()

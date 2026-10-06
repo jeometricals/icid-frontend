@@ -64,7 +64,7 @@ function idrAt(status, overrides = {}) {
 
 vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
-  editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(),
+  editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
 
@@ -124,13 +124,18 @@ beforeEach(() => {
     server.reports[0].report_data.payItems.push(item)
     return record(`payItems[${item.id}]`, 'pay_item_add', null, item)
   })
+  api.approvePayItem.mockImplementation(async (_, itemId) => {
+    const item = server.reports[0].report_data.payItems.find(i => i.id === itemId)
+    return record(`payItems[${itemId}]`, 'pay_item_approve', item.payQuantity, item.payQuantity)
+  })
 })
 
-function renderPage({ user = OLIVE, roles = ['oe', 're'] } = {}) {
+// state: the router state the page is opened with (the IDR page passes payItemGate when the backend's gate refused)
+function renderPage({ user = OLIVE, roles = ['oe', 're'], state } = {}) {
   signedIn = user
   vi.spyOn(AuthContext, 'useOptionalAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={[REPORT_URL]}>
+    <MemoryRouter initialEntries={[{ pathname: REPORT_URL, state }]}>
       <ProjectRolesContext.Provider value={{ rolesByProject: { HWS0023: roles }, error: null, reload: () => {} }}>
         <EditModeProvider>
           <Routes>
@@ -456,5 +461,73 @@ describe('report page — redlines for every reader', () => {
     expect(redlines()).toEqual([
       ['Poured curb', 'Poured curb and sidewalkOE', 'Poured curb, sidewalk and rampInspector revised after return'],
     ])
+  })
+})
+
+describe('report page in review — approving pay items', () => {
+  const approveButton = n => screen.queryByRole('button', { name: `Approve pay item ${n}` })
+
+  it('lets the stage\'s reviewer approve each item without edit mode, leaving the form itself read-only', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    expect(toggle()).toHaveTextContent('Edit mode: off')
+    expect(approveButton(1)).toBeEnabled()
+    for (const input of [...screen.queryAllByRole('textbox'), ...screen.queryAllByRole('spinbutton'), ...screen.queryAllByRole('radio')]) {
+      expect(input).toBeDisabled()
+    }
+
+    await user.click(approveButton(1))
+    await waitFor(() => expect(approveButton(1)).not.toBeInTheDocument())
+    expect(api.approvePayItem).toHaveBeenCalledWith(IDR_ID, 'item-1')
+    expect(payRows()).toEqual([['pay-item-row', '60.00OE'], ['pay-item-row', '29.00']])
+    expect(approveButton(2)).toBeInTheDocument()
+  })
+
+  it('needs no approval of an item the reviewer has just revised', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(toggle())
+    await user.click(screen.getByRole('button', { name: 'Revise the quantity of pay item 2' }))
+
+    await user.type(screen.getByLabelText('New quantity'), '31')
+    await user.click(screen.getByRole('button', { name: 'Revise' }))
+    await waitFor(() => expect(approveButton(2)).not.toBeInTheDocument())
+    expect(approveButton(1)).toBeInTheDocument()
+  })
+
+  it('asks the RE to approve again at Stage 2, beside the OE\'s initials', async () => {
+    server = idrAt('stage2_review')
+    server.field_edits.push({
+      edit_id: 'oe-1', report_id: REPORT_ID, field_path: 'payItems[item-1]', edit_type: 'pay_item_approve',
+      old_value: '60.00', new_value: '60.00', editor_uuid: OLIVE.uuid, editor_initials: 'OE', editor_name: 'Olive Engineer',
+      editor_stage: 'stage1', edited_at: '2026-09-28T09:00:00Z',
+    })
+    const user = userEvent.setup()
+    renderPage({ user: REX, roles: ['re'] })
+    await ready()
+    expect(payRows()[0]).toEqual(['pay-item-row', '60.00OE'])
+    await user.click(approveButton(1))
+    await waitFor(() => expect(payRows()[0]).toEqual(['pay-item-row', '60.00OERR']))
+  })
+
+  it.each([
+    ['the inspector', TEST_USER, ['inspector']],
+    ['a reviewer who did not accept the IDR', REX, ['oe', 're']],
+  ])('offers nothing to %s', async (_, user, roles) => {
+    renderPage({ user, roles })
+    await ready()
+    expect(screen.queryByRole('button', { name: /^Approve pay item/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the gate\'s reason and points at the item it was sent here for', async () => {
+    const message = '1 pay item still needs your approval or revision before you can approve this IDR'
+    renderPage({ state: { payItemGate: { itemId: 'item-2', message } } })
+    await ready()
+    expect(screen.getByRole('status')).toHaveTextContent(message)
+    const [first, second] = screen.getAllByTestId('pay-item-row')
+    expect(second).toHaveAttribute('data-untouched', 'true')
+    expect(first).not.toHaveAttribute('data-untouched')
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  displayValue, editsForField, hasEdits, payItemAddEdit, payItemPath, revisedAfterReturn, sameValue,
+  displayValue, editsForField, hasEdits, isPayItemTouched, payItemAddEdit, payItemAttestations, payItemPath,
+  reviewStage, revisedAfterReturn, sameValue, untouchedPayItems,
 } from '../fieldEdits'
 
 const edit = (overrides) => ({ edit_id: 'e', report_id: 'rep-1', field_path: 'description', edit_type: 'field_change',
@@ -92,5 +93,77 @@ describe('revisedAfterReturn', () => {
     const times = [edit({ old_value: '07:00:00', new_value: '07:30:00' })]
     expect(revisedAfterReturn('07:30', times)).toBe(true)
     expect(revisedAfterReturn('07:30', times, v => (v ? String(v).slice(0, 5) : v))).toBe(false)
+  })
+})
+
+describe('pay-item attestation', () => {
+  const ME = 'user-me'
+  const OTHER = 'user-other'
+  const ITEM = { id: 'item-1', itemNo: '4.13 AAS', payQuantity: '60.00' }
+  const who = { userUuid: ME, stage: 'stage1' }
+  const by = (overrides) => edit({ field_path: 'payItems[item-1]', edit_type: 'pay_item_approve', old_value: '60.00',
+    new_value: '60.00', editor_uuid: ME, editor_stage: 'stage1', ...overrides })
+  const revision = (overrides) => by({ field_path: 'payItems[item-1].payQuantity', edit_type: 'pay_item_revision',
+    old_value: '70.00', ...overrides })
+  const added = (overrides) => by({ edit_type: 'pay_item_add', old_value: null, new_value: { ...ITEM }, ...overrides })
+
+  it('names the stage an IDR in review is at', () => {
+    expect(reviewStage('stage1_review')).toBe('stage1')
+    expect(reviewStage('stage2_review')).toBe('stage2')
+    expect(reviewStage('approved')).toBeNull()
+  })
+
+  it('lists an item\'s approvals, quantity revisions and its add, and nothing else', () => {
+    const edits = [
+      added({ edit_id: 'a' }), revision({ edit_id: 'r' }), by({ edit_id: 'p' }),
+      by({ edit_id: 'x', field_path: 'payItems[item-1].budgetCode', edit_type: 'field_change' }),
+      by({ edit_id: 'y', field_path: 'payItems[item-2]' }), by({ edit_id: 'z', report_id: 'rep-2' }),
+    ]
+    expect(payItemAttestations(edits, 'rep-1', ITEM).map(a => a.edit.edit_id)).toEqual(['a', 'r', 'p'])
+  })
+
+  it('marks an attestation to a quantity the item no longer has as not current', () => {
+    const edits = [by({ edit_id: 'old', new_value: '55.00' }), by({ edit_id: 'now', new_value: '60' })]
+    expect(payItemAttestations(edits, 'rep-1', ITEM).map(a => a.current)).toEqual([false, true])
+  })
+
+  it.each([
+    ['their approval', [by({})]],
+    ['their revision to the quantity it has now', [revision({})]],
+    ['their adding it', [added({})]],
+  ])('counts an item as touched by %s', (_, edits) => {
+    expect(isPayItemTouched(edits, 'rep-1', ITEM, who)).toBe(true)
+  })
+
+  it.each([
+    ['no edits', []],
+    ['someone else\'s approval', [by({ editor_uuid: OTHER })]],
+    ['their approval at the other stage', [by({ editor_stage: 'stage2' })]],
+    ['their approval of a quantity since changed', [by({ new_value: '55.00' })]],
+    ['their revision, revised again by someone else', [revision({ new_value: '58.00' })]],
+    ['their approval on another report', [by({ report_id: 'rep-2' })]],
+  ])('does not count %s', (_, edits) => {
+    expect(isPayItemTouched(edits, 'rep-1', ITEM, who)).toBe(false)
+  })
+
+  it('lets the backend\'s refusal overrule an attestation it had already seen, until a newer one arrives', () => {
+    const refusal = { itemIds: ['item-1'], knownEditIds: ['before'] }
+    expect(isPayItemTouched([by({ edit_id: 'before' })], 'rep-1', ITEM, { ...who, refusal })).toBe(false)
+    expect(isPayItemTouched([by({ edit_id: 'before' }), by({ edit_id: 'after' })], 'rep-1', ITEM, { ...who, refusal })).toBe(true)
+    // an item the refusal didn't name is judged as usual
+    expect(isPayItemTouched([by({ edit_id: 'before' })], 'rep-1', ITEM, { ...who, refusal: { itemIds: ['item-9'], knownEditIds: ['before'] } })).toBe(true)
+  })
+
+  it('lists the untouched items of every report but an auto-generated General, in order', () => {
+    const reports = [
+      { report_id: 'rep-auto', is_auto_generated: true, report_data: { payItems: [{ id: 'auto-1', payQuantity: '1' }] } },
+      { report_id: 'rep-1', is_auto_generated: false, report_data: { payItems: [ITEM, { id: 'item-2', payQuantity: '5' }, { itemNo: 'no id' }] } },
+      { report_id: 'rep-2', is_auto_generated: false, report_data: { payItems: [{ id: 'item-3', payQuantity: '9' }] } },
+      { report_id: 'rep-mix', is_auto_generated: false, report_data: {} },
+    ]
+    expect(untouchedPayItems(reports, [by({})], who)).toEqual([
+      { pay_item_id: 'item-2', report_id: 'rep-1' }, { pay_item_id: 'item-3', report_id: 'rep-2' },
+    ])
+    expect(untouchedPayItems(undefined, [], who)).toEqual([])
   })
 })

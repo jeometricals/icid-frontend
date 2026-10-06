@@ -23,12 +23,28 @@ function addition(item, initials) {
   }
 }
 
+const ME = 'user-me'
+
+function approval(n, itemId, quantity, initials, overrides = {}) {
+  return {
+    edit_id: `app-${n}`, report_id: REPORT, field_path: `payItems[${itemId}]`, edit_type: 'pay_item_approve',
+    old_value: quantity, new_value: quantity, editor_initials: initials, editor_name: `Editor ${initials}`,
+    editor_uuid: `user-${initials}`, editor_stage: 'stage1', ...overrides,
+  }
+}
+
 let revise
 let addItem
+let approve
 
-function renderTable({ payItems = [SIDEWALK, CURB], edits = [], canEdit = false } = {}) {
+// attesting: who is approving pay items here ({userUuid, stage, refusal}); null for someone who may not
+function renderTable({ payItems = [SIDEWALK, CURB], edits = [], canEdit = false, attesting = null, highlightItemId = null } = {}) {
   return render(
-    <RedlineProvider value={{ reportId: REPORT, edits, isDraft: false, canEdit, saveField: vi.fn(), revise, addItem }}>
+    <RedlineProvider
+      value={{
+        reportId: REPORT, edits, isDraft: false, canEdit, saveField: vi.fn(), revise, addItem, approve, attesting, highlightItemId,
+      }}
+    >
       <PayItemsReview payItems={payItems} contractItems={MOCK_CONTRACT_ITEMS} />
     </RedlineProvider>
   )
@@ -43,6 +59,7 @@ const reviseButton = n => screen.queryByRole('button', { name: `Revise the quant
 beforeEach(() => {
   revise = vi.fn().mockResolvedValue({ ok: true })
   addItem = vi.fn().mockResolvedValue({ ok: true })
+  approve = vi.fn().mockResolvedValue({ ok: true })
 })
 
 describe('PayItemsReview — the rows', () => {
@@ -265,5 +282,144 @@ describe('PayItemsReview — Add Pay Item', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('This kind of report has no pay items')
     expect(screen.getByLabelText('Item No.')).toHaveValue('9.99')
+  })
+})
+
+describe('PayItemsReview — Approve', () => {
+  const REVIEWER = { userUuid: ME, stage: 'stage1', refusal: null }
+  const mine = (n, itemId, quantity, overrides) => approval(n, itemId, quantity, 'ME', { editor_uuid: ME, ...overrides })
+  const approveButton = n => screen.queryByRole('button', { name: `Approve pay item ${n}` })
+  const quantityCell = row => within(screen.getAllByRole('row')[row]).getAllByRole('cell')[2]
+
+  it('is offered on every item to the stage\'s reviewer, without edit mode', () => {
+    renderTable({ attesting: REVIEWER })
+    expect(approveButton(1)).toBeInTheDocument()
+    expect(approveButton(2)).toBeInTheDocument()
+    expect(reviseButton(1)).not.toBeInTheDocument() // Revise still needs edit mode
+  })
+
+  it('is not offered to anyone else', () => {
+    renderTable({ canEdit: false, attesting: null })
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('is not offered for an item without an id', () => {
+    renderTable({ payItems: [{ ...SIDEWALK, id: undefined }], attesting: REVIEWER })
+    expect(approveButton(1)).not.toBeInTheDocument()
+  })
+
+  it('approves the item by its id', async () => {
+    const user = userEvent.setup()
+    renderTable({ attesting: REVIEWER })
+    await user.click(approveButton(2))
+    expect(approve).toHaveBeenCalledWith('item-2')
+  })
+
+  it('shows why an approval was refused', async () => {
+    approve.mockResolvedValue({ ok: false, message: 'Pay item not found in this IDR' })
+    const user = userEvent.setup()
+    renderTable({ attesting: REVIEWER })
+    await user.click(approveButton(1))
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't approve the item: Pay item not found in this IDR")
+  })
+
+  it('says nothing more on a conflict: the page has reloaded and said so', async () => {
+    approve.mockResolvedValue({ ok: false, conflict: true })
+    const user = userEvent.setup()
+    renderTable({ attesting: REVIEWER })
+    await user.click(approveButton(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['approved it', [mine(1, 'item-1', '60.00')]],
+    ['revised it', [{ ...revision(1, 'item-1', '70.00', '60.00', 'ME'), editor_uuid: ME, editor_stage: 'stage1' }]],
+    ['added it', [{ ...addition(SIDEWALK, 'ME'), editor_uuid: ME, editor_stage: 'stage1' }]],
+  ])('is hidden on an item once the reviewer has %s at this stage', (_, edits) => {
+    renderTable({ edits, attesting: REVIEWER })
+    expect(approveButton(1)).not.toBeInTheDocument()
+    expect(approveButton(2)).toBeInTheDocument()
+  })
+
+  it('comes back when the approval was of a quantity the item no longer has', () => {
+    renderTable({ payItems: [{ ...SIDEWALK, payQuantity: '55.00' }], edits: [mine(1, 'item-1', '60.00')], attesting: REVIEWER })
+    expect(approveButton(1)).toBeInTheDocument()
+  })
+
+  it('is still offered when only someone else, or the reviewer at another stage, approved', () => {
+    renderTable({
+      edits: [approval(1, 'item-1', '60.00', 'OE'), mine(2, 'item-2', '29.00', { editor_stage: 'stage2' })],
+      attesting: REVIEWER,
+    })
+    expect(approveButton(1)).toBeInTheDocument()
+    expect(approveButton(2)).toBeInTheDocument()
+  })
+
+  it('comes back for an item the backend\'s gate named, whatever the page had worked out', () => {
+    const refusal = { itemIds: ['item-1'], knownEditIds: ['app-1'] }
+    renderTable({ edits: [mine(1, 'item-1', '60.00')], attesting: { ...REVIEWER, refusal } })
+    expect(approveButton(1)).toBeInTheDocument()
+  })
+
+  it('shows each approver\'s initials beside the quantity, side by side', () => {
+    renderTable({
+      edits: [approval(1, 'item-1', '60.00', 'OE'), approval(2, 'item-1', '60.00', 'RR', { editor_stage: 'stage2' })],
+    })
+    expect(quantityCell(1)).toHaveTextContent('60.00OERR')
+    expect(within(quantityCell(1)).getByText('OE')).toHaveAttribute('title', 'Editor OE')
+    expect(quantityCell(2)).toHaveTextContent(/^29.00$/)
+  })
+
+  it('puts the initials on the row that holds the current quantity', () => {
+    renderTable({
+      payItems: [{ ...SIDEWALK, payQuantity: '55.00' }],
+      edits: [revision(1, 'item-1', '60.00', '55.00', 'OE'), approval(2, 'item-1', '55.00', 'RR', { editor_stage: 'stage2' })],
+    })
+    expect(quantityCell(1)).toHaveTextContent(/^60.00$/)
+    expect(quantityCell(2)).toHaveTextContent('55.00OERR')
+  })
+
+  it('greys out an approval of a quantity the item no longer has, with a tooltip saying so', () => {
+    renderTable({
+      payItems: [{ ...SIDEWALK, payQuantity: '55.00' }],
+      edits: [approval(1, 'item-1', '60.00', 'OE'), revision(2, 'item-1', '60.00', '55.00', 'RR')],
+    })
+    const stale = within(quantityCell(2)).getByText('OE')
+    expect(stale).toHaveAttribute('title', 'Approval superseded — re-approve or revise to attest.')
+    expect(stale).toHaveAttribute('data-stale', 'true')
+    expect(stale).toHaveClass('line-through')
+    expect(within(quantityCell(2)).getByText('RR')).not.toHaveAttribute('data-stale')
+  })
+
+  it('shows only a reviewer\'s latest approval at a stage', () => {
+    renderTable({
+      payItems: [{ ...SIDEWALK, payQuantity: '55.00' }],
+      edits: [
+        approval(1, 'item-1', '60.00', 'OE'), revision(2, 'item-1', '60.00', '55.00', 'RR'), approval(3, 'item-1', '55.00', 'OE'),
+      ],
+    })
+    const badges = within(quantityCell(2)).getAllByText('OE')
+    expect(badges).toHaveLength(1)
+    expect(badges[0]).not.toHaveAttribute('data-stale')
+  })
+
+  it('outlines the item the gate sent the reviewer here for and scrolls to it', () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      renderTable({ attesting: REVIEWER, highlightItemId: 'item-2' })
+      const [first, second] = screen.getAllByTestId('pay-item-row')
+      expect(second).toHaveAttribute('data-untouched', 'true')
+      expect(first).not.toHaveAttribute('data-untouched')
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    } finally {
+      Element.prototype.scrollIntoView = original
+    }
+  })
+
+  it('drops the outline once that item is approved', () => {
+    renderTable({ edits: [mine(1, 'item-2', '29.00')], attesting: REVIEWER, highlightItemId: 'item-2' })
+    expect(screen.getAllByTestId('pay-item-row')[1]).not.toHaveAttribute('data-untouched')
   })
 })

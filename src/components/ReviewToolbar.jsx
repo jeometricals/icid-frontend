@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
+import { usePayItemGate } from '../contexts/PayItemGateContext'
 import { acceptStage1, acceptStage2, approveStage1, approveStage2, returnIdr } from '../services/api'
+import { reviewStage, untouchedPayItems } from '../lib/fieldEdits'
 import { reviewActionsFor } from '../lib/reviewRoles'
 import AcceptStage1Modal from './AcceptStage1Modal'
 import ConfirmDialog from './ConfirmDialog'
 import ReturnCommentModal from './ReturnCommentModal'
 import SignatureSetupModal from './SignatureSetupModal'
+import Toast from './Toast'
 
 const LABELS = {
   'accept-stage1': 'Accept Task - IDR Check',
@@ -18,6 +21,8 @@ const LABELS = {
 }
 // The actions that move an IDR forward are the primary buttons; returns are secondary
 const PRIMARY = ['accept-stage1', 'approve-stage1', 'accept-stage2', 'approve-stage2']
+// The actions the backend only allows once the reviewer has attested to every pay item
+const GATED = ['approve-stage1', 'approve-stage2']
 const RETURNS = {
   'return-inspector': { to: 'inspector', title: 'Return to Inspector', recipient: 'the inspector' },
   'return-oe': { to: 'oe', title: 'Return to OE', recipient: 'the OE' },
@@ -31,33 +36,60 @@ const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped
  * Approve & Sign, Return to OE, Return to Inspector). It runs each action itself, then calls onChanged and refreshes
  * the task count, whether it worked or not, so the page and the header badge show where things now stand. Renders
  * nothing for someone with nothing to do here.
- * Props: idr, roles (the user's roles on the IDR's project), onChanged (async; refetches the IDR), disabled (the
- * page is busy with something else).
+ * The two approve buttons carry "N un-approved items" while the reviewer still has pay items to approve or revise.
+ * They stay enabled: the backend is the gate. When it refuses (400 with untouched), the toolbar shows its reason
+ * as a toast, remembers the items it named (PayItemGateContext) and calls onPayItemsUntouched.
+ * Props: idr, roles (the user's roles on the IDR's project), reports and fieldEdits (the IDR's, for the count),
+ * onChanged (async; refetches the IDR), onPayItemsUntouched({detail, untouched}) (optional), disabled (the page is
+ * busy with something else).
  */
-export default function ReviewToolbar({ idr, roles, onChanged, disabled = false }) {
+export default function ReviewToolbar({
+  idr, roles, reports = [], fieldEdits = [], onChanged, onPayItemsUntouched, disabled = false,
+}) {
   const { user } = useAuth()
   const { refresh: refreshTaskCount } = useTaskCount()
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState(null) // the action whose dialog is open, or 'signature'
   const [error, setError] = useState(null) // { message, conflictIdrId }
+  const [toast, setToast] = useState(null)
+  const [refusal, setRefusal] = usePayItemGate(idr.idr_id)
   const { actions, note } = reviewActionsFor(idr, user, roles)
 
   if (actions.length === 0 && !note) return null
+
+  // How many pay items the reviewer has yet to approve or revise at this stage, for the approve button's badge
+  const waiting = actions.some(action => GATED.includes(action))
+    ? untouchedPayItems(reports, fieldEdits, { userUuid: user?.uuid, stage: reviewStage(idr.status), refusal }).length
+    : 0
 
   // Runs one action; its dialog (if any) stays open on failure, showing the error
   const run = async (request) => {
     setBusy(true)
     setError(null)
     let failed = false
+    let gate = null // the backend's refusal for pay items still waiting on the reviewer
     try {
       await request()
     } catch (err) {
       failed = true
-      setError({ message: err.message, conflictIdrId: err.status === 409 ? err.body?.existing_idr_id ?? null : null })
+      if (err.status === 400 && Array.isArray(err.body?.untouched) && err.body.untouched.length > 0) {
+        gate = { detail: err.message, untouched: err.body.untouched }
+      } else {
+        setError({ message: err.message, conflictIdrId: err.status === 409 ? err.body?.existing_idr_id ?? null : null })
+      }
     }
     await Promise.all([onChanged(), refreshTaskCount()])
     setBusy(false)
     if (!failed) setDialog(null)
+    if (gate) {
+      setDialog(null)
+      setToast(gate.detail)
+      setRefusal({
+        itemIds: gate.untouched.map(item => item.pay_item_id),
+        knownEditIds: fieldEdits.map(edit => edit.edit_id),
+      })
+      onPayItemsUntouched?.(gate)
+    }
   }
 
   const closeDialog = () => {
@@ -95,12 +127,18 @@ export default function ReviewToolbar({ idr, roles, onChanged, disabled = false 
               className={PRIMARY.includes(action) ? 'btn-primary' : 'btn-secondary'}
             >
               {LABELS[action]}
+              {GATED.includes(action) && waiting > 0 && (
+                <span className="ml-2 inline-block rounded-full bg-white/25 px-2 py-0.5 text-xs font-semibold">
+                  {waiting} un-approved {waiting === 1 ? 'item' : 'items'}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
       {note && <p className="text-sm text-gray-600 mt-2">{note}</p>}
       {error && !dialog && <p role="alert" className="text-sm text-red-600 mt-2">{error.message}</p>}
+      <Toast message={toast} onDone={() => setToast(null)} duration={8000} />
 
       {dialog === 'accept-stage1' && (
         <AcceptStage1Modal

@@ -39,3 +39,12 @@ export async function addPayItem(idrId, { reportId, itemNo, budgetCode, quantity
   const json = await apiFetch(`/v1/idrs/${idrId}/pay-items/add`, { method: 'POST', body })
   return json.data
 }
+
+/**
+ * Records the signed-in reviewer's approval of one pay item as it stands (no body): the edit row holds the quantity
+ * approved. Approving an item they have already approved, revised or added at this stage changes nothing.
+ */
+export async function approvePayItem(idrId, payItemId) {
+  const json = await apiFetch(`/v1/idrs/${idrId}/pay-items/${encodeURIComponent(payItemId)}/approve`, { method: 'POST' })
+  return json.data
+}
