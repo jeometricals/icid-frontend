@@ -748,7 +748,10 @@ describe('read-only', () => {
 
     expect(await screen.findByText(SUBMITTED_TEXT)).toBeInTheDocument()
     expect(screen.getByDisplayValue('Poured curb')).toBeDisabled()
-    expect(screen.getByDisplayValue('4.01')).toBeDisabled()
+    // past draft the pay items are rows of text, not inputs
+    expect(screen.getByText('4.01')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('4.01')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add item/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to IDR' })).toBeEnabled()
   })

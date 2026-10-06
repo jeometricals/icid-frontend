@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  STATUS_LABELS, countBadgeText, isAdmin, isTaskFor, reviewActionsFor, reviewQueuesFor,
+  STATUS_LABELS, canEditInReview, countBadgeText, isAdmin, isTaskFor, reviewActionsFor, reviewQueuesFor,
 } from '../reviewRoles'
 import { DEMO_USER, TEST_USER } from '../../test/users'
 
@@ -184,4 +184,42 @@ describe('countBadgeText', () => {
     'shows %s as %s', (count, text) => {
       expect(countBadgeText(count)).toBe(text)
     })
+})
+
+describe('canEditInReview', () => {
+  const me = TEST_USER.uuid
+  const stage1 = idr({ status: 'stage1_review', stage1_reviewer_uuid: me })
+  const stage2 = idr({ status: 'stage2_review', stage1_reviewer_uuid: OTHER, re_reviewer_uuid: me })
+
+  it('lets the reviewer who accepted Stage 1 edit there, as an OE or an RE', () => {
+    expect(canEditInReview(stage1, TEST_USER, ['oe'])).toBe(true)
+    expect(canEditInReview(stage1, TEST_USER, ['inspector', 're'])).toBe(true)
+  })
+
+  it('lets the RE who accepted Stage 2 edit there, and not the Stage 1 reviewer', () => {
+    expect(canEditInReview(stage2, TEST_USER, ['re'])).toBe(true)
+    expect(canEditInReview({ ...stage2, stage1_reviewer_uuid: me, re_reviewer_uuid: OTHER }, TEST_USER, ['oe', 're'])).toBe(false)
+  })
+
+  it('refuses another reviewer on the project, and the reviewer once the role is gone', () => {
+    expect(canEditInReview({ ...stage1, stage1_reviewer_uuid: OTHER }, TEST_USER, ['oe', 're'])).toBe(false)
+    expect(canEditInReview(stage1, TEST_USER, ['inspector'])).toBe(false)
+    expect(canEditInReview(stage2, TEST_USER, ['oe'])).toBe(false) // Stage 2 is the RE's
+    expect(canEditInReview(stage1, TEST_USER)).toBe(false)
+  })
+
+  it('lets an admin edit at either stage with no project role', () => {
+    expect(canEditInReview({ ...stage1, stage1_reviewer_uuid: OTHER }, ADMIN, [])).toBe(true)
+    expect(canEditInReview({ ...stage2, re_reviewer_uuid: null }, ADMIN, [])).toBe(true)
+  })
+
+  it.each(['draft', 'submitted', 'approved', 'deleted'])('lets nobody edit a %s IDR', (status) => {
+    const mine = idr({ status, stage1_reviewer_uuid: me, re_reviewer_uuid: me })
+    expect(canEditInReview(mine, TEST_USER, ['oe', 're'])).toBe(false)
+    expect(canEditInReview(mine, ADMIN, [])).toBe(false)
+  })
+
+  it('refuses when nobody is signed in', () => {
+    expect(canEditInReview(stage1, null, ['oe'])).toBe(false)
+  })
 })

@@ -84,6 +84,20 @@ export function reviewActionsFor(idr, user, roles = []) {
 }
 
 /**
+ * Whether the user may edit an IDR's fields as its reviewer: it is in Stage 1 review and they accepted it there
+ * (and still hold OE or RE on its project), or in Stage 2 review and they accepted it there (and still hold RE).
+ * An admin may at either stage. Nobody may at any other status.
+ */
+export function canEditInReview(idr, user, roles = []) {
+  if (idr.status !== 'stage1_review' && idr.status !== 'stage2_review') return false
+  if (isAdmin(user)) return true
+  if (!user) return false
+  const isRe = roles.includes('re')
+  if (idr.status === 'stage1_review') return idr.stage1_reviewer_uuid === user.uuid && (isRe || roles.includes('oe'))
+  return idr.re_reviewer_uuid === user.uuid && isRe
+}
+
+/**
  * Whether an IDR in a review queue is a task for the user: something they can act on right now, given the roles
  * they hold on its project. A submitted IDR is one for any OE or RE on the project; one in Stage 1 review, for the
  * reviewer who accepted it; one in Stage 2 review, for the RE who accepted it, or for every RE on the project while

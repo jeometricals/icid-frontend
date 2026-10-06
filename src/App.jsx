@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'rea
 import { AuthProvider } from './contexts/AuthContext'
 import { ProjectRolesProvider } from './contexts/ProjectRolesContext'
 import { TaskCountProvider } from './contexts/TaskCountContext'
+import { EditModeProvider } from './contexts/RedlineContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/AppLayout'
 
@@ -64,7 +65,9 @@ function App() {
       <AuthProvider>
         <ProjectRolesProvider>
           <TaskCountProvider>
-            <AppRoutes />
+            <EditModeProvider>
+              <AppRoutes />
+            </EditModeProvider>
           </TaskCountProvider>
         </ProjectRolesProvider>
       </AuthProvider>

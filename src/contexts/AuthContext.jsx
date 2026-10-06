@@ -16,6 +16,9 @@ function failureMessage(err) {
   return err.message
 }
 
+// The same context without the guard: null outside an AuthProvider. For shared pieces that can do without a user.
+export const useOptionalAuth = () => useContext(AuthContext)
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {

@@ -125,6 +125,7 @@ export default function ConcMixReportPage() {
 
       <CommentsSection
         heading="Remarks"
+        path="remarks"
         value={formData.remarks}
         onChange={(value) => form.handleInputChange('remarks', value)}
         disabled={isReadOnly}

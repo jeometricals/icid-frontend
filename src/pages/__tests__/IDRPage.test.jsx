@@ -79,6 +79,9 @@ vi.mock('../../services/api', () => ({
   acceptStage2: vi.fn(),
   approveStage2: vi.fn(),
   returnIdr: vi.fn(),
+  editIdrField: vi.fn(),
+  revisePayItem: vi.fn(),
+  addPayItem: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -908,7 +911,8 @@ describe('IDRPage — review', () => {
     await ready()
     expect(title()).toHaveTextContent(label)
     expect(title()).toHaveTextContent(status === 'submitted' ? 'No IDR # yet' : '005')
-    expect(screen.getByText(/^Submitted by Genghis Khan on/)).toBeInTheDocument()
+    // the name is set by an effect after the IDR loads, so wait for it rather than read it straight away
+    expect(await screen.findByText(/^Submitted by Genghis Khan on/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /submit idr/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /save header/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument()
@@ -1054,5 +1058,159 @@ describe('IDRPage — task count', () => {
     await user.click(within(screen.getByRole('dialog', { name: 'Certification' })).getByRole('button', { name: 'Submit' }))
     expect(await screen.findAllByText(/Submit failed: Signature required before submitting/)).not.toHaveLength(0)
     expect(refresh).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reviewer edits of the header: redlines for everyone, edit mode for the reviewer who holds the IDR
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — reviewer edits', () => {
+  const OLIVE = { ...TEST_USER, uuid: '5246b39d-87fe-4e21-92a3-2804c899e8b3', first_name: 'Olive', last_name: 'Engineer' }
+  const inReview = (overrides = {}) => draftIdr({
+    status: 'stage1_review', submitted_at: '2026-09-25T16:05:00Z', total_pages: 1, idr_number: '005',
+    stage1_reviewer_uuid: OLIVE.uuid, re_reviewer_uuid: null, return_reason: null, field_edits: [], ...overrides,
+  })
+  const weatherEdit = { edit_id: 'e1', report_id: null, field_path: 'header.weather_am', edit_type: 'field_change',
+    old_value: 'Clear', new_value: 'Rainy', editor_initials: 'OE', editor_name: 'Olive Engineer' }
+
+  function renderAs(user, roles = ['oe']) {
+    vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
+    vi.spyOn(AuthContext, 'useOptionalAuth').mockReturnValue({ user })
+    api.listUsers.mockResolvedValue([])
+    return render(
+      <MemoryRouter initialEntries={[IDR_URL]}>
+        <ProjectRolesContext.Provider value={{ rolesByProject: { HWS0023: roles }, error: null, reload: () => {} }}>
+          <Routes>
+            <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
+          </Routes>
+        </ProjectRolesContext.Provider>
+      </MemoryRouter>
+    )
+  }
+
+  const toggle = () => screen.queryByRole('button', { name: /^Edit mode:/ })
+  const redlines = () => screen.queryAllByTestId('redline').map(el => [...el.children].map(line => line.textContent))
+
+  it('offers edit mode to the reviewer who accepted the IDR, off by default', async () => {
+    server = inReview()
+    renderAs(OLIVE)
+    await ready()
+    expect(toggle()).toHaveTextContent('Edit mode: off')
+    expect(screen.queryByRole('button', { name: 'Edit Weather AM' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Weather AM')).toBeDisabled()
+  })
+
+  it.each([
+    ['the inspector', TEST_USER, ['inspector']],
+    ['another reviewer', { ...TEST_USER, uuid: 'someone-else' }, ['oe', 're']],
+  ])('does not offer it to %s', async (_, user, roles) => {
+    server = inReview()
+    renderAs(user, roles)
+    await ready()
+    expect(toggle()).not.toBeInTheDocument()
+  })
+
+  it('does not offer it on a draft or an approved IDR', async () => {
+    server = inReview({ status: 'approved' })
+    const { unmount } = renderAs(OLIVE)
+    await ready()
+    expect(toggle()).not.toBeInTheDocument()
+    unmount()
+    server = draftIdr({ stage1_reviewer_uuid: OLIVE.uuid })
+    renderAs(OLIVE)
+    await ready()
+    expect(toggle()).not.toBeInTheDocument()
+  })
+
+  it('edits a header field through its pencil and shows the redline from the response', async () => {
+    server = inReview()
+    api.editIdrField.mockImplementation(async (_, { fieldPath, newValue }) => {
+      server = { ...server, weather_am: newValue, field_edits: [{ ...weatherEdit, field_path: fieldPath, new_value: newValue }] }
+      return structuredClone(server)
+    })
+    const user = userEvent.setup()
+    renderAs(OLIVE)
+    await ready()
+    await user.click(toggle())
+    expect(screen.getByLabelText('Weather AM')).toBeDisabled() // the form's own input never comes alive in review
+    await user.click(screen.getByRole('button', { name: 'Edit Weather AM' }))
+    await user.selectOptions(screen.getByLabelText('New value for Weather AM'), 'Rainy')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(redlines()).toEqual([['Clear', 'RainyOE']]))
+    expect(api.editIdrField).toHaveBeenCalledWith(IDR_ID, { reportId: null, fieldPath: 'header.weather_am', newValue: 'Rainy' })
+    expect(api.getIdr).toHaveBeenCalledTimes(1) // the response is the refresh
+  })
+
+  it('sends a time as typed, a temperature as a number and a cleared field as nothing', async () => {
+    server = inReview()
+    api.editIdrField.mockImplementation(async () => structuredClone(server))
+    const user = userEvent.setup()
+    renderAs(OLIVE)
+    await ready()
+    await user.click(toggle())
+
+    await user.click(screen.getByRole('button', { name: 'Edit Work Activity Start' }))
+    expect(screen.getByLabelText('New value for Work Activity Start')).toHaveValue('07:00')
+    fireEvent.change(screen.getByLabelText('New value for Work Activity Start'), { target: { value: '07:30' } })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.editIdrField).toHaveBeenLastCalledWith(IDR_ID, {
+      reportId: null, fieldPath: 'header.work_start_time', newValue: '07:30' }))
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Daily Temp High (°F)' }))
+    await user.clear(screen.getByLabelText('New value for Daily Temp High (°F)'))
+    await user.type(screen.getByLabelText('New value for Daily Temp High (°F)'), '80.5')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.editIdrField).toHaveBeenLastCalledWith(IDR_ID, {
+      reportId: null, fieldPath: 'header.temp_high', newValue: 80.5 }))
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Weather AM' }))
+    await user.selectOptions(screen.getByLabelText('New value for Weather AM'), '(blank)')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.editIdrField).toHaveBeenLastCalledWith(IDR_ID, {
+      reportId: null, fieldPath: 'header.weather_am', newValue: null }))
+  })
+
+  it('shows header redlines to every reader, with times read without their seconds', async () => {
+    server = inReview({ status: 'approved', weather_am: 'Rainy', work_start_time: '07:30:00', field_edits: [
+      weatherEdit,
+      { edit_id: 'e2', report_id: null, field_path: 'header.work_start_time', edit_type: 'field_change',
+        old_value: '07:00:00', new_value: '07:30:00', editor_initials: 'RR', editor_name: 'Rex Resident' },
+      { edit_id: 'e3', report_id: 'rep-gen', field_path: 'description', edit_type: 'field_change',
+        old_value: 'a', new_value: 'a report edit, not shown on this page', editor_initials: 'OE', editor_name: 'Olive Engineer' },
+    ] })
+    renderAs(TEST_USER, ['inspector'])
+    await ready()
+    expect(redlines()).toEqual([['07:00', '07:30RR'], ['Clear', 'RainyOE']])
+    expect(toggle()).not.toBeInTheDocument()
+    expect(screen.queryByText(/not shown on this page/)).not.toBeInTheDocument()
+  })
+
+  it('says someone else edited the field and reloads on a conflict', async () => {
+    server = inReview()
+    api.editIdrField.mockImplementation(async () => {
+      server = { ...server, weather_am: 'Snowy', field_edits: [{ ...weatherEdit, new_value: 'Snowy', editor_initials: 'AA' }] }
+      throw Object.assign(new Error('The IDR changed while you were editing; reload and try again'), { status: 409 })
+    })
+    const user = userEvent.setup()
+    renderAs(OLIVE)
+    await ready()
+    await user.click(toggle())
+    await user.click(screen.getByRole('button', { name: 'Edit Weather AM' }))
+    await user.selectOptions(screen.getByLabelText('New value for Weather AM'), 'Rainy')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Someone else edited this field — reloading')).toBeInTheDocument()
+    await waitFor(() => expect(redlines()).toEqual([['Clear', 'SnowyAA']]))
+    expect(api.getIdr).toHaveBeenCalledTimes(2)
+  })
+
+  it("reads a returned draft's header history under its live inputs", async () => {
+    server = draftIdr({ weather_am: 'Rainy', return_reason: 'check the weather', field_edits: [weatherEdit] })
+    renderAs(TEST_USER, ['inspector'])
+    await ready()
+    expect(screen.getByLabelText('Weather AM')).toBeEnabled()
+    expect(redlines()).toEqual([['Clear', 'RainyOE']])
   })
 })

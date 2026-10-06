@@ -8,10 +8,14 @@
  * Props: payItems (array of { itemNo, budgetCode, payQuantity, unit, description }), onAddItem(),
  * onItemChange(index, field, value), onRemoveItem(index), contractItems, contractItemsLoading, contractItemsError,
  * disabled (makes the buttons and inputs natively disabled).
+ * Once the IDR is past draft the table is drawn by PayItemsReview instead: read-only rows with the reviewers'
+ * revisions and additions, and their Revise / Add Pay Item buttons.
  */
 import { useCallback, useMemo, useRef, useState } from 'react'
 import PayItemPicker, { catalogEntries } from './PayItemPicker'
 import RemoveRowButton from './RemoveRowButton'
+import PayItemsReview from './PayItemsReview'
+import { useRedline } from '../../contexts/RedlineContext'
 
 export const CATALOG_UNAVAILABLE = 'Catalog unavailable — enter items manually.'
 
@@ -27,6 +31,7 @@ export default function PayItemsSection({
   contractItemsError = null,
   disabled = false,
 }) {
+  const redline = useRedline()
   // The open picker: which row and cell it hangs off, and whether it takes focus (nonce remounts it to refocus)
   const [picker, setPicker] = useState(null) // { index, field, focusSearch, nonce } | null
   const cellRefs = useRef({})
@@ -149,6 +154,9 @@ export default function PayItemsSection({
   }
 
   const addLabel = contractItemsLoading ? 'Add Item (loading catalog…)' : 'Add Item'
+
+  // Past draft there is nothing to type here: the review table shows the items with their revisions
+  if (redline && !redline.isDraft) return <PayItemsReview payItems={payItems} contractItems={contractItems} />
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

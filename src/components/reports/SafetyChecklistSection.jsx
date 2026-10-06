@@ -2,7 +2,13 @@
  * The "End of the Day MPT/Safety Check List" card: Y / N / N/A radios and a Remarks input per safety item. Stateless.
  * Props: safetyChecks ({ [key]: 'Y' | 'N' | 'NA' | null }), onChange(key, value) with 'Y', 'N' or 'NA',
  * remarks ({ [key]: string }), onRemarksChange(key, value), disabled (makes the inputs natively disabled).
+ * A reviewer's edit of an answer reads under the item's name; one of a remark, in the Remarks cell.
  */
+import RedlinedField from '../RedlinedField'
+
+const ANSWERS = [{ value: 'Y', label: 'Y' }, { value: 'N', label: 'N' }, { value: 'NA', label: 'N/A' }]
+const answerLabel = (value) => ANSWERS.find(a => a.value === value)?.label ?? value
+
 export default function SafetyChecklistSection({ safetyChecks, onChange, remarks, onRemarksChange, disabled = false }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -32,7 +38,19 @@ export default function SafetyChecklistSection({ safetyChecks, onChange, remarks
               { label: 'Site Cleaned and Secured', key: 'siteCleaned' }
             ].map((item) => (
               <tr key={item.key}>
-                <td className="px-4 py-3 text-sm text-gray-900">{item.label}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  {item.label}
+                  {/* The answer itself is the three radios; its edits, and the reviewer's pencil, sit here */}
+                  <RedlinedField
+                    path={`safetyChecks.${item.key}`}
+                    value={safetyChecks[item.key]}
+                    label={item.label}
+                    type="select"
+                    options={ANSWERS}
+                    format={answerLabel}
+                    toRequest={(text) => (text === '' ? null : ANSWERS.find(a => a.label === text || a.value === text)?.value ?? text)}
+                  />
+                </td>
                 {['Y', 'N', 'NA'].map((option) => (
                   <td key={option} className="px-4 py-3 text-center">
                     <input
@@ -46,14 +64,16 @@ export default function SafetyChecklistSection({ safetyChecks, onChange, remarks
                   </td>
                 ))}
                 <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Remarks"
-                    value={remarks[item.key] || ''}
-                    disabled={disabled}
-                    onChange={(e) => onRemarksChange(item.key, e.target.value)}
-                  />
+                  <RedlinedField path={`safetyRemarks.${item.key}`} value={remarks[item.key] || ''} label={`${item.label} remarks`}>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Remarks"
+                      value={remarks[item.key] || ''}
+                      disabled={disabled}
+                      onChange={(e) => onRemarksChange(item.key, e.target.value)}
+                    />
+                  </RedlinedField>
                 </td>
               </tr>
             ))}

@@ -433,7 +433,7 @@ describe('SWCBReportPage — read-only', () => {
     await loaded()
     expect(screen.getByText(SUBMITTED_TEXT)).toBeInTheDocument()
     expect(descriptionBox()).toBeDisabled()
-    expect(screen.getByRole('button', { name: /add item/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /add item/i })).not.toBeInTheDocument() // pay items are text past draft
     expect(screen.getByLabelText('Pour From Station')).toBeDisabled()
     expect(screen.getByRole('radio', { name: 'Subgrade Compacted, Base: Y' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /save draft/i })).not.toBeInTheDocument()

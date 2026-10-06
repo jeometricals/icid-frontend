@@ -6,6 +6,7 @@
  */
 import AddRowPicker, { OTHER_OPTION } from './AddRowPicker'
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
 
 const WORKFORCE_EXTRAS = ['Chauffeurs', 'Surveyors', 'Masons', 'Carpenters', 'Timbermen', 'Teamsters', OTHER_OPTION]
 
@@ -27,14 +28,16 @@ export default function WorkforceSection({
             <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
               <span className="text-sm font-medium text-gray-700">{role}</span>
             </div>
-            <input
-              type="number"
-              className="input-field"
-              placeholder="No."
-              value={workforce[role.toLowerCase()]}
-              disabled={disabled}
-              onChange={(e) => onChange(role.toLowerCase(), e.target.value)}
-            />
+            <RedlinedField path={`workforce.${role.toLowerCase()}`} value={workforce[role.toLowerCase()]} label={role} type="number">
+              <input
+                type="number"
+                className="input-field"
+                placeholder="No."
+                value={workforce[role.toLowerCase()]}
+                disabled={disabled}
+                onChange={(e) => onChange(role.toLowerCase(), e.target.value)}
+              />
+            </RedlinedField>
           </div>
         ))}
         {additionalWorkforce.map((row, index) => (
@@ -43,14 +46,18 @@ export default function WorkforceSection({
               <span className="text-sm font-medium text-gray-700">{row.label}</span>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="number"
-                className="input-field"
-                placeholder="No."
-                value={row.count}
-                disabled={disabled}
-                onChange={(e) => onChangeAdditional(index, 'count', e.target.value)}
-              />
+              <div className="flex-1 min-w-0">
+                <RedlinedField path={`additionalWorkforce[${index}].count`} value={row.count} label={row.label} type="number">
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="No."
+                    value={row.count}
+                    disabled={disabled}
+                    onChange={(e) => onChangeAdditional(index, 'count', e.target.value)}
+                  />
+                </RedlinedField>
+              </div>
               <RemoveRowButton onClick={() => onRemoveAdditional(index)} disabled={disabled} ariaLabel={`Remove ${row.label}`} />
             </div>
           </div>

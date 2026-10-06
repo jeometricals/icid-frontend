@@ -14,11 +14,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue, project roles, the admin's all-IDRs list). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
-- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the three edit calls) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -140,6 +140,38 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **The Archive** is a table (`IdrTable`, shared with the queue) of every IDR past draft, sorted by work date,
     with names from the list itself (`reporter_name`, `stage1_reviewer_name`, `re_reviewer_name`); it no longer
     calls `GET /v1/users/`. No filters yet.
+- **Reviewer edits (redlines).** While an IDR is in review, the reviewer who accepted it at its current stage (or
+  an admin) can change its fields. The backend applies each edit and logs it, so the IDR and its reports always
+  hold the current values and `field_edits` (on `GET /v1/idrs/{id}`, oldest first) is their history.
+  - **`RedlinedField`** wraps a field's normal control and reads a `RedlineProvider` around it. With no provider,
+    or no edits and no edit mode, it renders just the control. With edits it draws the redline in the control's
+    place: the original struck through, then each edit's value in blue (`#0070C0`) with its editor's initials.
+    When the current value differs from the last edit's, it adds the value with "Inspector revised after
+    return" (no initials: the inspector's saves are not logged).
+  - **Edit mode** (`EditModeToggle`, on the IDR page and on a report page) is off by default, per IDR, and carries
+    across its pages (`EditModeProvider` in `App.jsx`). On, each `RedlinedField` shows a pencil on hover or
+    focus; it opens an inline input with Save / Cancel. `lib/reviewRoles.js` `canEditInReview` decides who gets
+    the switch; the backend enforces it.
+  - **The form's own inputs stay disabled in review.** In edit mode the page's `<fieldset disabled>` lets go so
+    the inline editors work, and each section's `disabled` prop keeps its inputs off. A section rendered inside
+    a report page must therefore honour `disabled`.
+  - **Pay items past draft** are drawn by `PayItemsReview`, not the form table: rows of text; an item whose
+    quantity was revised keeps its row with the quantity crossed out and gets a blue row per revision with the
+    reviser's initials; an added item is a blue row with the adder's initials. In edit mode each item has Revise
+    (`RevisePayItemModal`, a number) and the table has Add Pay Item (`AddPayItemModal`: pick from the catalog or
+    enter by hand). Every call uses the item's `id`, never its position.
+  - **A lost race** (409) shows the toast "Someone else edited this field — reloading" and refetches the IDR.
+    Any other refusal shows under the input, which stays open.
+  - **Which fields have it:** the eight header fields; and on every report the description, comments / remarks,
+    workforce (added trades included), equipment (added equipment included), the safety checklist with its
+    remarks, and pay items. **The report-specific sections do not yet**: SWCB's operation fields, activity table
+    and inspection matrix; AC's eight sections; Conc Mix's and Conc Cyl's own sections. They show as before and
+    can't be edited by a reviewer. Giving one of them redlines is a `RedlinedField` around each input with its
+    path.
+  - **On a returned draft** the form's inputs are live and each field's history reads under it. The draft's
+    pay-item table is the normal form; its pay-item history isn't shown there.
+  - Lists other than pay items are addressed by position (`additionalWorkforce[0].count`), which the backend
+    notes as a known limitation once a returned draft's rows are reordered.
 - **Project roles (admin).** `/admin/projects/:projectId/roles` (`ProjectRolesPage`), reached from "Manage Roles"
   on the project dashboard, which only an admin sees. One row per user and role with Revoke (confirmed first; it
   warns when it is the user's only role there, since that takes them off the project), and an "Add role" row: any
@@ -171,6 +203,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
     `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`
+  - Reviewer edits: `PATCH /v1/idrs/{id}/field` · `POST /v1/idrs/{id}/pay-items/{item id}/revise` ·
+    `POST /v1/idrs/{id}/pay-items/add` (each returns the IDR with `field_edits`, as `GET /v1/idrs/{id}` does)
   - Admin: `POST /v1/idrs/{id}/admin/unlock` · `POST /v1/idrs/{id}/admin/delete` (a soft delete)
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
   - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·

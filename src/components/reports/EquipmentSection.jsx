@@ -8,6 +8,7 @@
  */
 import AddRowPicker, { OTHER_OPTION } from './AddRowPicker'
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
 
 export const STANDARD_EQUIPMENT = [
   { label: 'Front End Loader', key: 'frontEndLoader' },
@@ -42,22 +43,26 @@ export default function EquipmentSection({
             <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
               <span className="text-sm font-medium text-gray-700">{equip.label}</span>
             </div>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Model/Size"
-              value={equipment[equip.key].model}
-              disabled={disabled}
-              onChange={(e) => onChange(equip.key, { ...equipment[equip.key], model: e.target.value })}
-            />
-            <input
-              type="number"
-              className="input-field"
-              placeholder="No."
-              value={equipment[equip.key].number}
-              disabled={disabled}
-              onChange={(e) => onChange(equip.key, { ...equipment[equip.key], number: e.target.value })}
-            />
+            <RedlinedField path={`equipment.${equip.key}.model`} value={equipment[equip.key].model} label={`${equip.label} model`}>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Model/Size"
+                value={equipment[equip.key].model}
+                disabled={disabled}
+                onChange={(e) => onChange(equip.key, { ...equipment[equip.key], model: e.target.value })}
+              />
+            </RedlinedField>
+            <RedlinedField path={`equipment.${equip.key}.number`} value={equipment[equip.key].number} label={`${equip.label} count`} type="number">
+              <input
+                type="number"
+                className="input-field"
+                placeholder="No."
+                value={equipment[equip.key].number}
+                disabled={disabled}
+                onChange={(e) => onChange(equip.key, { ...equipment[equip.key], number: e.target.value })}
+              />
+            </RedlinedField>
           </div>
         ))}
         {additionalEquipment.map((row, index) => (
@@ -65,23 +70,29 @@ export default function EquipmentSection({
             <div className="flex items-center px-3 py-2 bg-gray-50 rounded">
               <span className="text-sm font-medium text-gray-700">{row.label}</span>
             </div>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Model/Size"
-              value={row.model}
-              disabled={disabled}
-              onChange={(e) => onChangeAdditional(index, 'model', e.target.value)}
-            />
-            <div className="flex items-center gap-2">
+            <RedlinedField path={`additionalEquipment[${index}].model`} value={row.model} label={`${row.label} model`}>
               <input
-                type="number"
+                type="text"
                 className="input-field"
-                placeholder="No."
-                value={row.number}
+                placeholder="Model/Size"
+                value={row.model}
                 disabled={disabled}
-                onChange={(e) => onChangeAdditional(index, 'number', e.target.value)}
+                onChange={(e) => onChangeAdditional(index, 'model', e.target.value)}
               />
+            </RedlinedField>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <RedlinedField path={`additionalEquipment[${index}].number`} value={row.number} label={`${row.label} count`} type="number">
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="No."
+                    value={row.number}
+                    disabled={disabled}
+                    onChange={(e) => onChangeAdditional(index, 'number', e.target.value)}
+                  />
+                </RedlinedField>
+              </div>
               <RemoveRowButton onClick={() => onRemoveAdditional(index)} disabled={disabled} ariaLabel={`Remove ${row.label}`} />
             </div>
           </div>

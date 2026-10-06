@@ -3,7 +3,9 @@
  * inside the IDR (add, open, delete), Export (.xlsx) and Submit. Every change is followed by a silent refetch, so
  * the page always shows what the server has. A submitted IDR renders read-only under a banner saying who submitted
  * it and when, and keeps its Export button. The title carries the IDR's status and number. From submission on, a
- * reviewer gets the review toolbar (accept, approve, return); an IDR carrying a return comment shows it.
+ * reviewer gets the review toolbar (accept, approve, return); an IDR carrying a return comment shows it. Reviewer
+ * edits of the header read as redlines; the reviewer who holds the IDR gets an edit-mode switch, which carries over to
+ * its report pages.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -31,6 +33,10 @@ import ReviewToolbar from '../components/ReviewToolbar'
 import ReturnNotice from '../components/ReturnNotice'
 import StatusBadge from '../components/StatusBadge'
 import IDRNumberBadge from '../components/IDRNumberBadge'
+import EditModeToggle from '../components/EditModeToggle'
+import Toast from '../components/Toast'
+import { RedlineProvider } from '../contexts/RedlineContext'
+import useReviewEditing from '../lib/useReviewEditing'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
@@ -76,6 +82,7 @@ export default function IDRPage() {
   // Server state. savedHeader is the last header the server confirmed; headerForm is what's typed.
   const [idr, setIdr] = useState(null) // header fields + status, without reports
   const [reports, setReports] = useState([])
+  const [fieldEdits, setFieldEdits] = useState([]) // every reviewer edit on the IDR, oldest first
   const [savedHeader, setSavedHeader] = useState(null)
   const [headerForm, setHeaderForm] = useState(null)
 
@@ -113,10 +120,11 @@ export default function IDRPage() {
 
   // Puts a getIdr response into state. resetForm replaces the typed header (initial load only).
   const applyIdr = useCallback((data, { resetForm }) => {
-    const { reports: reportRows, ...idrFields } = data
+    const { reports: reportRows, field_edits: edits = [], ...idrFields } = data
     const serverHeader = headerFormValues(idrFields)
     setIdr(idrFields)
     setReports(reportRows)
+    setFieldEdits(edits)
     setSavedHeader(serverHeader)
     if (resetForm) setHeaderForm(serverHeader)
   }, [])
@@ -164,6 +172,13 @@ export default function IDRPage() {
     await refresh()
     setBusyAction(null)
   }
+
+  // Reviewer editing: an edit answers with the IDR as it now stands; a lost race refetches it
+  const editing = useReviewEditing({
+    idr,
+    onIdrUpdated: (data) => applyIdr(data, { resetForm: false }),
+    refetch: refresh,
+  })
 
   if (loadStatus === 'loading') {
     return (
@@ -323,11 +338,36 @@ export default function IDRPage() {
           </div>
         )}
 
+        {editing.mayEdit && (
+          <div className="flex items-center justify-end gap-3 mb-4">
+            <span className="text-sm text-gray-500">
+              {editing.editMode ? 'Hover a field and click its pencil to edit it.' : 'Turn on edit mode to change a field.'}
+            </span>
+            <EditModeToggle on={editing.editMode} onToggle={editing.toggleEditMode} />
+          </div>
+        )}
+        <Toast message={editing.toast} onDone={editing.clearToast} />
+
         {/* Shared header */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="form-section-title">Time & Weather</h2>
-          <fieldset disabled={readOnly} className="min-w-0 border-0 p-0 m-0">
-            <IdrHeaderForm values={readOnly ? savedHeader : headerForm} onChange={handleHeaderChange} />
+          {/* In a reviewer's edit mode the fieldset lets go, so the inline editors work; the inputs stay disabled */}
+          <fieldset disabled={readOnly && !editing.editMode} className="min-w-0 border-0 p-0 m-0">
+            <RedlineProvider
+              value={{
+                reportId: null,
+                edits: fieldEdits,
+                isDraft: !readOnly,
+                canEdit: editing.editMode,
+                saveField: (fieldPath, newValue) => editing.saveField(null, fieldPath, newValue),
+              }}
+            >
+              <IdrHeaderForm
+                values={readOnly ? savedHeader : headerForm}
+                onChange={handleHeaderChange}
+                disabled={readOnly}
+              />
+            </RedlineProvider>
           </fieldset>
           {!readOnly && (
             <div className="flex items-center justify-end space-x-3 mt-4">
