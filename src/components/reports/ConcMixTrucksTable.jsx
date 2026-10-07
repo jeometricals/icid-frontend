@@ -3,8 +3,11 @@
  * sticker Y / N / N/A, load, batch, revolutions, discharge times, slump, air, temperature, cylinders), each removable.
  * Stateless. Props: trucks (array of truck rows), onAddTruck(), onTruckChange(index, field, value),
  * onRemoveTruck(index), disabled (makes the button and inputs natively disabled).
+ * A reviewer's edit of a cell reads in the cell (a truck is addressed by its position); one of the sticker, under
+ * its radios.
  */
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
 
 // The text / number columns, in table order; the Inspection Sticker radios sit after the first one
 const FIELDS = [
@@ -26,21 +29,29 @@ const STICKER_OPTIONS = [
   { label: 'N', value: 'N' },
   { label: 'N/A', value: 'NA' },
 ]
+const stickerLabel = (value) => STICKER_OPTIONS.find(o => o.value === value)?.label ?? value
 
 const HEADER_CLASS = 'px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap'
 
 export default function ConcMixTrucksTable({ trucks, onAddTruck, onTruckChange, onRemoveTruck, disabled = false }) {
   const fieldCell = (truck, index, field) => (
     <td key={field.key} className="px-3 py-2">
-      <input
-        type={field.type}
-        step={field.type === 'number' ? '0.01' : undefined}
-        className="input-field min-w-[6rem]"
-        aria-label={`Truck ${index + 1} ${field.label}`}
+      <RedlinedField
+        path={`trucks[${index}].${field.key}`}
         value={truck[field.key] ?? ''}
-        disabled={disabled}
-        onChange={(e) => onTruckChange(index, field.key, e.target.value)}
-      />
+        label={`Truck ${index + 1} ${field.label}`}
+        type={field.type}
+      >
+        <input
+          type={field.type}
+          step={field.type === 'number' ? '0.01' : undefined}
+          className="input-field min-w-[6rem]"
+          aria-label={`Truck ${index + 1} ${field.label}`}
+          value={truck[field.key] ?? ''}
+          disabled={disabled}
+          onChange={(e) => onTruckChange(index, field.key, e.target.value)}
+        />
+      </RedlinedField>
     </td>
   )
 
@@ -90,6 +101,16 @@ export default function ConcMixTrucksTable({ trucks, onAddTruck, onTruckChange, 
                         </label>
                       ))}
                     </div>
+                    {/* The answer itself is the three radios; its edits, and the reviewer's pencil, sit here */}
+                    <RedlinedField
+                      path={`trucks[${index}].inspectionSticker`}
+                      value={truck.inspectionSticker}
+                      label={`Truck ${index + 1} Inspection Sticker`}
+                      type="select"
+                      options={STICKER_OPTIONS}
+                      format={stickerLabel}
+                      toRequest={(text) => (text === '' ? null : text)}
+                    />
                   </td>
                   {OTHER_FIELDS.map(field => fieldCell(truck, index, field))}
                   <td className="px-3 py-2">

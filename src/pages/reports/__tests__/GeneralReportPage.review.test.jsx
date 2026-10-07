@@ -484,6 +484,30 @@ describe('report page in review — approving pay items', () => {
     expect(approveButton(2)).toBeInTheDocument()
   })
 
+  it('approves every item left with Approve All, one call each, and then drops the button', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    expect(toggle()).toHaveTextContent('Edit mode: off')
+    await user.click(screen.getByRole('button', { name: 'Approve All' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Approve All|Approving/ })).not.toBeInTheDocument())
+    expect(api.approvePayItem.mock.calls).toEqual([[IDR_ID, 'item-1'], [IDR_ID, 'item-2']])
+    expect(payRows()).toEqual([['pay-item-row', '60.00OE'], ['pay-item-row', '29.00OE']])
+    expect(approveButton(1)).not.toBeInTheDocument()
+    expect(approveButton(2)).not.toBeInTheDocument()
+  })
+
+  it('stops Approve All at the item the backend refuses and names it in a toast', async () => {
+    api.approvePayItem.mockImplementationOnce(async () => { throw Object.assign(new Error('Pay item not found in this IDR'), { status: 404 }) })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Approve All' }))
+    expect(await screen.findByRole('status')).toHaveTextContent("Couldn't approve 4.13 AAS — Sidewalk: Pay item not found in this IDR")
+    expect(api.approvePayItem).toHaveBeenCalledTimes(1)
+    expect(approveButton(2)).toBeEnabled()
+  })
+
   it('needs no approval of an item the reviewer has just revised', async () => {
     const user = userEvent.setup()
     renderPage()

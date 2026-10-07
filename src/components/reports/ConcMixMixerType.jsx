@@ -2,7 +2,13 @@
  * The Concrete Truck & Mix Info "Mixer Type" card: Ready Mix or Other, with a text box for the specific type once
  * Other is picked. Stateless. Props: value ({ type: 'readyMix' | 'other' | '', otherLabel }),
  * onChange(nextValue) with the whole updated value, disabled (makes the inputs natively disabled).
+ * A reviewer's edit of the type reads under the radios; one of the specific type, in place of its text box.
  */
+import RedlinedField from '../RedlinedField'
+
+const TYPES = [{ value: 'readyMix', label: 'Ready Mix' }, { value: 'other', label: 'Other' }]
+const typeLabel = (value) => TYPES.find(t => t.value === value)?.label ?? value
+
 export default function ConcMixMixerType({ value, onChange, disabled = false }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -32,18 +38,29 @@ export default function ConcMixMixerType({ value, onChange, disabled = false }) 
             <span>Other</span>
           </label>
           {value.type === 'other' && (
-            <input
-              type="text"
-              className="input-field w-56"
-              placeholder="Specify mixer type"
-              aria-label="Other mixer type"
-              value={value.otherLabel}
-              disabled={disabled}
-              onChange={(e) => onChange({ ...value, otherLabel: e.target.value })}
-            />
+            <RedlinedField path="mixerType.otherLabel" value={value.otherLabel} label="Other mixer type">
+              <input
+                type="text"
+                className="input-field w-56"
+                placeholder="Specify mixer type"
+                aria-label="Other mixer type"
+                value={value.otherLabel}
+                disabled={disabled}
+                onChange={(e) => onChange({ ...value, otherLabel: e.target.value })}
+              />
+            </RedlinedField>
           )}
         </div>
       </div>
+      {/* The answer itself is the two radios; its edits, and the reviewer's pencil, sit here */}
+      <RedlinedField
+        path="mixerType.type"
+        value={value.type}
+        label="Mixer Type"
+        type="select"
+        options={TYPES}
+        format={typeLabel}
+      />
     </div>
   )
 }

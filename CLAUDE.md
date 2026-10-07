@@ -164,10 +164,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Any other refusal shows under the input, which stays open.
   - **Which fields have it:** the eight header fields; and on every report the description, comments / remarks,
     workforce (added trades included), equipment (added equipment included), the safety checklist with its
-    remarks, and pay items. **The report-specific sections do not yet**: SWCB's operation fields, activity table
-    and inspection matrix; AC's eight sections; Conc Mix's and Conc Cyl's own sections. They show as before and
-    can't be edited by a reviewer. Giving one of them redlines is a `RedlinedField` around each input with its
-    path.
+    remarks, and pay items; and every Conc Mix section, by the keys the report stores (`locationOfUse.curb`,
+    `mixerType.type`, `mixerType.otherLabel`, `trucks[0].slump`, `concreteSpecs.slumpMin`,
+    `materialUsage.batchReportNo`, `remarks`). **The other report-specific sections do not yet**: SWCB's operation
+    fields, activity table and inspection matrix; AC's eight sections; Conc Cyl's own sections (they wait for the
+    Conc Cyl form and export slice). They show as before and can't be edited by a reviewer. Giving one of them
+    redlines is a `RedlinedField` around each input with its path.
+  - **A checkbox or radio group** keeps its own (disabled) control and gets a childless `RedlinedField` beside it
+    with `type="select"`: its options hold the stored values (`'true'` / `'false'` with `toRequest` back to a
+    boolean, `readyMix` / `other`, `Y` / `N` / `NA`) and `format` gives how one reads. The select opens on the
+    stored value.
   - **On a returned draft** the form's inputs are live and each field's history reads under it. The draft's
     pay-item table is the normal form; its pay-item history isn't shown there.
   - Lists other than pay items are addressed by position (`additionalWorkforce[0].count`), which the backend
@@ -201,6 +207,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     response. So the shell's fieldset lets go for that reviewer, not only in edit mode. Approvers' initials sit
     beside the current quantity (each reviewer's latest at each stage); one for a quantity the item no longer
     has is greyed and struck, with the tooltip "Approval superseded — re-approve or revise to attest."
+  - **Approve All** sits above the table for that reviewer while the report has an item they haven't touched. It
+    posts the same approve call for each such item, one after another (each response's IDR is taken before the
+    next call), with no confirmation; the button reads "Approving..." meanwhile. It stops at the first refusal
+    with a toast naming the item, and does not retry.
   - **On the IDR page** the two approve buttons in `ReviewToolbar` carry "N un-approved items" and stay enabled:
     the backend is the gate. On its 400 the toolbar toasts the detail, and the page opens the report holding the
     first untouched item with `state.payItemGate = {itemId, message}`; `useReportForm` passes that on, the shell

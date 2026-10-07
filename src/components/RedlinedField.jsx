@@ -38,7 +38,8 @@ export default function RedlinedField({
   }
 
   const startEditing = () => {
-    const current = format(value)
+    // A select opens on the stored value (what its options hold); any other input on the value as it reads
+    const current = type === 'select' ? value : format(value)
     setDraft(current === null || current === undefined ? '' : String(current))
     setError(null)
   }

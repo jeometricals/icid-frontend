@@ -228,6 +228,14 @@ describe('RedlinedField — editing', () => {
     expect(saveField).toHaveBeenCalledWith('workforce.foremen', 'NA')
   })
 
+  it('opens a select on the stored value, not on how it reads', async () => {
+    const user = userEvent.setup()
+    const options = [{ value: 'readyMix', label: 'Ready Mix' }, { value: 'other', label: 'Other' }]
+    renderField({ value: 'readyMix', canEdit: true, type: 'select', options, format: v => options.find(o => o.value === v)?.label ?? v })
+    await user.click(pencil())
+    expect(screen.getByLabelText('New value for Foremen')).toHaveValue('readyMix')
+  })
+
   it('offers a textarea for long text', async () => {
     const user = userEvent.setup()
     renderField({ value: 'Poured curb', canEdit: true, type: 'textarea' })

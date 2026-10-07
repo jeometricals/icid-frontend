@@ -5,6 +5,7 @@ import {
   payItemAddEdit, payItemAttestations, payItemPath, sameValue,
 } from '../../lib/fieldEdits'
 import RedlinedField, { InitialsBadge } from '../RedlinedField'
+import Toast from '../Toast'
 import AddPayItemModal from './AddPayItemModal'
 import RevisePayItemModal from './RevisePayItemModal'
 
@@ -18,7 +19,9 @@ const CELL = 'px-4 py-2 text-sm align-top'
  * counts. An item a reviewer added is a blue row with the adder's initials. A reviewer who approved an item as it
  * stands has their initials beside its current quantity; an approval that no longer counts (of a quantity the item
  * no longer has, or from before its stage was last accepted) is greyed out ("Approval superseded"). The stage's reviewer gets an Approve button on each item they haven't approved,
- * revised or added at this stage, and, in edit mode, a Revise button on each item and an Add Pay Item button.
+ * revised or added at this stage, an Approve All button above the table while any such item is left (it approves
+ * them one after another and stops at the first refusal, with a toast naming the item), and, in edit mode, a Revise
+ * button on each item and an Add Pay Item button.
  * The item the backend's gate sent them here for is outlined and scrolled into view.
  * Reads the edits and the edit calls from the RedlineProvider around it.
  * Props: payItems (the report's saved pay items, each with its id), contractItems (the project's catalog, for the
@@ -32,10 +35,16 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
   const [error, setError] = useState(null)
   const [approving, setApproving] = useState(null) // the id of the item whose approval is being sent
   const [approveError, setApproveError] = useState(null)
+  const [approvingAll, setApprovingAll] = useState(false)
+  const [allToast, setAllToast] = useState(null) // why Approve All stopped
 
   const canEdit = Boolean(redline?.canEdit)
   const attesting = redline?.attesting ?? null
   const showActions = canEdit || Boolean(attesting)
+  // The items this reviewer has still to attest to, on this report
+  const untouched = attesting
+    ? payItems.filter(item => item.id && !isPayItemTouched(redline.edits, redline.reportId, item, attesting))
+    : []
 
   // Approves one item as it stands; the page takes the IDR the backend answers with
   const approve = async (item) => {
@@ -44,6 +53,24 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
     const result = await redline.approve(item.id)
     setApproving(null)
     if (!result.ok && !result.conflict) setApproveError(`Couldn't approve the item: ${result.message}`)
+  }
+
+  // Approves every untouched item, one call after another, so each response's IDR lands before the next call.
+  // Stops at the first refusal and names the item; on a conflict the page has reloaded and said so.
+  const approveAll = async () => {
+    setApprovingAll(true)
+    setApproveError(null)
+    setAllToast(null)
+    for (const item of untouched) {
+      setApproving(item.id)
+      const result = await redline.approve(item.id)
+      if (!result.ok) {
+        if (!result.conflict) setAllToast(`Couldn't approve ${itemName(item, payItems)}: ${result.message}`)
+        break
+      }
+    }
+    setApproving(null)
+    setApprovingAll(false)
   }
 
   // Runs a revise or an add; its dialog closes on success, and on a conflict (the page has reloaded)
@@ -66,11 +93,28 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="form-section-title mb-0">Pay Items</h3>
-        {canEdit && (
-          <button type="button" onClick={() => setAdding(true)} disabled={busy} className="btn-secondary text-sm">
-            Add Pay Item
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {(untouched.length > 0 || approvingAll) && (
+            <button
+              type="button"
+              onClick={approveAll}
+              disabled={busy || approving !== null}
+              className="btn-primary text-sm"
+            >
+              {approvingAll ? 'Approving...' : 'Approve All'}
+            </button>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              disabled={busy || approvingAll}
+              className="btn-secondary text-sm"
+            >
+              Add Pay Item
+            </button>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -99,21 +143,20 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
                   reportId={redline?.reportId}
                   acceptedAt={redline?.acceptedAt}
                   canEdit={canEdit && Boolean(item.id)}
-                  canApprove={Boolean(attesting) && Boolean(item.id)
-                    && !isPayItemTouched(redline.edits, redline.reportId, item, attesting)}
+                  canApprove={untouched.includes(item)}
                   approving={approving === item.id}
                   busy={busy || approving !== null}
                   highlighted={Boolean(item.id) && item.id === redline?.highlightItemId}
                   showActions={showActions}
                   onApprove={() => approve(item)}
-                  onRevise={() => { setError(null); setRevising(item) }}
-                />
+                  onRevise={() => { setError(null); setRevising(item) }}                />
               ))
             )}
           </tbody>
         </table>
       </div>
       {approveError && <p role="alert" className="text-sm text-red-600 mt-3">{approveError}</p>}
+      <Toast message={allToast} onDone={() => setAllToast(null)} duration={8000} />
 
       {revising && (
         <RevisePayItemModal
@@ -135,6 +178,11 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
       )}
     </div>
   )
+}
+
+// An item as a message names it: "4.13 AAS — Sidewalk", or its place in the table when it has neither
+function itemName(item, payItems) {
+  return [item.itemNo, item.description].filter(Boolean).join(' — ') || `pay item ${payItems.indexOf(item) + 1}`
 }
 
 // The approvals of one item to show beside its current quantity: each reviewer's latest at each stage, oldest first.

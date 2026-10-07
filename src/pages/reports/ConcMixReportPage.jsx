@@ -2,7 +2,8 @@
  * Concrete Truck & Mix Info (CONC_MIX) addendum, at /project/:projectId/idr/:idrId/conc-mix/:reportId.
  * Same load / Save Draft / read-only flow as the other report pages (useReportForm + ReportPageShell). Its body follows
  * the DDC template: Location of Use, Mixer Type, the Trucks table, Concrete Specifications, Material Usage and Remarks
- * (no Description of Work block: the trucks table and its metadata are the description).
+ * (no Description of Work block: the trucks table and its metadata are the description). In review every one of
+ * those fields takes reviewer edits (each section wraps its inputs in RedlinedField with the stored key).
  */
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'

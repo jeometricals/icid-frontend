@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PayItemsReview from '../PayItemsReview'
 import { RedlineProvider } from '../../../contexts/RedlineContext'
@@ -421,6 +421,79 @@ describe('PayItemsReview — Approve', () => {
     const badges = within(quantityCell(2)).getAllByText('OE')
     expect(badges).toHaveLength(1)
     expect(badges[0]).not.toHaveAttribute('data-stale')
+  })
+
+  describe('Approve All', () => {
+    const approveAll = () => screen.queryByRole('button', { name: /^Approve All$|^Approving\.\.\.$/ })
+
+    it('is offered to the stage\'s reviewer while an item is left, without edit mode', () => {
+      renderTable({ attesting: REVIEWER })
+      expect(approveAll()).toBeEnabled()
+      expect(approveAll()).toHaveTextContent('Approve All')
+    })
+
+    it('is not offered to anyone else, edit mode or not', () => {
+      renderTable({ canEdit: true, attesting: null })
+      expect(approveAll()).not.toBeInTheDocument()
+    })
+
+    it('is hidden once the reviewer has attested to every item on the report', () => {
+      renderTable({ edits: [mine(1, 'item-1', '60.00'), mine(2, 'item-2', '29.00')], attesting: REVIEWER })
+      expect(approveAll()).not.toBeInTheDocument()
+    })
+
+    it('is hidden when the only item left has no id', () => {
+      renderTable({ payItems: [{ ...SIDEWALK, id: undefined }], attesting: REVIEWER })
+      expect(approveAll()).not.toBeInTheDocument()
+    })
+
+    it('approves each untouched item by its id, in table order, with no confirmation', async () => {
+      const third = { ...CURB, id: 'item-3', itemNo: '4.05 A' }
+      const user = userEvent.setup()
+      renderTable({ payItems: [SIDEWALK, CURB, third], edits: [mine(1, 'item-2', '29.00')], attesting: REVIEWER })
+      await user.click(approveAll())
+      expect(approve.mock.calls).toEqual([['item-1'], ['item-3']])
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('sends one call at a time and reads "Approving..." until the last has answered', async () => {
+      const answers = []
+      approve.mockImplementation(() => new Promise(resolve => answers.push(resolve)))
+      const user = userEvent.setup()
+      renderTable({ attesting: REVIEWER })
+      await user.click(approveAll())
+      expect(approveAll()).toHaveTextContent('Approving...')
+      expect(approveAll()).toBeDisabled()
+      expect(approveButton(2)).toBeDisabled()
+      expect(approve).toHaveBeenCalledTimes(1) // the second waits for the first
+      answers[0]({ ok: true })
+      await waitFor(() => expect(approve).toHaveBeenCalledTimes(2))
+      expect(approveAll()).toHaveTextContent('Approving...')
+      answers[1]({ ok: true })
+      await waitFor(() => expect(approveAll()).toHaveTextContent('Approve All'))
+    })
+
+    it('stops at the first refusal and names the item in a toast, without retrying', async () => {
+      const third = { ...CURB, id: 'item-3' }
+      approve.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, message: 'Pay item not found in this IDR' })
+      const user = userEvent.setup()
+      renderTable({ payItems: [SIDEWALK, CURB, third], attesting: REVIEWER })
+      await user.click(approveAll())
+      expect(await screen.findByRole('status')).toHaveTextContent("Couldn't approve 4.08 AA — Curb: Pay item not found in this IDR")
+      expect(approve.mock.calls).toEqual([['item-1'], ['item-2']])
+      expect(approveAll()).toBeEnabled()
+    })
+
+    it('stops on a conflict and says nothing more: the page has reloaded and said so', async () => {
+      approve.mockResolvedValue({ ok: false, conflict: true })
+      const user = userEvent.setup()
+      renderTable({ attesting: REVIEWER })
+      await user.click(approveAll())
+      await waitFor(() => expect(approveAll()).toBeEnabled())
+      expect(approve).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
   })
 
   it('outlines the item the gate sent the reviewer here for and scrolls to it', () => {
