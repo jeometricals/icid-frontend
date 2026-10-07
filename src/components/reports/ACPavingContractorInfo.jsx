@@ -1,8 +1,10 @@
 /**
  * The Asphaltic Concrete "Paving Contractor Info" card: paving contractor, subcontractor and the Rice No. / Specific
  * Gravity the contractor supplies. Stateless. Props: value ({ pavingContractorName, subcontractor, riceNo }),
- * onChange(field, value), disabled (makes the inputs natively disabled).
+ * onChange(field, value), disabled (makes the inputs natively disabled). A reviewer's edit of a field reads in its place.
  */
+import RedlinedField from '../RedlinedField'
+
 const FIELDS = [
   { label: 'Paving Contractor Name', key: 'pavingContractorName', type: 'text' },
   { label: 'Subcontractor (if any)', key: 'subcontractor', type: 'text' },
@@ -17,15 +19,17 @@ export default function ACPavingContractorInfo({ value, onChange, disabled = fal
         {FIELDS.map(field => (
           <div key={field.key}>
             <label htmlFor={`ac-${field.key}`} className="input-label">{field.label}</label>
-            <input
-              id={`ac-${field.key}`}
-              type={field.type}
-              step={field.step}
-              className="input-field"
-              value={value[field.key] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onChange(field.key, e.target.value)}
-            />
+            <RedlinedField path={`pavingContractor.${field.key}`} value={value[field.key] ?? ''} label={field.label} type={field.type}>
+              <input
+                id={`ac-${field.key}`}
+                type={field.type}
+                step={field.step}
+                className="input-field"
+                value={value[field.key] ?? ''}
+                disabled={disabled}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            </RedlinedField>
             {field.helper && <p className="text-xs text-gray-500 mt-1">{field.helper}</p>}
           </div>
         ))}

@@ -2,7 +2,10 @@
  * The Asphaltic Concrete requirements checklist: seven AC-specific items, each answered Y / N / N/A with a Remarks
  * input (separate from the shared end-of-day safety checklist). Stateless. Props: value ({ [key]: { value: '' | 'Y' |
  * 'N' | 'NA', remarks } }), onChange(nextValue) with the whole updated object, disabled (makes the inputs natively disabled).
+ * A reviewer's edit of an answer reads under the item's name; one of a remark, in the Remarks cell.
  */
+import RedlinedField from '../RedlinedField'
+
 const ITEMS = [
   { label: 'Subgrade Compacted per Spec or Approved Alternative', key: 'subgradeCompacted' },
   { label: 'Roadway Subgrade/Base Surface Sufficiently Clean and Dry', key: 'roadwayCleanDry' },
@@ -18,6 +21,7 @@ const OPTIONS = [
   { label: 'N', value: 'N' },
   { label: 'N/A', value: 'NA' },
 ]
+const answerLabel = (value) => OPTIONS.find(o => o.value === value)?.label ?? value
 
 const HEADER_CLASS = 'px-4 py-3 text-xs font-medium text-gray-500 uppercase'
 
@@ -43,7 +47,18 @@ export default function ACRequirementsChecklist({ value, onChange, disabled = fa
           <tbody className="bg-white divide-y divide-gray-200">
             {ITEMS.map(item => (
               <tr key={item.key}>
-                <td className="px-4 py-3 text-sm text-gray-900">{item.label}</td>
+                <td className="px-4 py-3 text-sm text-gray-900">
+                  {item.label}
+                  {/* The answer itself is the three radios; its edits, and the reviewer's pencil, sit here */}
+                  <RedlinedField
+                    path={`acRequirements.${item.key}.value`}
+                    value={value[item.key]?.value}
+                    label={item.label}
+                    type="select"
+                    options={OPTIONS}
+                    format={answerLabel}
+                  />
+                </td>
                 {OPTIONS.map(option => (
                   <td key={option.value} className="px-4 py-3 text-center">
                     <input
@@ -58,15 +73,21 @@ export default function ACRequirementsChecklist({ value, onChange, disabled = fa
                   </td>
                 ))}
                 <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Remarks"
-                    aria-label={`${item.label} Remarks`}
+                  <RedlinedField
+                    path={`acRequirements.${item.key}.remarks`}
                     value={value[item.key]?.remarks ?? ''}
-                    disabled={disabled}
-                    onChange={(e) => updateItem(item.key, 'remarks', e.target.value)}
-                  />
+                    label={`${item.label} Remarks`}
+                  >
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Remarks"
+                      aria-label={`${item.label} Remarks`}
+                      value={value[item.key]?.remarks ?? ''}
+                      disabled={disabled}
+                      onChange={(e) => updateItem(item.key, 'remarks', e.target.value)}
+                    />
+                  </RedlinedField>
                 </td>
               </tr>
             ))}

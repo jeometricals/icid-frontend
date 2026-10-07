@@ -3,8 +3,11 @@
  * (location, ticket number, temperature in °F), each removable. Stateless. Props: tickets (array of
  * { location, ticketNo, temperature }), onAddTicket(), onTicketChange(index, field, value), onRemoveTicket(index),
  * disabled (makes the button and inputs natively disabled).
+ * A reviewer's edit of a cell reads in the cell (a ticket is addressed by its position). A reviewer neither adds nor
+ * removes a ticket.
  */
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
 
 const FIELDS = [
   { label: 'Location', key: 'location', type: 'text' },
@@ -45,15 +48,24 @@ export default function ACDeliveryTicketLog({ tickets, onAddTicket, onTicketChan
                 {FIELDS.map(field => (
                   <td key={field.key} className="px-4 py-2">
                     <div className="flex items-center gap-2">
-                      <input
-                        type={field.type}
-                        step={field.type === 'number' ? '0.01' : undefined}
-                        className="input-field"
-                        aria-label={`Ticket ${index + 1} ${field.label}`}
-                        value={ticket[field.key] ?? ''}
-                        disabled={disabled}
-                        onChange={(e) => onTicketChange(index, field.key, e.target.value)}
-                      />
+                      <div className="flex-1 min-w-0">
+                        <RedlinedField
+                          path={`deliveryTickets[${index}].${field.key}`}
+                          value={ticket[field.key] ?? ''}
+                          label={`Ticket ${index + 1} ${field.label}`}
+                          type={field.type}
+                        >
+                          <input
+                            type={field.type}
+                            step={field.type === 'number' ? '0.01' : undefined}
+                            className="input-field"
+                            aria-label={`Ticket ${index + 1} ${field.label}`}
+                            value={ticket[field.key] ?? ''}
+                            disabled={disabled}
+                            onChange={(e) => onTicketChange(index, field.key, e.target.value)}
+                          />
+                        </RedlinedField>
+                      </div>
                       {field.suffix && <span className="text-sm text-gray-500">{field.suffix}</span>}
                     </div>
                   </td>

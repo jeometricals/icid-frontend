@@ -1,7 +1,10 @@
 /**
  * The Asphaltic Concrete "Theoretical Max Density (from A/C Plant)" card: the Top and Binder course densities.
  * Stateless. Props: value ({ top, binder }), onChange(field, value), disabled (makes the inputs natively disabled).
+ * A reviewer's edit of a field reads in its place.
  */
+import RedlinedField from '../RedlinedField'
+
 const FIELDS = [
   { label: 'Top', key: 'top' },
   { label: 'Binder', key: 'binder' },
@@ -15,15 +18,22 @@ export default function ACMaxDensity({ value, onChange, disabled = false }) {
         {FIELDS.map(field => (
           <div key={field.key}>
             <label htmlFor={`ac-max-density-${field.key}`} className="input-label">{field.label}</label>
-            <input
-              id={`ac-max-density-${field.key}`}
-              type="number"
-              step="0.01"
-              className="input-field"
+            <RedlinedField
+              path={`maxDensity.${field.key}`}
               value={value[field.key] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onChange(field.key, e.target.value)}
-            />
+              label={`Max Density ${field.label}`}
+              type="number"
+            >
+              <input
+                id={`ac-max-density-${field.key}`}
+                type="number"
+                step="0.01"
+                className="input-field"
+                value={value[field.key] ?? ''}
+                disabled={disabled}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            </RedlinedField>
           </div>
         ))}
       </div>

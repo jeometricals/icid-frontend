@@ -3,8 +3,11 @@
  * (item, mix, stations, lane, dimensions, course, design depth, area, weight), each removable. Stateless.
  * Props: courses (array of course rows), onAddCourse(), onCourseChange(index, field, value), onRemoveCourse(index),
  * disabled (makes the button and inputs natively disabled).
+ * A reviewer's edit of a cell reads in the cell (a course is addressed by its position). A reviewer neither adds nor
+ * removes a course.
  */
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
 
 const FIELDS = [
   { label: 'Item No.', key: 'itemNo', type: 'text' },
@@ -51,15 +54,22 @@ export default function ACPavementCourseTable({ courses, onAddCourse, onCourseCh
                 <tr key={index}>
                   {FIELDS.map(field => (
                     <td key={field.key} className="px-3 py-2">
-                      <input
-                        type={field.type}
-                        step={field.type === 'number' ? '0.01' : undefined}
-                        className="input-field min-w-[6rem]"
-                        aria-label={`Course ${index + 1} ${field.label}`}
+                      <RedlinedField
+                        path={`pavementCourses[${index}].${field.key}`}
                         value={course[field.key] ?? ''}
-                        disabled={disabled}
-                        onChange={(e) => onCourseChange(index, field.key, e.target.value)}
-                      />
+                        label={`Course ${index + 1} ${field.label}`}
+                        type={field.type}
+                      >
+                        <input
+                          type={field.type}
+                          step={field.type === 'number' ? '0.01' : undefined}
+                          className="input-field min-w-[6rem]"
+                          aria-label={`Course ${index + 1} ${field.label}`}
+                          value={course[field.key] ?? ''}
+                          disabled={disabled}
+                          onChange={(e) => onCourseChange(index, field.key, e.target.value)}
+                        />
+                      </RedlinedField>
                     </td>
                   ))}
                   <td className="px-3 py-2">

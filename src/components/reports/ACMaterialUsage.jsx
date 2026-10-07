@@ -2,9 +2,11 @@
  * An Asphaltic Concrete "Material Usage" card, mounted once for the Top course and once for the Binder: ticket count
  * and range plus the quantities received, used and wasted. Stateless. Props: heading (e.g. 'Material Usage — Top'),
  * value ({ noOfTickets, firstTicketNo, lastTicketNo, qtyReceived, qtyUsed, qtyWasted }), onChange(field, value),
- * disabled (makes the inputs natively disabled).
+ * disabled (makes the inputs natively disabled), path (the report key this card is saved under: 'materialUsageTop'
+ * or 'materialUsageBinder', for its reviewer edits, which read in a field's place).
  */
 import { useId } from 'react'
+import RedlinedField from '../RedlinedField'
 
 const FIELDS = [
   { label: 'No. of Tickets', key: 'noOfTickets', type: 'number' },
@@ -15,7 +17,7 @@ const FIELDS = [
   { label: 'Qty Wasted/Rejected', key: 'qtyWasted', type: 'number' },
 ]
 
-export default function ACMaterialUsage({ heading, value, onChange, disabled = false }) {
+export default function ACMaterialUsage({ heading, value, onChange, disabled = false, path }) {
   // Mounted twice on one page, so the label / input ids can't be fixed strings
   const idPrefix = useId()
   return (
@@ -25,15 +27,22 @@ export default function ACMaterialUsage({ heading, value, onChange, disabled = f
         {FIELDS.map(field => (
           <div key={field.key}>
             <label htmlFor={`${idPrefix}-${field.key}`} className="input-label">{field.label}</label>
-            <input
-              id={`${idPrefix}-${field.key}`}
-              type={field.type}
-              step={field.type === 'number' ? '0.01' : undefined}
-              className="input-field"
+            <RedlinedField
+              path={`${path}.${field.key}`}
               value={value[field.key] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onChange(field.key, e.target.value)}
-            />
+              label={`${heading}: ${field.label}`}
+              type={field.type}
+            >
+              <input
+                id={`${idPrefix}-${field.key}`}
+                type={field.type}
+                step={field.type === 'number' ? '0.01' : undefined}
+                className="input-field"
+                value={value[field.key] ?? ''}
+                disabled={disabled}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            </RedlinedField>
           </div>
         ))}
       </div>

@@ -1,8 +1,10 @@
 /**
  * The Asphaltic Concrete "Tack Coat" card: gallons applied, gallons per square yard and the application method / type.
  * Stateless. Props: value ({ noOfGallons, gallonsPerSy, applicationMethod }), onChange(field, value),
- * disabled (makes the inputs natively disabled).
+ * disabled (makes the inputs natively disabled). A reviewer's edit of a field reads in its place.
  */
+import RedlinedField from '../RedlinedField'
+
 const QUANTITY_FIELDS = [
   { label: 'No. of Gallons', key: 'noOfGallons' },
   { label: 'Gallons per S.Y.', key: 'gallonsPerSy' },
@@ -16,27 +18,35 @@ export default function ACTackCoat({ value, onChange, disabled = false }) {
         {QUANTITY_FIELDS.map(field => (
           <div key={field.key}>
             <label htmlFor={`ac-tack-${field.key}`} className="input-label">{field.label}</label>
-            <input
-              id={`ac-tack-${field.key}`}
-              type="number"
-              step="0.01"
-              className="input-field"
-              value={value[field.key] ?? ''}
-              disabled={disabled}
-              onChange={(e) => onChange(field.key, e.target.value)}
-            />
+            <RedlinedField path={`tackCoat.${field.key}`} value={value[field.key] ?? ''} label={field.label} type="number">
+              <input
+                id={`ac-tack-${field.key}`}
+                type="number"
+                step="0.01"
+                className="input-field"
+                value={value[field.key] ?? ''}
+                disabled={disabled}
+                onChange={(e) => onChange(field.key, e.target.value)}
+              />
+            </RedlinedField>
           </div>
         ))}
         <div className="md:col-span-2">
           <label htmlFor="ac-tack-applicationMethod" className="input-label">Tack Coat Application Method / Type</label>
-          <input
-            id="ac-tack-applicationMethod"
-            type="text"
-            className="input-field"
+          <RedlinedField
+            path="tackCoat.applicationMethod"
             value={value.applicationMethod ?? ''}
-            disabled={disabled}
-            onChange={(e) => onChange('applicationMethod', e.target.value)}
-          />
+            label="Tack Coat Application Method / Type"
+          >
+            <input
+              id="ac-tack-applicationMethod"
+              type="text"
+              className="input-field"
+              value={value.applicationMethod ?? ''}
+              disabled={disabled}
+              onChange={(e) => onChange('applicationMethod', e.target.value)}
+            />
+          </RedlinedField>
         </div>
       </div>
     </div>

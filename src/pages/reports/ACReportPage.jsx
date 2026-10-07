@@ -159,6 +159,7 @@ export default function ACReportPage() {
 
       <ACMaterialUsage
         heading="Material Usage — Top"
+        path="materialUsageTop"
         value={formData.materialUsageTop}
         onChange={nestedChange('materialUsageTop')}
         disabled={isReadOnly}
@@ -166,6 +167,7 @@ export default function ACReportPage() {
 
       <ACMaterialUsage
         heading="Material Usage — Binder"
+        path="materialUsageBinder"
         value={formData.materialUsageBinder}
         onChange={nestedChange('materialUsageBinder')}
         disabled={isReadOnly}

@@ -1,8 +1,10 @@
 /**
  * The Asphaltic Concrete "Temperature" card: surface and ambient temperatures at the start and finish of paving, in
  * °F, as a 2 × 2 grid. Stateless. Props: value ({ surfaceStart, surfaceFinish, ambientStart, ambientFinish }),
- * onChange(field, value), disabled (makes the inputs natively disabled).
+ * onChange(field, value), disabled (makes the inputs natively disabled). A reviewer's edit of a field reads in its place.
  */
+import RedlinedField from '../RedlinedField'
+
 const ROWS = [
   { label: 'Surface', start: 'surfaceStart', finish: 'surfaceFinish' },
   { label: 'Ambient', start: 'ambientStart', finish: 'ambientFinish' },
@@ -11,15 +13,19 @@ const ROWS = [
 export default function ACTemperature({ value, onChange, disabled = false }) {
   const temperatureInput = (field, label) => (
     <div key={field} className="flex items-center gap-2">
-      <input
-        type="number"
-        step="0.01"
-        className="input-field"
-        aria-label={label}
-        value={value[field] ?? ''}
-        disabled={disabled}
-        onChange={(e) => onChange(field, e.target.value)}
-      />
+      <div className="flex-1 min-w-0">
+        <RedlinedField path={`temperature.${field}`} value={value[field] ?? ''} label={label} type="number">
+          <input
+            type="number"
+            step="0.01"
+            className="input-field"
+            aria-label={label}
+            value={value[field] ?? ''}
+            disabled={disabled}
+            onChange={(e) => onChange(field, e.target.value)}
+          />
+        </RedlinedField>
+      </div>
       <span className="text-sm text-gray-500">°F</span>
     </div>
   )

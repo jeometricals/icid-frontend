@@ -175,8 +175,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `mixerType.type`, `mixerType.otherLabel`, `trucks[0].slump`, `concreteSpecs.slumpMin`,
     `materialUsage.batchReportNo`, `remarks`); and SWCB's own sections (`structural`, `subcontractor`,
     `activity.excavation.fromStation`, `inspectionMatrix.subgradeCompacted.sidewalk`,
-    `inspectionMatrix.otherCuringMethods.base`), except the matrix cells the form greys out, which take no edits.
-    **The other report-specific sections do not yet**: AC's eight sections; Conc Cyl's own sections (they wait for the
+    `inspectionMatrix.otherCuringMethods.base`), except the matrix cells the form greys out, which take no edits;
+    and AC's own sections (`pavingContractor.riceNo`, `temperature.surfaceStart`, `maxDensity.top`,
+    `pavementCourses[0].width`, `materialUsageTop.qtyUsed`, `materialUsageBinder.qtyUsed`,
+    `acRequirements.subgradeCompacted.value` and `.remarks`, `tackCoat.noOfGallons`,
+    `deliveryTickets[0].temperature`). A reviewer can't add a pavement course or a delivery ticket (only a truck).
+    **The only report-specific sections that do not yet** are Conc Cyl's own (they wait for the
     Conc Cyl form and export slice). They show as before and can't be edited by a reviewer. Giving one of them
     redlines is a `RedlinedField` around each input with its path.
   - **A checkbox or radio group** keeps its own (disabled) control and gets a childless `RedlinedField` beside it
