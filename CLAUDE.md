@@ -171,10 +171,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Any other refusal shows under the input, which stays open.
   - **Which fields have it:** the eight header fields; and on every report the description, comments / remarks,
     workforce (added trades included), equipment (added equipment included), the safety checklist with its
-    remarks, and pay items; and every Conc Mix section, by the keys the report stores (`locationOfUse.curb`,
+    remarks, and pay items; every Conc Mix section, by the keys the report stores (`locationOfUse.curb`,
     `mixerType.type`, `mixerType.otherLabel`, `trucks[0].slump`, `concreteSpecs.slumpMin`,
-    `materialUsage.batchReportNo`, `remarks`). **The other report-specific sections do not yet**: SWCB's operation
-    fields, activity table and inspection matrix; AC's eight sections; Conc Cyl's own sections (they wait for the
+    `materialUsage.batchReportNo`, `remarks`); and SWCB's own sections (`structural`, `subcontractor`,
+    `activity.excavation.fromStation`, `inspectionMatrix.subgradeCompacted.sidewalk`,
+    `inspectionMatrix.otherCuringMethods.base`), except the matrix cells the form greys out, which take no edits.
+    **The other report-specific sections do not yet**: AC's eight sections; Conc Cyl's own sections (they wait for the
     Conc Cyl form and export slice). They show as before and can't be edited by a reviewer. Giving one of them
     redlines is a `RedlinedField` around each input with its path.
   - **A checkbox or radio group** keeps its own (disabled) control and gets a childless `RedlinedField` beside it

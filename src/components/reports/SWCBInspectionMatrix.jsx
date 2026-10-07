@@ -4,7 +4,10 @@
  * and Sidewalk and "Roadway Stone Base" only Base (the other cells are greyed out), and "Other Curing Methods" is a
  * short text entry per column. Stateless. Props: matrix ({ [rowKey]: { base, sidewalk, curb } }: 'Y' | 'N' | 'NA' | null for
  * answer rows, text for the text row), onChange(rowKey, column, value), disabled (makes every input natively disabled).
+ * A reviewer's edit of an answer reads under its radios, and one of a text cell in its place; a greyed-out cell
+ * takes no edits.
  */
+import RedlinedField from '../RedlinedField'
 
 export const COLUMNS = [
   { label: 'Base', key: 'base' },
@@ -30,6 +33,7 @@ const OPTIONS = [
   { label: 'N', value: 'N' },
   { label: 'N/A', value: 'NA' },
 ]
+const answerLabel = (value) => OPTIONS.find(o => o.value === value)?.label ?? value
 
 export default function SWCBInspectionMatrix({ matrix, onChange, disabled = false }) {
   const answerCell = (row, column) => {
@@ -52,20 +56,38 @@ export default function SWCBInspectionMatrix({ matrix, onChange, disabled = fals
             </label>
           ))}
         </div>
+        {/* The answer itself is the three radios; its edits, and the reviewer's pencil, sit here */}
+        {applies && (
+          <RedlinedField
+            path={`inspectionMatrix.${row.key}.${column.key}`}
+            value={matrix[row.key]?.[column.key]}
+            label={`${row.label}, ${column.label}`}
+            type="select"
+            options={OPTIONS}
+            format={answerLabel}
+            toRequest={(text) => (text === '' ? null : text)}
+          />
+        )}
       </td>
     )
   }
 
   const textCell = (row, column) => (
     <td key={column.key} className="px-4 py-3">
-      <input
-        type="text"
-        className="input-field"
-        aria-label={`${row.label}, ${column.label}`}
+      <RedlinedField
+        path={`inspectionMatrix.${row.key}.${column.key}`}
         value={matrix[row.key]?.[column.key] ?? ''}
-        disabled={disabled}
-        onChange={(e) => onChange(row.key, column.key, e.target.value)}
-      />
+        label={`${row.label}, ${column.label}`}
+      >
+        <input
+          type="text"
+          className="input-field"
+          aria-label={`${row.label}, ${column.label}`}
+          value={matrix[row.key]?.[column.key] ?? ''}
+          disabled={disabled}
+          onChange={(e) => onChange(row.key, column.key, e.target.value)}
+        />
+      </RedlinedField>
     </td>
   )
 

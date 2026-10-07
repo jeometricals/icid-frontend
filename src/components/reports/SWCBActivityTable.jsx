@@ -2,7 +2,10 @@
  * The SWCB "Detailed Activity" card: From Station / To Station / Remarks inputs for Excavation, Form / Prep and Pour.
  * Stateless. Props: activity ({ excavation, formPrep, pour }, each { fromStation, toStation, remarks }),
  * onChange(row, field, value), disabled (makes the inputs natively disabled).
+ * A reviewer's edit of a cell reads in its place.
  */
+import RedlinedField from '../RedlinedField'
+
 const ACTIVITY_ROWS = [
   { label: 'Excavation', key: 'excavation' },
   { label: 'Form / Prep', key: 'formPrep' },
@@ -41,15 +44,21 @@ export default function SWCBActivityTable({ activity, onChange, disabled = false
                 </td>
                 {FIELDS.map(field => (
                   <td key={field.key} className="px-4 py-2">
-                    <input
-                      type="text"
-                      className="input-field"
-                      placeholder={field.label}
-                      aria-label={`${row.label} ${field.label}`}
+                    <RedlinedField
+                      path={`activity.${row.key}.${field.key}`}
                       value={activity[row.key]?.[field.key] ?? ''}
-                      disabled={disabled}
-                      onChange={(e) => onChange(row.key, field.key, e.target.value)}
-                    />
+                      label={`${row.label} ${field.label}`}
+                    >
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder={field.label}
+                        aria-label={`${row.label} ${field.label}`}
+                        value={activity[row.key]?.[field.key] ?? ''}
+                        disabled={disabled}
+                        onChange={(e) => onChange(row.key, field.key, e.target.value)}
+                      />
+                    </RedlinedField>
                   </td>
                 ))}
               </tr>
