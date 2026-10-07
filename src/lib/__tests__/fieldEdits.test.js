@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   displayValue, editsForField, hasEdits, isPayItemTouched, payItemAddEdit, payItemAttestations, payItemPath,
-  reviewStage, revisedAfterReturn, sameValue, stageAcceptedTimes, untouchedPayItems,
+  reviewStage, revisedAfterReturn, sameValue, stageAcceptedTimes, truckAddEdit, untouchedPayItems,
 } from '../fieldEdits'
 
 const edit = (overrides) => ({ edit_id: 'e', report_id: 'rep-1', field_path: 'description', edit_type: 'field_change',
@@ -40,6 +40,16 @@ describe('pay item paths', () => {
     expect(payItemAddEdit(edits, 'rep-1', 'item-3')).toBe(added)
     expect(payItemAddEdit(edits, 'rep-1', 'item-1')).toBeUndefined()
     expect(payItemAddEdit(edits, 'rep-2', 'item-3')).toBeUndefined()
+  })
+})
+
+describe('truckAddEdit', () => {
+  it("finds the edit that added a truck, by the truck's id and its report", () => {
+    const added = edit({ edit_id: 'add', field_path: 'trucks[truck-3]', edit_type: 'truck_add', old_value: null })
+    const edits = [edit({ field_path: 'trucks[0].slump' }), added]
+    expect(truckAddEdit(edits, 'rep-1', 'truck-3')).toBe(added)
+    expect(truckAddEdit(edits, 'rep-1', '0')).toBeUndefined()
+    expect(truckAddEdit(edits, 'rep-2', 'truck-3')).toBeUndefined()
   })
 })
 

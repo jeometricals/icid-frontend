@@ -24,6 +24,11 @@ export function payItemAddEdit(edits, reportId, itemId) {
   return editsForField(edits, reportId, payItemPath(itemId)).find(e => e.edit_type === 'pay_item_add')
 }
 
+/** The 'truck_add' edit that added a truck to a Conc Mix report, or undefined for a truck the inspector entered. */
+export function truckAddEdit(edits, reportId, truckId) {
+  return editsForField(edits, reportId, `trucks[${truckId}]`).find(e => e.edit_type === 'truck_add')
+}
+
 /** Whether a report has any edit at all (so its history is worth showing). */
 export function hasEdits(edits, reportId) {
   return (edits || []).some(e => (e.report_id ?? null) === (reportId ?? null))

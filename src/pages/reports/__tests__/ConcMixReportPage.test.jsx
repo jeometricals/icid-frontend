@@ -219,6 +219,24 @@ describe('ConcMixReportPage — Save Draft', () => {
     })
   })
 
+  it("sends each saved truck's id back, and none for a truck added on the draft (submit gives it one)", async () => {
+    api.getIdr.mockResolvedValue(parentIdr({
+      reportData: { ...SAVED_DATA, trucks: [{ id: 'truck-1', truckOrTicketNo: 'T-101' }, { id: 'truck-2', truckOrTicketNo: 'T-102' }] },
+    }))
+    const user = userEvent.setup()
+    renderPage()
+    await loaded()
+    await user.type(screen.getByLabelText('Truck 2 Slump'), '4')
+    await user.click(screen.getByRole('button', { name: 'Add Truck' }))
+    await user.click(screen.getByRole('button', { name: 'Remove truck 1' }))
+    await user.click(saveButton())
+    await waitFor(() => expect(api.saveReport).toHaveBeenCalled())
+    expect(savedData().trucks).toEqual([
+      { ...EMPTY_TRUCK, id: 'truck-2', truckOrTicketNo: 'T-102', slump: '4' },
+      EMPTY_TRUCK,
+    ])
+  })
+
   it('removes a truck', async () => {
     const user = userEvent.setup()
     renderPage()

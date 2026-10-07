@@ -41,6 +41,17 @@ export async function addPayItem(idrId, { reportId, itemNo, budgetCode, quantity
 }
 
 /**
+ * Adds a truck to a Concrete Truck & Mix Info report on the reviewer's behalf. truck holds any of the keys the
+ * report form saves (truckOrTicketNo, inspectionSticker, loadSizeCy, endBatch, mixingRevs, startDischTime,
+ * endDischTime, slump, airContent, concTemp, cylinderNumbers), sent as they are; it needs a truck or ticket number
+ * or a slump. The backend gives the truck its id.
+ */
+export async function addTruck(idrId, reportId, truck) {
+  const json = await apiFetch(`/v1/idrs/${idrId}/reports/${reportId}/trucks/add`, { method: 'POST', body: truck })
+  return json.data
+}
+
+/**
  * Records the signed-in reviewer's approval of one pay item as it stands (no body): the edit row holds the quantity
  * approved. Approving an item they have already approved, revised or added at this stage changes nothing.
  */

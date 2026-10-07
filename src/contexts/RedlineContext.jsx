@@ -7,7 +7,8 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
  * Value: reportId (null for the header), edits (the IDR's field_edits), isDraft (the IDR is a draft, so the form's
  * own inputs are live and the history only reads beside them), canEdit (edit mode is on and the signed-in user is
  * this stage's reviewer), saveField(fieldPath, newValue) → {ok} | {ok: false, message} | {ok: false, conflict: true},
- * and for pay items revise(itemId, quantity) and addItem(item), which answer the same way. It also carries
+ * for pay items revise(itemId, quantity) and addItem(item), and for a Conc Mix addTruck(truck), which answer the
+ * same way. It also carries
  * acceptedAt (when each stage was last accepted, for telling an earlier round's approvals apart) and, for the
  * stage's reviewer (edit mode or not), attesting ({userUuid, stage, acceptedAt}: who is approving pay items; null
  * for anyone else), approve(itemId), and highlightItemId (the pay item the backend's gate sent them here for).

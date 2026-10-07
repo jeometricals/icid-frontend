@@ -56,7 +56,7 @@ function idrAt(status, overrides = {}) {
 
 vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
-  editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(),
+  editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(), addTruck: vi.fn(),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
 
@@ -153,7 +153,80 @@ describe('Conc Mix report in review — edit mode', () => {
       ...screen.getAllByRole('spinbutton'),
     ]
     for (const input of inputs) expect(input).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Add Truck' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Remove truck 1' })).toBeDisabled()
+  })
+})
+
+describe('Conc Mix report in review — Add Truck', () => {
+  const addButton = () => screen.getByRole('button', { name: 'Add Truck' })
+
+  beforeEach(() => {
+    // The backend appends the truck with an id of its own and logs it as added by the reviewer
+    api.addTruck.mockImplementation(async (_, reportId, truck) => {
+      const added = { ...truck, id: 'truck-new' }
+      server.reports[1].report_data.trucks.push(added)
+      server.field_edits.push({
+        edit_id: 'add-1', report_id: reportId, field_path: `trucks[${added.id}]`, edit_type: 'truck_add',
+        old_value: null, new_value: added, editor_uuid: OLIVE.uuid, editor_initials: 'OE',
+        editor_name: 'Olive Engineer', editor_stage: 'stage1', edited_at: '2026-09-28T10:00:00Z',
+      })
+      return structuredClone(server)
+    })
+  })
+
+  it('is disabled for the reviewer until edit mode is on, and for anyone else', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderPage()
+    await ready()
+    expect(addButton()).toBeDisabled()
+    await user.click(toggle())
+    expect(addButton()).toBeEnabled()
+    unmount()
+    renderPage({ user: TEST_USER, roles: ['inspector'] })
+    await ready()
+    expect(addButton()).toBeDisabled()
+  })
+
+  it("adds a truck with a ticket number and a slump, then shows it as a blue row with the reviewer's initials", async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(toggle())
+    await user.click(addButton())
+    await user.type(screen.getByLabelText('New truck Truck or Ticket No'), 'T-103')
+    await user.type(screen.getByLabelText('New truck Slump'), '4.5')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.getAllByTestId('truck-row')).toHaveLength(3))
+    expect(api.addTruck).toHaveBeenCalledWith(IDR_ID, REPORT_ID, {
+      truckOrTicketNo: 'T-103', inspectionSticker: null, loadSizeCy: '', endBatch: '', mixingRevs: '',
+      startDischTime: '', endDischTime: '', slump: '4.5', airContent: '', concTemp: '', cylinderNumbers: '',
+    })
+    expect(screen.queryByTestId('new-truck-row')).not.toBeInTheDocument()
+    const [first, , third] = screen.getAllByTestId('truck-row')
+    expect(third).toHaveAttribute('data-added', 'true')
+    expect(first).not.toHaveAttribute('data-added')
+    expect(screen.getByLabelText('Truck 3 Truck or Ticket No')).toHaveValue('T-103')
+    expect(screen.getByLabelText('Truck 3 Slump')).toHaveClass('text-[#0070C0]')
+    expect(within(third).getByText('OE')).toBeInTheDocument()
+
+    // its cells take later edits like any other truck's, by position
+    await edit(user, 'Truck 3 Slump', retype(user, '5'))
+    expect(lastEdit()).toEqual({ reportId: REPORT_ID, fieldPath: 'trucks[2].slump', newValue: '5' })
+    await waitFor(() => expect(redlines()).toEqual([['4.5', '5OE']]))
+  })
+
+  it("shows the backend's reason under the row when the add is refused", async () => {
+    api.addTruck.mockRejectedValue(Object.assign(new Error('The IDR is not in review'), { status: 400 }))
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(toggle())
+    await user.click(addButton())
+    await user.type(screen.getByLabelText('New truck Slump'), '4')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The IDR is not in review')
+    expect(screen.getByTestId('new-truck-row')).toBeInTheDocument()
   })
 })
 

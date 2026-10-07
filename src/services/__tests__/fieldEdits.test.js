@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { addPayItem, approvePayItem, editIdrField, revisePayItem } from '../fieldEdits'
+import { addPayItem, addTruck, approvePayItem, editIdrField, revisePayItem } from '../fieldEdits'
 import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
@@ -85,6 +85,29 @@ describe('addPayItem', () => {
     mockFetch(400, { detail: 'This kind of report has no pay items' })
     await expect(addPayItem(IDR_ID, { reportId: REPORT_ID, itemNo: 'x', quantity: '1' })).rejects.toMatchObject({
       status: 400, message: 'This kind of report has no pay items',
+    })
+  })
+})
+
+describe('addTruck', () => {
+  const TRUCK = {
+    truckOrTicketNo: 'T-103', inspectionSticker: 'NA', loadSizeCy: '', endBatch: '', mixingRevs: '', startDischTime: '',
+    endDischTime: '', slump: '4.5', airContent: '', concTemp: '', cylinderNumbers: '',
+  }
+
+  it('POSTs the truck, in the keys the report stores, to the report it joins', async () => {
+    mockFetch(200, { status: 'success', data: EDITED_IDR })
+    const idr = await addTruck(IDR_ID, REPORT_ID, TRUCK)
+    expect(fetchUrl().pathname).toBe(`/v1/idrs/${IDR_ID}/reports/${REPORT_ID}/trucks/add`)
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual(TRUCK)
+    expect(idr).toEqual(EDITED_IDR)
+  })
+
+  it('throws the backend message when the truck has neither a number nor a slump', async () => {
+    mockFetch(400, { detail: 'A truck needs a truck or ticket number or a slump' })
+    await expect(addTruck(IDR_ID, REPORT_ID, { ...TRUCK, truckOrTicketNo: '', slump: '' })).rejects.toMatchObject({
+      status: 400, message: 'A truck needs a truck or ticket number or a slump',
     })
   })
 })
