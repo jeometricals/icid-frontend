@@ -12,7 +12,7 @@ import { REDLINE_TEXT, REVISED_AFTER_RETURN, displayValue, editsForField, revise
  * and outside a RedlineProvider it renders nothing else at all. On a draft the control stays live and the history
  * reads under it.
  * Props: path (the field_path), value (the field's current value), label (names the field for screen readers and the
- * pencil), type ('text' | 'number' | 'time' | 'textarea' | 'select'; default 'text'), options (for 'select':
+ * pencil), type ('text' | 'number' | 'time' | 'date' | 'textarea' | 'select'; default 'text'), options (for 'select':
  * [{value, label}]), format(value) (how a value reads, e.g. a time without its seconds; default as it is),
  * toRequest(text) (the input's text as the value to send; default the text itself), children.
  */

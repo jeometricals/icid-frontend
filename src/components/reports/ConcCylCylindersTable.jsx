@@ -5,8 +5,12 @@
  * Stateless. Props: cylinders (array of { class, cylinderNo, slump }, plus an id once the backend gave one),
  * onAddCylinder(), onCylinderChange(index, field, value), onRemoveCylinder(index),
  * disabled (makes the button and inputs natively disabled).
+ * A reviewer's edit of a class, cylinder number or slump reads in the cell. A cylinder is addressed by its id
+ * (cylinders[<id>].slump), so one without an id takes no edits. A reviewer neither adds nor removes a cylinder.
  */
 import RemoveRowButton from './RemoveRowButton'
+import RedlinedField from '../RedlinedField'
+import { useRedline } from '../../contexts/RedlineContext'
 
 // The DDC sheet has 18 cylinder rows; a pour with more takes a second addendum
 export const MAX_CYLINDERS = 18
@@ -22,8 +26,13 @@ const LAB_COLUMNS = ['Age Day', 'Date Tested', 'Total Load Lbs (x1000)', 'PSI', 
 
 const COLUMN_COUNT = FIELDS.length + LAB_COLUMNS.length + 1
 
+export const NO_CYLINDER_ID = "This cylinder has no id, so it can't take reviewer edits."
+
 export default function ConcCylCylindersTable({ cylinders, onAddCylinder, onCylinderChange, onRemoveCylinder, disabled = false }) {
+  const redline = useRedline()
   const isFull = cylinders.length >= MAX_CYLINDERS
+  // Past draft every cylinder should have the id submit gave it; one that doesn't says why it has no pencil
+  const inReview = Boolean(redline) && !redline.isDraft
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -59,18 +68,29 @@ export default function ConcCylCylindersTable({ cylinders, onAddCylinder, onCyli
             ) : (
               cylinders.map((cylinder, index) => (
                 <tr key={index}>
-                  {FIELDS.map(field => (
-                    <td key={field.key} className="px-4 py-2">
+                  {FIELDS.map(field => {
+                    const label = `Cylinder ${index + 1} ${field.label}`
+                    const value = cylinder[field.key] ?? ''
+                    const input = (
                       <input
                         type="text"
                         className="input-field min-w-[7rem]"
-                        aria-label={`Cylinder ${index + 1} ${field.label}`}
-                        value={cylinder[field.key] ?? ''}
+                        aria-label={label}
+                        value={value}
                         disabled={disabled}
                         onChange={(e) => onCylinderChange(index, field.key, e.target.value)}
                       />
-                    </td>
-                  ))}
+                    )
+                    return (
+                      <td key={field.key} className="px-4 py-2" title={!cylinder.id && inReview ? NO_CYLINDER_ID : undefined}>
+                        {cylinder.id ? (
+                          <RedlinedField path={`cylinders[${cylinder.id}].${field.key}`} value={value} label={label}>
+                            {input}
+                          </RedlinedField>
+                        ) : input}
+                      </td>
+                    )
+                  })}
                   {LAB_COLUMNS.map(label => (
                     <td key={label} className="px-4 py-2">
                       <input

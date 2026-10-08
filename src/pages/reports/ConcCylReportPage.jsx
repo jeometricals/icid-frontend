@@ -4,6 +4,8 @@
  * the DDC "Data Sheet for Concrete Test Cylinders": Delivery & Casting (with Sheet No. / of and the specific location
  * of placement), the Cylinders table (18 rows at most) and the form's instruction lines. The testing lab's details
  * are not entered in ICID. A never-saved report gets its Date Cast pre-filled with the IDR date.
+ * In review every one of those fields takes reviewer edits (each section wraps its inputs in RedlinedField with the
+ * stored key; a cylinder's by its id).
  */
 import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'

@@ -172,6 +172,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `slump`; 18 rows at most; the lab's five columns are disabled placeholders and are never stored). The backend
     gives each cylinder an `id` at submit, and a draft save must send it back unchanged: the page keeps whatever
     keys a saved cylinder has, and a new row has no `id`. The testing lab's details are not entered in ICID.
+    In review a cylinder's class, number and slump are addressed by that `id`, not by position; a cylinder with
+    no `id` gets no pencil and a tooltip saying why. The lab columns never take edits.
   - **A lost race** (409) shows the toast "Someone else edited this field — reloading" and refetches the IDR.
     Any other refusal shows under the input, which stays open.
   - **Which fields have it:** the eight header fields; and on every report the description, comments / remarks,
@@ -184,9 +186,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     and AC's own sections (`pavingContractor.riceNo`, `temperature.surfaceStart`, `maxDensity.top`,
     `pavementCourses[0].width`, `materialUsageTop.qtyUsed`, `materialUsageBinder.qtyUsed`,
     `acRequirements.subgradeCompacted.value` and `.remarks`, `tackCoat.noOfGallons`,
-    `deliveryTickets[0].temperature`). A reviewer can't add a pavement course or a delivery ticket (only a truck).
-    **The only report-specific sections that do not yet** are Conc Cyl's own (reviewer edits on them are
-    Slice N4). They show as before and can't be edited by a reviewer. Giving one of them
+    `deliveryTickets[0].temperature`); and Conc Cyl's own (`deliveryCasting.cyPoured`, `sheetNo`, `sheetOf`,
+    `placementLocation`, `cylinders[<cylinder id>].slump`). A reviewer can't add a pavement course, a delivery
+    ticket or a cylinder (only a truck). Every report-specific section now has it; giving a new one
     redlines is a `RedlinedField` around each input with its path.
   - **A checkbox or radio group** keeps its own (disabled) control and gets a childless `RedlinedField` beside it
     with `type="select"`: its options hold the stored values (`'true'` / `'false'` with `toRequest` back to a
@@ -194,7 +196,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     stored value.
   - **On a returned draft** the form's inputs are live and each field's history reads under it. The draft's
     pay-item table is the normal form; its pay-item history isn't shown there.
-  - Lists other than pay items are addressed by position (`additionalWorkforce[0].count`), which the backend
+  - Lists other than pay items and Conc Cyl cylinders are addressed by position (`additionalWorkforce[0].count`), which the backend
     notes as a known limitation once a returned draft's rows are reordered.
 - **Project roles (admin).** `/admin/projects/:projectId/roles` (`ProjectRolesPage`), reached from "Manage Roles"
   on the project dashboard, which only an admin sees. One row per user and role with Revoke (confirmed first; it
