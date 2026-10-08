@@ -167,6 +167,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     blue row with the adder's initials after its ticket number. Its cells are still addressed by position and
     take later edits like any other truck's. A reviewer never removes a truck. Every truck carries its `id` once
     the IDR was submitted, and a draft save sends it back (the form keeps whatever keys a saved truck has).
+  - **Conc Cyl cylinders.** The form (`ConcCylMetadata`, `ConcCylCylindersTable`, `ConcCylFooter`) saves
+    `deliveryCasting.*`, `sheetNo`, `sheetOf`, `placementLocation` and `cylinders[]` (`class`, `cylinderNo`,
+    `slump`; 18 rows at most; the lab's five columns are disabled placeholders and are never stored). The backend
+    gives each cylinder an `id` at submit, and a draft save must send it back unchanged: the page keeps whatever
+    keys a saved cylinder has, and a new row has no `id`. The testing lab's details are not entered in ICID.
   - **A lost race** (409) shows the toast "Someone else edited this field — reloading" and refetches the IDR.
     Any other refusal shows under the input, which stays open.
   - **Which fields have it:** the eight header fields; and on every report the description, comments / remarks,
@@ -180,8 +185,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `pavementCourses[0].width`, `materialUsageTop.qtyUsed`, `materialUsageBinder.qtyUsed`,
     `acRequirements.subgradeCompacted.value` and `.remarks`, `tackCoat.noOfGallons`,
     `deliveryTickets[0].temperature`). A reviewer can't add a pavement course or a delivery ticket (only a truck).
-    **The only report-specific sections that do not yet** are Conc Cyl's own (they wait for the
-    Conc Cyl form and export slice). They show as before and can't be edited by a reviewer. Giving one of them
+    **The only report-specific sections that do not yet** are Conc Cyl's own (reviewer edits on them are
+    Slice N4). They show as before and can't be edited by a reviewer. Giving one of them
     redlines is a `RedlinedField` around each input with its path.
   - **A checkbox or radio group** keeps its own (disabled) control and gets a childless `RedlinedField` beside it
     with `type="select"`: its options hold the stored values (`'true'` / `'false'` with `toRequest` back to a

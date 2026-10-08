@@ -105,6 +105,16 @@ describe('AddendumsSection — add', () => {
     expect(screen.getByTestId('from')).toHaveTextContent('drafts')
   })
 
+  it('adds a Concrete Cylinder Data addendum and opens its page', async () => {
+    api.addReport.mockResolvedValue({ report_id: 'rep-new-cyl', report_type: 'CONC_CYL', is_addendum: true, parent_report_id: REPORT_ID })
+    const user = userEvent.setup()
+    renderSection()
+    await user.click(screen.getByRole('button', { name: /add addendum/i }))
+    await user.click(screen.getByRole('button', { name: 'Concrete Cylinder Data' }))
+    expect(api.addReport).toHaveBeenCalledWith('idr-1', { reportType: 'CONC_CYL', isAddendum: true, parentReportId: REPORT_ID })
+    expect(await screen.findByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-1/conc-cyl/rep-new-cyl')
+  })
+
   it('shows an error and stays put when adding fails', async () => {
     api.addReport.mockRejectedValueOnce(new Error('Only draft IDRs can be edited'))
     const user = userEvent.setup()

@@ -1,40 +1,43 @@
 /**
  * Concrete Cylinder Data (CONC_CYL) addendum, at /project/:projectId/idr/:idrId/conc-cyl/:reportId.
  * Same load / Save Draft / read-only flow as the other report pages (useReportForm + ReportPageShell). Its body follows
- * the DDC "Data Sheet for Concrete Test Cylinders": Testing Laboratory, Delivery & Casting, the Cylinders table,
- * Specific Location of Placement and Remarks. A never-saved report gets its Date Cast pre-filled with the IDR date.
+ * the DDC "Data Sheet for Concrete Test Cylinders": Delivery & Casting (with Sheet No. / of and the specific location
+ * of placement), the Cylinders table (18 rows at most) and the form's instruction lines. The testing lab's details
+ * are not entered in ICID. A never-saved report gets its Date Cast pre-filled with the IDR date.
  */
 import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
 import { isObject } from '../../lib/reportData'
 import ReportPageShell from '../../components/reports/ReportPageShell'
-import ConcCylTestingLab from '../../components/reports/ConcCylTestingLab'
-import ConcCylDeliveryCasting from '../../components/reports/ConcCylDeliveryCasting'
-import ConcCylCylindersTable from '../../components/reports/ConcCylCylindersTable'
-import ConcCylPlacementLocation from '../../components/reports/ConcCylPlacementLocation'
-import CommentsSection from '../../components/reports/CommentsSection'
+import ConcCylMetadata from '../../components/reports/ConcCylMetadata'
+import ConcCylCylindersTable, { MAX_CYLINDERS } from '../../components/reports/ConcCylCylindersTable'
+import ConcCylFooter from '../../components/reports/ConcCylFooter'
 
-// One blank row of the Cylinders table
+// One blank row of the Cylinders table. No id: the backend gives a new cylinder its id when the IDR is submitted.
 const emptyCylinder = () => ({ class: '', cylinderNo: '', slump: '' })
 
 // A blank Concrete Cylinder Data report. Only report-specific fields: the IDR's date, times and weather come from the IDR.
 function emptyFormData() {
   return {
-    testingLab: { labName: '', labAddress: '', labPhonePrimary: '', labPhoneAlt: '' },
     deliveryCasting: { dateOfDelivery: '', cyPoured: '', dateCast: '', jobLocation: '' },
+    sheetNo: '',
+    sheetOf: '',
     cylinders: [],
-    placementLocation: '',
-    remarks: ''
+    placementLocation: ''
   }
 }
 
 // This report's saved report_data as form state: defaults for missing keys, one level down too, so partial or
-// older saved shapes and cylinder rows missing a field load cleanly
+// older saved shapes and cylinder rows missing a field load cleanly.
+// CYLINDER IDS: every key a saved cylinder has is kept ({ ...cylinder }), and Save Draft sends the whole form back,
+// so a cylinder's id returns to the backend unchanged on every save. Do not rebuild cylinders from a fixed list of
+// keys here or in the handlers below: dropping an id detaches the reviewer edit history that points at that cylinder.
 function formDataFromReport(reportData, defaults) {
   const data = { ...defaults, ...reportData }
-  for (const section of ['testingLab', 'deliveryCasting']) {
-    data[section] = { ...defaults[section], ...(isObject(data[section]) ? data[section] : {}) }
+  data.deliveryCasting = {
+    ...defaults.deliveryCasting,
+    ...(isObject(data.deliveryCasting) ? data.deliveryCasting : {})
   }
   data.cylinders = Array.isArray(data.cylinders)
     ? data.cylinders.map(cylinder => ({ ...emptyCylinder(), ...cylinder }))
@@ -67,9 +70,12 @@ export default function ConcCylReportPage() {
   }, [loadStatus, isReadOnly, savedDateCast, idr?.report_date, updateForm])
 
   const handleAddCylinder = () => {
-    updateForm(prev => ({ ...prev, cylinders: [...prev.cylinders, emptyCylinder()] }))
+    updateForm(prev => (
+      prev.cylinders.length >= MAX_CYLINDERS ? prev : { ...prev, cylinders: [...prev.cylinders, emptyCylinder()] }
+    ))
   }
 
+  // Spreads the row, so its id (and any other saved key) stays on it
   const handleCylinderChange = (index, field, value) => {
     updateForm(prev => ({
       ...prev,
@@ -83,15 +89,14 @@ export default function ConcCylReportPage() {
 
   return (
     <ReportPageShell title="Concrete Cylinder Data" form={form}>
-      <ConcCylTestingLab
-        value={formData.testingLab}
-        onChange={(field, value) => form.handleNestedInputChange('testingLab', field, value)}
-        disabled={isReadOnly}
-      />
-
-      <ConcCylDeliveryCasting
-        value={formData.deliveryCasting}
-        onChange={(field, value) => form.handleNestedInputChange('deliveryCasting', field, value)}
+      <ConcCylMetadata
+        workDate={idr?.report_date}
+        deliveryCasting={formData.deliveryCasting}
+        sheetNo={formData.sheetNo}
+        sheetOf={formData.sheetOf}
+        placementLocation={formData.placementLocation}
+        onDeliveryCastingChange={(field, value) => form.handleNestedInputChange('deliveryCasting', field, value)}
+        onFieldChange={form.handleInputChange}
         disabled={isReadOnly}
       />
 
@@ -103,19 +108,7 @@ export default function ConcCylReportPage() {
         disabled={isReadOnly}
       />
 
-      <ConcCylPlacementLocation
-        value={formData.placementLocation}
-        onChange={(value) => form.handleInputChange('placementLocation', value)}
-        disabled={isReadOnly}
-      />
-
-      <CommentsSection
-        heading="Remarks"
-        path="remarks"
-        value={formData.remarks}
-        onChange={(value) => form.handleInputChange('remarks', value)}
-        disabled={isReadOnly}
-      />
+      <ConcCylFooter />
     </ReportPageShell>
   )
 }
