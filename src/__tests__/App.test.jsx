@@ -13,6 +13,7 @@ vi.mock('../services/api', () => ({
   getProjectById: vi.fn(),
   getIdr: vi.fn(),
   listIdrs: vi.fn(),
+  listQuantities: vi.fn(),
   getReviewQueue: vi.fn(),
   signIn: vi.fn(),
   startDemo: vi.fn(),
@@ -28,6 +29,7 @@ beforeEach(() => {
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens 2025' })
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.listIdrs.mockResolvedValue([])
+  api.listQuantities.mockResolvedValue({ rows: [], totals_by_unit: {}, row_count: 0, truncated: false })
   api.getIdr.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
 })
 
@@ -140,6 +142,7 @@ describe('app header', () => {
     ['the project page', '/project/HWS0023'],
     ['Drafts', '/project/HWS0023/drafts'],
     ['the Archive', '/project/HWS0023/archive'],
+    ['Progress', '/project/HWS0023/progress'],
     ['an IDR', '/project/HWS0023/idr/idr-1'],
     ['a General report', '/project/HWS0023/idr/idr-1/general/rep-1'],
     ['an SWCB report', '/project/HWS0023/idr/idr-1/swcb/rep-1'],

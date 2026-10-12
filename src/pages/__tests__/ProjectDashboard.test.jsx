@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -299,6 +299,29 @@ describe('ProjectDashboard report archive button', () => {
     renderDashboard()
     await userEvent.click(await screen.findByRole('button', { name: 'Report Archive' }))
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/archive')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Progress entry point
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard progress button', () => {
+  it("navigates to this project's progress page, with no range of its own", async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByRole('button', { name: 'Progress' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/progress')
+  })
+
+  it('sits with the other three entry points, after the archive', async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    const progress = await screen.findByRole('button', { name: 'Progress' })
+    const tiles = within(progress.parentElement).getAllByRole('button').map(button => button.textContent)
+    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress'])
   })
 })
 

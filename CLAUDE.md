@@ -12,13 +12,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, IDR, review queue, project roles, the admin's all-IDRs list). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, the admin's all-IDRs list). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping, tiles and number format) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, and `disciplines.js`: the discipline names the archive filters by).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, and the archive's `ArchiveFilters`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -170,6 +170,28 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       `state: { from: 'archive', archiveSearch }`, and `listOrigin` (`lib/listOrigin.js`) hands both on with
       every navigation between the IDR page, its reports and their addendums. A new navigation among those
       pages passes `listOrigin(location)` as its state.
+- **Progress.** `/project/:projectId/progress` (`ProgressPage`), the "Progress" tile on the project dashboard: the
+  pay-item quantities of the project's approved IDRs over a range of work dates.
+  - **One call:** `listQuantities({ projectId, from, to })` in `services/quantities.js`, which is
+    `GET /v1/projects/{id}/quantities` and returns `{rows, totals_by_unit, row_count, truncated}`. The route's
+    other filters (pay item, budget code, discipline, inspector) aren't used yet. It answers 403 to a user who
+    isn't on the project; the page shows that like any other failure, with Retry.
+  - **The range is in the URL** (`?from=&to=`, the archive's convention), written with `replace` so picking dates
+    doesn't pile up history. A bare URL means the last 30 days (`DEFAULT_RANGE_DAYS`), by the viewer's own
+    calendar (`date-fns`, never `toISOString()`, which is UTC's day), and is left bare, so a link without dates
+    always means "the latest 30 days". A URL naming either bound is taken as it stands: a cleared picker is an
+    open bound, and clearing both is the default again.
+  - **From after To** shows a red hint under the pickers, hides the results and asks the backend nothing.
+  - **Tiles:** a total per unit from the response's `totals_by_unit`: TN, LF, SF and EA always, in that order
+    (a dash for one with no rows), then any other unit alphabetically, `(unknown)` last (`unitTiles`).
+  - **The table is rolled up here** (`rollupByItem` in `lib/progressRollup.js`): one row per item number, budget
+    code and unit, its amounts summed. Rows with no item number (a reviewer can add an item by description
+    alone) are grouped by description as well, so unrelated ones don't merge. A group shows the first
+    description it has. Sorted by item number as numbers (`4.13` before `10.02`), items without one last.
+  - **Numbers** print with thousands separators and three decimals at most (`formatQuantity`).
+  - **Truncated.** When the response says `truncated` (more than 10,000 rows matched), a banner above the table
+    says the view is of the first 10,000; the tiles and the table are then totals of those rows only.
+  - No comparison with contract quantities, no export and no breakdown by inspector or day yet.
 - **Reviewer edits (redlines).** While an IDR is in review, the reviewer who accepted it at its current stage (or
   an admin) can change its fields. The backend applies each edit and logs it, so the IDR and its reports always
   hold the current values and `field_edits` (on `GET /v1/idrs/{id}`, oldest first) is their history.
@@ -279,6 +301,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/` (the signed-in user's projects, each with `roles`)
   - `GET /v1/projects/{id}`
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
+  - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
     `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and

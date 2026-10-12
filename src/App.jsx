@@ -12,6 +12,7 @@ import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
+import ProgressPage from './pages/ProgressPage'
 import IDRPage from './pages/IDRPage'
 import ReviewQueuePage from './pages/ReviewQueuePage'
 import ProjectRolesPage from './pages/ProjectRolesPage'
@@ -44,6 +45,7 @@ function AppRoutes() {
           <Route path="/project/:projectId" element={<ProjectDashboard />} />
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
+          <Route path="/project/:projectId/progress" element={<ProgressPage />} />
           <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
           <Route path="/project/:projectId/idr/:idrId/general/:reportId" element={<GeneralReportPage />} />
           <Route path="/project/:projectId/idr/:idrId/swcb/:reportId" element={<SWCBReportPage />} />
