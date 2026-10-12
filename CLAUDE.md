@@ -264,7 +264,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   and, for `ADMIN_UNLOCKABLE_STATUSES` in `lib/reviewRoles.js` (`approved`, `stage2_review`: what the backend
   accepts), "Unlock"; a deleted IDR (`status === 'deleted'`) shows a Deleted badge instead. Both are confirmed
   first, a refusal shows in the dialog, and after a success the page reads the list again rather than patching
-  the row, then refreshes the task count. Rows don't open the IDR page. A non-admin who opens the URL is told it
+  the row, then refreshes the task count. Unlock on an IDR in RE Review that no RE has accepted (no
+  `re_reviewer_uuid`) sends nothing and shows the toast "Already unlocked — IDR is in RE Review"; once an RE has
+  accepted it, Unlock still asks and goes through, since that takes the IDR off them. Rows don't open the IDR page. A non-admin who opens the URL is told it
   is for admins; the backend returns 403 / 400 to them anyway.
 - **All Users (admin).** `/admin/users` (`AdminUsersPage`), "All Users (Admin)" in the user menu, which only an
   admin sees. One `GET /v1/admin/users` (`listAdminUsers` in `services/users.js`), shown in the backend's order:
@@ -333,6 +335,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
   - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
+  - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` (admin only: every user,
+    creating one, and changing a user's first and last name)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
     `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and

@@ -3,7 +3,8 @@
  * status) with a Soft-delete button on each IDR and Unlock on those the backend can unlock; a deleted IDR shows a
  * Deleted badge instead. "Show deleted" and "Show all drafts" (both off to start) bring in deleted IDRs and other
  * people's drafts. Each action is confirmed first, and the list is read again afterwards, so a row shows what the
- * backend wrote. Anyone who isn't an admin is told so instead.
+ * backend wrote. Unlock on an IDR in RE Review that no RE has accepted has nothing to undo: it only says so, in a
+ * toast. Anyone who isn't an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -16,6 +17,7 @@ import { ADMIN_UNLOCKABLE_STATUSES, STATUS_LABELS, isAdmin } from '../lib/review
 import ConfirmDialog from '../components/ConfirmDialog'
 import IdrTable from '../components/IdrTable'
 import StatusBadge from '../components/StatusBadge'
+import Toast from '../components/Toast'
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS)
 const DEFAULT_SORT = { key: 'report_date', direction: 'desc' }
@@ -40,7 +42,13 @@ const ACTIONS = {
   },
 }
 
+export const ALREADY_UNLOCKED = 'Already unlocked — IDR is in RE Review'
+
 const isDeleted = (idr) => idr.status === 'deleted' || Boolean(idr.deleted_at)
+
+// In RE Review with no RE on it: an unlock would change nothing. Once an RE has accepted it, an unlock takes it
+// off them, so that one still goes through.
+const isAlreadyUnlocked = (idr) => idr.status === 'stage2_review' && !idr.re_reviewer_uuid
 
 // "Sep 16, 2025 on HWS0023 (Genghis Khan)": which IDR a confirm dialog is about
 function describeIdr(idr) {
@@ -79,6 +87,7 @@ export default function AdminIdrsPage() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
   const [refreshError, setRefreshError] = useState(null) // an action worked but the list couldn't be read again
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     if (!admin) return
@@ -94,6 +103,11 @@ export default function AdminIdrsPage() {
   }, [admin, attempt])
 
   const ask = (idr, action) => {
+    if (action === 'unlock' && isAlreadyUnlocked(idr)) {
+      setToast(ALREADY_UNLOCKED)
+      return
+    }
+    setToast(null)
     setActionError(null)
     setPending({ idr, action })
   }
@@ -239,6 +253,8 @@ export default function AdminIdrsPage() {
             error={actionError}
           />
         )}
+
+        <Toast message={toast} onDone={() => setToast(null)} />
       </main>
     </div>
   )

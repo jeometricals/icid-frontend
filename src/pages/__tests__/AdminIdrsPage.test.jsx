@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminIdrsPage from '../AdminIdrsPage'
+import AdminIdrsPage, { ALREADY_UNLOCKED } from '../AdminIdrsPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { TaskCountContext } from '../../contexts/TaskCountContext'
@@ -15,6 +15,7 @@ import { DEMO_USER, TEST_USER } from '../../test/users'
 const ADMIN = { ...TEST_USER, uuid: 'a0000000-0000-4000-8000-000000000001', email: 'reza@icid.local', first_name: 'Reza',
   last_name: null, role: 'admin' }
 const KHAN = TEST_USER.uuid
+const REX = 'e0000000-0000-4000-8000-000000000005'
 
 function idr(overrides) {
   return {
@@ -25,7 +26,9 @@ function idr(overrides) {
     submitted_at: null,
     idr_number: null,
     stage1_reviewer_name: null,
+    re_reviewer_uuid: null,
     re_reviewer_name: null,
+    stage2_accepted_at: null,
     re_signature_path: null,
     return_reason: null,
     inspector_signature_path: null,
@@ -37,8 +40,8 @@ function idr(overrides) {
 // As the backend lists them: most recently edited first, which is not work-date order
 const LISTED = [
   idr({ idr_id: 'approved', report_date: '2026-09-16', submitted_at: '2026-09-24T15:00:00Z', status: 'approved',
-    idr_number: '004', stage1_reviewer_name: 'Olive Engineer', re_reviewer_name: 'Rex Resident',
-    re_signature_path: 'signatures/rex.png' }),
+    idr_number: '004', stage1_reviewer_name: 'Olive Engineer', re_reviewer_uuid: REX, re_reviewer_name: 'Rex Resident',
+    stage2_accepted_at: '2026-09-24T14:00:00Z', re_signature_path: 'signatures/rex.png' }),
   idr({ idr_id: 'submitted', report_date: '2026-09-23', submitted_at: '2026-09-23T19:00:00Z', project_id: 'SE384' }),
   idr({ idr_id: 'stage1', report_date: '2026-09-20', submitted_at: '2026-09-25T12:00:00Z', status: 'stage1_review',
     idr_number: '005', stage1_reviewer_name: 'Olive Engineer' }),
@@ -66,7 +69,8 @@ beforeEach(() => {
   server = structuredClone(LISTED)
   api.listIdrs.mockImplementation(async () => structuredClone(server))
   api.adminUnlockIdr.mockImplementation(async (idrId) => change(idrId, {
-    status: 'stage2_review', re_reviewer_name: null, re_signature_path: null,
+    status: 'stage2_review', re_reviewer_uuid: null, re_reviewer_name: null, stage2_accepted_at: null,
+    re_signature_path: null,
   }))
   api.adminDeleteIdr.mockImplementation(async (idrId) => change(idrId, {
     status: 'deleted', deleted_at: '2026-10-06T12:00:00Z',
@@ -342,6 +346,7 @@ describe('AdminIdrsPage — soft-delete', () => {
 
 describe('AdminIdrsPage — unlock', () => {
   const clickUnlock = (date) => userEvent.click(within(rowFor(date)).getByRole('button', { name: 'Unlock' }))
+  const toast = () => screen.queryByText(ALREADY_UNLOCKED)
 
   it('asks first, in the agreed words', async () => {
     renderPage()
@@ -370,11 +375,70 @@ describe('AdminIdrsPage — unlock', () => {
       Object.assign(new Error('Only an approved IDR, or one in Stage 2 review, can be unlocked'), { status: 400 }))
     renderPage()
     await ready()
-    await clickUnlock('Sep 18, 2026')
+    await clickUnlock('Sep 16, 2026')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
       "Couldn't unlock the IDR: Only an approved IDR, or one in Stage 2 review, can be unlocked")
     expect(refreshTaskCount).not.toHaveBeenCalled()
+  })
+
+  it('on an approved IDR: the POST fires, the row updates and no "already unlocked" toast shows', async () => {
+    renderPage()
+    await ready()
+    await clickUnlock('Sep 16, 2026')
+    expect(toast()).not.toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    expect(api.adminUnlockIdr).toHaveBeenCalledTimes(1)
+    expect(cells('Sep 16, 2026')[3]).toBe('RE Review')
+    expect(toast()).not.toBeInTheDocument()
+  })
+
+  it('on an IDR in RE Review that no RE has accepted: no request, a toast, and the button stays', async () => {
+    renderPage()
+    await ready()
+    await clickUnlock('Sep 18, 2026')
+    expect(toast()).toHaveTextContent('Already unlocked — IDR is in RE Review')
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.adminUnlockIdr).not.toHaveBeenCalled()
+    expect(api.listIdrs).toHaveBeenCalledTimes(1)
+    expect(refreshTaskCount).not.toHaveBeenCalled()
+    expect(actionsIn('Sep 18, 2026')).toEqual(['Unlock', 'Soft-delete'])
+  })
+
+  it('on an IDR in RE Review that an RE has accepted: asks, the POST fires and the RE is taken off it', async () => {
+    change('stage2', { re_reviewer_uuid: REX, re_reviewer_name: 'Rex Resident', stage2_accepted_at: '2026-09-26T12:00:00Z' })
+    renderPage()
+    await ready()
+    expect(cells('Sep 18, 2026')[5]).toBe('Rex Resident')
+    await clickUnlock('Sep 18, 2026')
+    expect(toast()).not.toBeInTheDocument()
+    expect(dialog()).toHaveAccessibleName('Unlock IDR')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    expect(api.adminUnlockIdr).toHaveBeenCalledWith('stage2')
+    expect(server.find(row => row.idr_id === 'stage2'))
+      .toMatchObject({ status: 'stage2_review', re_reviewer_uuid: null, stage2_accepted_at: null })
+    expect(cells('Sep 18, 2026').slice(3, 6)).toEqual(['RE Review', 'Genghis Khan', 'Olive Engineer'])
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+
+  it('the row unlocked a moment ago now only gets the toast', async () => {
+    renderPage()
+    await ready()
+    await clickUnlock('Sep 16, 2026')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    await clickUnlock('Sep 16, 2026')
+    expect(toast()).toHaveTextContent(ALREADY_UNLOCKED)
+    expect(api.adminUnlockIdr).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops the toast when another action is asked for', async () => {
+    renderPage()
+    await ready()
+    await clickUnlock('Sep 18, 2026')
+    expect(toast()).toBeInTheDocument()
+    await clickUnlock('Sep 16, 2026')
+    expect(toast()).not.toBeInTheDocument()
+    expect(dialog()).toHaveAccessibleName('Unlock IDR')
   })
 
   it('holds the dialog while it works', async () => {
