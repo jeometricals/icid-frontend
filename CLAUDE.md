@@ -12,7 +12,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, the admin's all-IDRs list). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
@@ -282,6 +282,20 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   again and a one-time banner names the new email and says to share the password, until it is dismissed or
   another dialog is opened. The new user is on no project until given a role on the project roles page. A non-admin who opens the
   URL is told it is for admins; the backend returns 403 to them anyway.
+- **All Projects (admin).** `/admin/projects` (`AdminProjectsPage`), "All Projects (Admin)" in the user menu, which
+  only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
+  backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
+  for whatever a project lacks. Nothing on a row is editable or opens anything yet.
+  "Create project" (right of the heading) opens `CreateProjectModal`: project ID, project name, description,
+  borough (free text: there is no borough list) and registration code (optional). Save is off until the first
+  four are non-blank; `createAdminProject` (`POST /v1/admin/projects`) sends them trimmed, a blank registration
+  code as `null`. A refusal shows in the dialog as the backend worded it, a taken project ID's 409 included (its
+  `existing_project_id` isn't used yet) and a project ID with anything but letters, digits, hyphens and
+  underscores (400), and the form keeps what was typed. After a success the list is read again and a one-time
+  banner reads "Created project <project_id>.", until it is dismissed or the dialog is opened again. The new
+  project has no status and is on nobody's project list until someone is given a role on it
+  (`/admin/projects/<project_id>/roles`). A non-admin who opens the URL is told it is for admins; the backend
+  returns 403 to them anyway.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with
@@ -318,6 +332,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}`
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
+  - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
     `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and

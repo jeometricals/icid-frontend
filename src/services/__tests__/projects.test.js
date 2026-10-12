@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { changeProjectRole, getProjectRoles, getProjectsForUser, getProjectById } from '../projects'
+import {
+  changeProjectRole, createAdminProject, getProjectRoles, getProjectsForUser, getProjectById, listAdminProjects,
+} from '../projects'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 const MOCK_PROJECTS = [
@@ -88,6 +90,59 @@ describe('getProjectById', () => {
   it('throws when fetch itself fails', async () => {
     mockFetchFailure('Network error')
     await expect(getProjectById('P001')).rejects.toThrow('Network error')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// listAdminProjects, createAdminProject
+// ---------------------------------------------------------------------------
+
+describe('listAdminProjects', () => {
+  it('GETs /v1/admin/projects and returns the data array', async () => {
+    mockFetch(200, { data: [MOCK_PROJECT_DETAIL] })
+    expect(await listAdminProjects()).toEqual([MOCK_PROJECT_DETAIL])
+    expect(fetchUrl().pathname).toBe('/v1/admin/projects')
+    expect(fetchInit().method).toBe('GET')
+  })
+
+  it('throws the backend message for someone who is not an admin', async () => {
+    mockFetch(403, { detail: 'Admin access required' })
+    await expect(listAdminProjects()).rejects.toMatchObject({ message: 'Admin access required', status: 403 })
+  })
+})
+
+describe('createAdminProject', () => {
+  const NEW_PROJECT = { project_id: 'TEST001', project_name: 'Smoke', project_description: 'Smoke test',
+    borough: 'Manhattan', registration_code: null, status: null }
+  const VALUES = { project_id: 'TEST001', project_name: 'Smoke', project_description: 'Smoke test', borough: 'Manhattan' }
+
+  it('POSTs the whole project to /v1/admin/projects and returns the project', async () => {
+    mockFetch(201, { data: { ...NEW_PROJECT, registration_code: 'REG-1' } })
+    const created = await createAdminProject({ ...VALUES, registration_code: 'REG-1' })
+    expect(created).toEqual({ ...NEW_PROJECT, registration_code: 'REG-1' })
+    expect(fetchUrl().pathname).toBe('/v1/admin/projects')
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual({ ...VALUES, registration_code: 'REG-1' })
+  })
+
+  it.each([undefined, ''])('sends a null registration code when it is %j', async (registration_code) => {
+    mockFetch(201, { data: NEW_PROJECT })
+    await createAdminProject({ ...VALUES, registration_code })
+    expect(JSON.parse(fetchInit().body)).toEqual({ ...VALUES, registration_code: null })
+  })
+
+  it('throws the backend message for a taken project id, with the id', async () => {
+    mockFetch(409, { detail: 'A project with this project_id already exists', existing_project_id: 'TEST001' })
+    await expect(createAdminProject(VALUES)).rejects.toMatchObject({
+      message: 'A project with this project_id already exists', status: 409, body: { existing_project_id: 'TEST001' },
+    })
+  })
+
+  it('throws the backend message on a refusal', async () => {
+    mockFetch(400, { detail: 'project_id can only contain letters, digits, hyphens and underscores' })
+    await expect(createAdminProject({ ...VALUES, project_id: 'TEST 001' })).rejects.toMatchObject({
+      message: 'project_id can only contain letters, digits, hyphens and underscores', status: 400,
+    })
   })
 })
 
