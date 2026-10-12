@@ -1,10 +1,10 @@
 /**
  * The sign-in page: an email and password form, and "Try Demo Mode" for visitors without an account. Failures show
- * inline under the form. Once someone is signed in it sends them to the page they were headed for, else the
- * project list.
+ * inline under the form. Once someone is signed in it sends them to the page they were on when their session
+ * ended (?returnTo=), else the page they were headed for, else the project list.
  */
 import { useState, useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { HardHat } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -20,6 +20,13 @@ function ButtonSpinner() {
   )
 }
 
+// ?returnTo= as a place in this app: a path from the root, and not the login page itself. Anything else is ignored.
+function returnPath(returnTo) {
+  if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.startsWith('/\\')) return null
+  if (returnTo === '/login' || returnTo.startsWith('/login?')) return null
+  return returnTo
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,9 +34,11 @@ export default function LoginPage() {
   const { login, loginDemo, user, isLoading, error } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  // Page the user was sent here from by ProtectedRoute, else the project list
+  const [searchParams] = useSearchParams()
+  // Where the session ended (AuthContext), else the page ProtectedRoute sent the user here from, else the project list
   const from = location.state?.from
-  const redirectTo = from ? `${from.pathname}${from.search}` : '/projects'
+  const redirectTo = returnPath(searchParams.get('returnTo'))
+    || (from ? `${from.pathname}${from.search}` : '/projects')
 
   useEffect(() => {
     // Signed in (just now, or already): leave the login page

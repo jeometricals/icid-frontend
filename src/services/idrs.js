@@ -30,16 +30,26 @@ export async function createOrGetIdr({ projectId, reportDate = format(new Date()
  * 'stage1_review' | 'stage2_review' | 'approved') are optional filters. The backend leaves out deleted IDRs and
  * other people's drafts unless an admin asks for them with includeDeleted and includeAllDrafts (a 400 for anyone
  * else); a deleted IDR has status 'deleted'.
- * Returns an array of IDR rows, each with report_count, has_general, reporter_name, stage1_reviewer_name and
- * re_reviewer_name.
+ * The archive's filters, optional too and all of which must hold: idrNumber (the start of the IDR number, any
+ * case), workDate (one day) or from and to (work dates, inclusive; the backend refuses workDate with either), and
+ * disciplines (names from data/disciplines.js; an IDR with a report covering any of them). Dates are YYYY-MM-DD.
+ * Returns an array of IDR rows, each with report_count, has_general, disciplines, reporter_name,
+ * stage1_reviewer_name and re_reviewer_name.
  */
-export async function listIdrs({ projectId, reporterUuid, status, includeDeleted, includeAllDrafts } = {}) {
+export async function listIdrs({
+  projectId, reporterUuid, status, includeDeleted, includeAllDrafts, idrNumber, workDate, from, to, disciplines,
+} = {}) {
   const params = new URLSearchParams()
   if (projectId) params.set('project_id', projectId)
   if (reporterUuid) params.set('reporter_uuid', reporterUuid)
   if (status) params.set('status', status)
   if (includeDeleted) params.set('include_deleted', 'true')
   if (includeAllDrafts) params.set('include_all_drafts', 'true')
+  if (idrNumber) params.set('idr_number', idrNumber)
+  if (workDate) params.set('work_date', workDate)
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  for (const discipline of disciplines || []) params.append('discipline', discipline)
   const json = await apiFetch(`/v1/idrs/?${params}`)
   return json.data
 }

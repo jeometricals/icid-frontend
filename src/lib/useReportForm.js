@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getContractItems, getIdr, getProjectById, saveReport } from '../services/api'
 import { reportTypeLabel } from '../data/reportTypes'
+import { listOrigin } from './listOrigin'
 
 export const SUBMITTED_MID_EDIT =
   'This IDR was submitted while you were editing. Your unsaved changes could not be saved. Reloading...'
@@ -40,7 +41,7 @@ export default function useReportForm({
   const navigate = useNavigate()
   const location = useLocation()
   // Carry the list the IDR was opened from, so the IDR page's own Back still goes there
-  const backToIdr = () => navigate(`/project/${projectId}/idr/${idrId}`, { state: { from: location.state?.from } })
+  const backToIdr = () => navigate(`/project/${projectId}/idr/${idrId}`, { state: listOrigin(location) })
   const backToProject = () => navigate(`/project/${projectId}`)
 
   // The page's form functions, read through a ref so a page passing new function instances can't retrigger the load

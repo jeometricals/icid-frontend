@@ -121,14 +121,16 @@ function CurrentUrl() {
   return (
     <>
       <div data-testid="url">{location.pathname}</div>
+      <div data-testid="search">{location.search}</div>
       <div data-testid="from">{location.state?.from}</div>
+      <div data-testid="archive-search">{location.state?.archiveSearch}</div>
     </>
   )
 }
 
-function renderPage(from) {
+function renderPage(from, archiveSearch) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: IDR_URL, state: from ? { from } : undefined }]}>
+    <MemoryRouter initialEntries={[{ pathname: IDR_URL, state: from ? { from, archiveSearch } : undefined }]}>
       <Routes>
         <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
         <Route path="*" element={<CurrentUrl />} />
@@ -334,6 +336,15 @@ describe('IDRPage — reports', () => {
     await user.click(screen.getByRole('button', { name: 'Open' }))
     expect(screen.getByTestId('url')).toHaveTextContent(`${IDR_URL}/general/rep-gen`)
     expect(screen.getByTestId('from')).toHaveTextContent('drafts') // carried so the IDR's Back still works later
+  })
+
+  it('carries the archive\'s filters into the report too, so they survive the trip there and back', async () => {
+    const user = userEvent.setup()
+    renderPage('archive', '?idr_number=SW&discipline=Sidewalk')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+    expect(screen.getByTestId('from')).toHaveTextContent('archive')
+    expect(screen.getByTestId('archive-search')).toHaveTextContent('?idr_number=SW&discipline=Sidewalk')
   })
 
   it('opens an SWCB report at /project/:projectId/idr/:idrId/swcb/:reportId', async () => {
@@ -1235,5 +1246,38 @@ describe('IDRPage — reviewer edits', () => {
     await ready()
     expect(screen.getByLabelText('Weather AM')).toBeEnabled()
     expect(redlines()).toEqual([['Clear', 'RainyOE']])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Back to the archive keeps its filters
+// ---------------------------------------------------------------------------
+
+describe('IDRPage — back to a filtered archive', () => {
+  it('returns to the archive with the filters it was opened from', async () => {
+    const user = userEvent.setup()
+    renderPage('archive', '?from=2026-10-01&to=2026-10-07&discipline=Sidewalk')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Back to Archive' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023\/archive$/)
+    expect(screen.getByTestId('search')).toHaveTextContent('?from=2026-10-01&to=2026-10-07&discipline=Sidewalk')
+  })
+
+  it('returns to the plain archive when it had no filters', async () => {
+    const user = userEvent.setup()
+    renderPage('archive', '')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Back to Archive' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023\/archive$/)
+    expect(screen.getByTestId('search')).toBeEmptyDOMElement()
+  })
+
+  it('does not put archive filters on another list\'s Back', async () => {
+    const user = userEvent.setup()
+    renderPage('drafts', '?idr_number=SW')
+    await ready()
+    await user.click(screen.getByRole('button', { name: 'Back to Drafts' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023\/drafts$/)
+    expect(screen.getByTestId('search')).toBeEmptyDOMElement()
   })
 })

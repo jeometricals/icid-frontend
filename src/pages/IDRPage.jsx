@@ -18,6 +18,7 @@ import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } 
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
 import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
+import { listOrigin } from '../lib/listOrigin'
 import IdrHeaderForm from '../components/IdrHeaderForm'
 import IdrReportRow from '../components/IdrReportRow'
 import AddReportControl from '../components/AddReportControl'
@@ -48,7 +49,8 @@ const CERTIFICATION_STATEMENT =
   'specifications, and standards unless otherwise noted.'
 
 // Where "Back" goes, keyed by the list page that opened the IDR (router state.from): a path under the project, or,
-// for the review queue, which spans projects, a path of its own
+// for the review queue, which spans projects, a path of its own. The archive is returned to with the filters it
+// was opened from (router state.archiveSearch).
 const BACK_TARGETS = {
   drafts: { path: '/drafts', label: 'Back to Drafts' },
   archive: { path: '/archive', label: 'Back to Archive' },
@@ -71,8 +73,10 @@ export default function IDRPage() {
   const { rolesByProject } = useProjectRoles()
   const { refresh: refreshTaskCount } = useTaskCount()
   const isDemo = Boolean(user?.is_demo)
-  const back = BACK_TARGETS[location.state?.from] || BACK_TO_PROJECT
-  const backPath = back.to || `/project/${projectId}${back.path}`
+  const origin = listOrigin(location)
+  const back = BACK_TARGETS[origin.from] || BACK_TO_PROJECT
+  const backSearch = back === BACK_TARGETS.archive ? origin.archiveSearch || '' : ''
+  const backPath = back.to || `/project/${projectId}${back.path}${backSearch}`
 
   // Initial load; only this shows a spinner
   const [loadStatus, setLoadStatus] = useState('loading') // 'loading' | 'ready' | 'error'
@@ -278,13 +282,13 @@ export default function IDRPage() {
     if (!report) return
     const segment = reportTypeRoute(report.report_type) || 'general'
     navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, {
-      state: { from: location.state?.from, payItemGate: { itemId: untouched[0].pay_item_id, message: detail } },
+      state: { ...origin, payItemGate: { itemId: untouched[0].pay_item_id, message: detail } },
     })
   }
 
   const openReport = (report) => {
     const segment = reportTypeRoute(report.report_type) || 'general'
-    navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, { state: { from: location.state?.from } })
+    navigate(`/project/${projectId}/idr/${idrId}/${segment}/${report.report_id}`, { state: origin })
   }
 
   return (

@@ -107,6 +107,34 @@ describe('LoginPage — signing in', () => {
     expect(await screen.findByTestId('url')).toHaveTextContent('/project/HWS0023/drafts?x=1')
   })
 
+  it('goes back to ?returnTo= after a session that ended, query string included', async () => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    const user = userEvent.setup()
+    const returnTo = '/project/HWS0023/archive?idr_number=SW&discipline=Sidewalk'
+    renderLogin(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await fillAndSubmit(user)
+    expect(await screen.findByTestId('url')).toHaveTextContent(returnTo)
+    expect(localStorage.getItem(TOKEN_KEY)).toBe(sessionFor(TEST_USER).access_token)
+  })
+
+  it('prefers ?returnTo= to the page ProtectedRoute remembered', async () => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    const user = userEvent.setup()
+    renderLogin({ pathname: '/login', search: '?returnTo=%2Fadmin%2Fidrs', state: { from: { pathname: '/projects', search: '' } } })
+    await fillAndSubmit(user)
+    expect(await screen.findByTestId('url')).toHaveTextContent(/^\/admin\/idrs$/)
+  })
+
+  it.each([
+    'https://evil.example/steal', '//evil.example', '/\\evil.example', 'project/HWS0023', '/login', '/login?returnTo=%2Fx', '',
+  ])('ignores a returnTo that is not a page of this app (%s)', async (returnTo) => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    const user = userEvent.setup()
+    renderLogin(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await fillAndSubmit(user)
+    expect(await screen.findByTestId('url')).toHaveTextContent(/^\/projects$/)
+  })
+
   it('shows "Invalid email or password" under the form on a 401 and stays on the page', async () => {
     api.signIn.mockRejectedValue(httpError(401, 'Invalid email or password'))
     const user = userEvent.setup()

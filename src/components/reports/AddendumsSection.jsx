@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import { addReport, deleteReport } from '../../services/api'
 import { REPORT_TYPES, isAddendumType, isReportTypeAvailable, reportTypeLabel, reportTypeRoute } from '../../data/reportTypes'
+import { listOrigin } from '../../lib/listOrigin'
 import ConfirmDialog from '../ConfirmDialog'
 
 // Addendum types with a form page, in catalog order
@@ -43,7 +44,7 @@ export default function AddendumsSection({
   const goToAddendum = (addendum) => {
     const segment = reportTypeRoute(addendum.report_type)
     navigate(`/project/${projectId}/idr/${idrId}/${segment}/${addendum.report_id}`, {
-      state: { from: location.state?.from },
+      state: listOrigin(location),
     })
   }
 

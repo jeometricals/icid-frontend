@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchCurrentUser, signIn, signOutOnServer, startDemo } from '../services/api'
 import { clearToken, getToken, setToken, UNAUTHORIZED_EVENT } from '../services/session'
 
@@ -38,6 +38,10 @@ export const useAuth = () => {
  */
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate()
+  // Where the user is, for the listener below, which is set up once and so can't read it from its own render
+  const location = useLocation()
+  const latestLocation = useRef(location)
+  latestLocation.current = location
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(() => Boolean(getToken()))
   const [error, setError] = useState(null)
@@ -58,13 +62,17 @@ export const AuthProvider = ({ children }) => {
     return () => { ignore = true }
   }, [])
 
-  // apiFetch reports a 401 on any signed-in request: the session is over, wherever the user was
+  // apiFetch reports a 401 on any signed-in request: the session is over, wherever the user was. The login page
+  // gets that place as ?returnTo=, and sends them back to it once they have signed in again.
   useEffect(() => {
     const endSession = () => {
       clearToken()
       setUser(null)
       setError(SESSION_EXPIRED)
-      navigate('/login', { replace: true })
+      const { pathname, search } = latestLocation.current
+      // Several requests can fail together; the first one has already brought the user here
+      if (pathname === '/login') return
+      navigate(`/login?returnTo=${encodeURIComponent(`${pathname}${search}`)}`, { replace: true })
     }
     window.addEventListener(UNAUTHORIZED_EVENT, endSession)
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, endSession)

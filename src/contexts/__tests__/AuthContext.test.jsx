@@ -28,6 +28,7 @@ function AuthConsumer() {
       <div data-testid="loading">{String(isLoading)}</div>
       <div data-testid="error">{error ?? 'null'}</div>
       <div data-testid="url">{location.pathname}</div>
+      <div data-testid="search">{location.search}</div>
       <button onClick={() => login('KhanG@magnoleng.pc', 'secret-pw')}>login</button>
       <button onClick={() => loginDemo()}>demo</button>
       <button onClick={() => logout()}>logout</button>
@@ -249,6 +250,40 @@ describe('a 401 from any request', () => {
     expect(shown('url')).toBe('/login')
     expect(shown('error')).toBe(SESSION_EXPIRED)
     expect(api.signOutOnServer).not.toHaveBeenCalled()
+  })
+
+  it('tells the login page where the user was, query string included', async () => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    renderAuth('/project/HWS0023/archive?idr_number=SW&discipline=AC%20Pavement')
+    await click('login')
+
+    act(() => { window.dispatchEvent(new Event(UNAUTHORIZED_EVENT)) })
+
+    expect(shown('url')).toBe('/login')
+    expect(new URLSearchParams(shown('search')).get('returnTo')).toBe(
+      '/project/HWS0023/archive?idr_number=SW&discipline=AC%20Pavement')
+    expect(localStorage.getItem(TOKEN_KEY)).toBeNull()
+  })
+
+  it('keeps the first place when several requests fail together', async () => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    renderAuth('/admin/idrs')
+    await click('login')
+
+    act(() => { window.dispatchEvent(new Event(UNAUTHORIZED_EVENT)) })
+    act(() => { window.dispatchEvent(new Event(UNAUTHORIZED_EVENT)) })
+
+    expect(shown('url')).toBe('/login')
+    expect(shown('search')).toBe('?returnTo=%2Fadmin%2Fidrs')
+  })
+
+  it('signing out by choice carries no returnTo', async () => {
+    api.signIn.mockResolvedValue(sessionFor(TEST_USER))
+    renderAuth('/project/HWS0023')
+    await click('login')
+    await click('logout')
+    expect(shown('url')).toBe('/login')
+    expect(shown('search')).toBe('')
   })
 
   it('stops listening once the provider is gone', () => {

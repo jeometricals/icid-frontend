@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import ReportArchivePage from '../ReportArchivePage'
@@ -54,20 +54,35 @@ function CurrentUrl() {
     <>
       <div data-testid="url">{location.pathname + location.search}</div>
       <div data-testid="from">{location.state?.from}</div>
+      <div data-testid="archive-search">{location.state?.archiveSearch}</div>
     </>
   )
 }
 
-function renderPage() {
+// Shows the archive's own query string beside the page, as the address bar would
+function ArchiveWithUrl() {
+  const location = useLocation()
+  return (
+    <>
+      <div data-testid="archive-url">{location.search}</div>
+      <ReportArchivePage />
+    </>
+  )
+}
+
+function renderPage(search = '') {
   return render(
-    <MemoryRouter initialEntries={['/project/HWS0023/archive']}>
+    <MemoryRouter initialEntries={[`/project/HWS0023/archive${search}`]}>
       <Routes>
-        <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
+        <Route path="/project/:projectId/archive" element={<ArchiveWithUrl />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>
   )
 }
+
+const archiveUrl = () => screen.getByTestId('archive-url').textContent
+const lastListCall = () => api.listIdrs.mock.calls.at(-1)[0]
 
 // The table's body rows, top to bottom
 const rows = () => screen.getAllByRole('row').slice(1)
@@ -221,5 +236,134 @@ describe('ReportArchivePage — signed IDRs', () => {
     expect(signedRow).toHaveTextContent('Signed')
     expect(legacyRow).not.toHaveTextContent('Signed')
     expect(legacyRow).not.toHaveTextContent(/unsigned/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Filters: in the URL, sent to the backend
+// ---------------------------------------------------------------------------
+
+describe('ReportArchivePage — filters', () => {
+  beforeEach(() => { api.listIdrs.mockResolvedValue(LISTED) })
+
+  it('shows the filter panel above the table, with a checkbox per discipline', async () => {
+    renderPage()
+    await screen.findByText('Sep 23, 2026')
+    const panel = screen.getByRole('region', { name: 'Filters' })
+    expect(within(panel).getAllByRole('checkbox')).toHaveLength(6)
+    expect(panel.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('typing an IDR # puts it in the URL after the debounce and asks the backend again', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Sep 23, 2026')
+    await user.type(screen.getByLabelText('IDR #'), 'sw')
+    expect(archiveUrl()).toBe('') // not yet
+    await waitFor(() => expect(archiveUrl()).toBe('?idr_number=sw'))
+    expect(api.listIdrs).toHaveBeenCalledTimes(2) // once on load, once for the whole word
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023', idrNumber: 'sw' })
+    expect(screen.getByLabelText('IDR #')).toHaveFocus() // the panel is not remounted by the reload
+  })
+
+  it('a work date goes in the URL and replaces a range; a range replaces a work date', async () => {
+    renderPage('?from=2026-10-01&to=2026-10-07')
+    await screen.findByText('Sep 23, 2026')
+    fireEvent.change(screen.getByLabelText('Work date'), { target: { value: '2026-10-04' } })
+    await waitFor(() => expect(archiveUrl()).toBe('?work_date=2026-10-04'))
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023', workDate: '2026-10-04' })
+
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-10-02' } })
+    await waitFor(() => expect(archiveUrl()).toBe('?from=2026-10-02'))
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023', from: '2026-10-02' })
+
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-10-09' } })
+    await waitFor(() => expect(archiveUrl()).toBe('?from=2026-10-02&to=2026-10-09'))
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023', from: '2026-10-02', to: '2026-10-09' })
+  })
+
+  it('each ticked discipline is its own discipline parameter', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Sep 23, 2026')
+    await user.click(screen.getByRole('checkbox', { name: 'Sidewalk' }))
+    await user.click(screen.getByRole('checkbox', { name: 'AC Pavement' }))
+    await waitFor(() => expect(archiveUrl()).toBe('?discipline=AC+Pavement&discipline=Sidewalk'))
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023', disciplines: ['AC Pavement', 'Sidewalk'] })
+  })
+
+  it('a linked or reloaded URL fills the inputs and filters the first request', async () => {
+    renderPage('?idr_number=SW&from=2026-10-01&to=2026-10-07&discipline=Curb&discipline=Sidewalk')
+    await screen.findByText('Sep 23, 2026')
+    expect(api.listIdrs).toHaveBeenCalledTimes(1)
+    expect(lastListCall()).toEqual({
+      projectId: 'HWS0023', idrNumber: 'SW', from: '2026-10-01', to: '2026-10-07', disciplines: ['Curb', 'Sidewalk'],
+    })
+    expect(screen.getByLabelText('IDR #')).toHaveValue('SW')
+    expect(screen.getByLabelText('From')).toHaveValue('2026-10-01')
+    expect(screen.getByLabelText('To')).toHaveValue('2026-10-07')
+    expect(screen.getByRole('checkbox', { name: 'Curb' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Sidewalk' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'General' })).not.toBeChecked()
+  })
+
+  it('Clear filters empties the URL and the inputs and lists everything again', async () => {
+    const user = userEvent.setup()
+    renderPage('?idr_number=SW&work_date=2026-10-04&discipline=Sidewalk')
+    await screen.findByText('Sep 23, 2026')
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await waitFor(() => expect(archiveUrl()).toBe(''))
+    expect(lastListCall()).toEqual({ projectId: 'HWS0023' })
+    expect(screen.getByLabelText('IDR #')).toHaveValue('')
+    expect(screen.getByLabelText('Work date')).toHaveValue('')
+    expect(screen.getByRole('checkbox', { name: 'Sidewalk' })).not.toBeChecked()
+  })
+
+  it('says nothing matches, rather than nothing submitted, when the filters leave no IDR', async () => {
+    api.listIdrs.mockResolvedValue([])
+    renderPage('?discipline=Concrete+%28delivery%29')
+    expect(await screen.findByText('No submitted IDRs match these filters.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeEnabled()
+  })
+
+  it('shows the backend\'s refusal of a hand-edited URL, with Clear filters at hand', async () => {
+    api.listIdrs.mockRejectedValueOnce(new Error('Unknown discipline: Nonsense')).mockResolvedValue(LISTED)
+    const user = userEvent.setup()
+    renderPage('?discipline=Nonsense')
+    expect(await screen.findByText(/couldn't load submitted idrs: unknown discipline: nonsense/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(await screen.findByText('Sep 23, 2026')).toBeInTheDocument()
+    expect(archiveUrl()).toBe('')
+  })
+
+  it('opening an IDR hands its page the filters, for Back', async () => {
+    const user = userEvent.setup()
+    renderPage('?idr_number=SW&discipline=Sidewalk')
+    await user.click(await screen.findByRole('button', { name: 'Sep 23, 2026' }))
+    expect(screen.getByTestId('from')).toHaveTextContent('archive')
+    expect(screen.getByTestId('archive-search')).toHaveTextContent('?idr_number=SW&discipline=Sidewalk')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Discipline chips
+// ---------------------------------------------------------------------------
+
+describe('ReportArchivePage — discipline chips', () => {
+  it('shows each IDR\'s disciplines beside its number, as the backend ordered them', async () => {
+    api.listIdrs.mockResolvedValue([
+      idr({ idr_id: 'swcb', report_date: '2026-09-23', idr_number: 'SW-1', disciplines: ['Curb', 'Sidewalk'] }),
+      idr({ idr_id: 'mixed', report_date: '2026-09-22', idr_number: '007',
+        disciplines: ['AC Pavement', 'Concrete (delivery)', 'General'] }),
+      idr({ idr_id: 'empty', report_date: '2026-09-21', disciplines: [] }),
+    ])
+    renderPage()
+    await screen.findByText('Sep 23, 2026')
+    const chips = row => within(row).queryAllByRole('listitem').map(chip => chip.textContent)
+    expect(rows().map(chips)).toEqual([
+      ['Curb', 'Sidewalk'],
+      ['AC Pavement', 'Concrete (delivery)', 'General'],
+      [],
+    ])
   })
 })

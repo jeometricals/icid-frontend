@@ -159,6 +159,30 @@ describe('listIdrs', () => {
     expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ project_id: 'HWS0023' })
   })
 
+  it('sends the archive filters under the backend\'s names', async () => {
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ projectId: 'HWS0023', idrNumber: 'SW', from: '2026-10-01', to: '2026-10-07' })
+    expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({
+      project_id: 'HWS0023', idr_number: 'SW', from: '2026-10-01', to: '2026-10-07',
+    })
+
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ projectId: 'HWS0023', workDate: '2026-10-04' })
+    expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ project_id: 'HWS0023', work_date: '2026-10-04' })
+  })
+
+  it('sends each discipline as its own discipline parameter, spelled as given', async () => {
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ projectId: 'HWS0023', disciplines: ['Sidewalk', 'AC Pavement', 'Concrete (delivery)'] })
+    expect(fetchUrl().searchParams.getAll('discipline')).toEqual(['Sidewalk', 'AC Pavement', 'Concrete (delivery)'])
+  })
+
+  it('leaves out an archive filter that is blank or empty', async () => {
+    mockFetch(200, { status: 'success', data: [] })
+    await listIdrs({ projectId: 'HWS0023', idrNumber: '', workDate: '', from: '', to: '', disciplines: [] })
+    expect(Object.fromEntries(fetchUrl().searchParams)).toEqual({ project_id: 'HWS0023' })
+  })
+
   it('returns the data array', async () => {
     mockFetch(200, { status: 'success', data: ROWS })
     expect(await listIdrs({ projectId: 'HWS0023' })).toEqual(ROWS)

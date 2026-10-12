@@ -18,10 +18,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
-- `src/data/` — static/mock data (report type definitions).
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/data/` — static/mock data (report type definitions, and `disciplines.js`: the discipline names the archive filters by).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, and the archive's `ArchiveFilters`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -68,9 +68,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `login(email, password)`, `loginDemo()`, `logout()`. On startup it restores the session from the stored token
     with `GET /v1/auth/me`. It must sit inside the Router (it navigates on sign-out).
   - `apiFetch` adds `Authorization: Bearer <token>` to every request. A 401 clears the token and fires
-    `UNAUTHORIZED_EVENT`; `AuthContext` then signs the user out and sends them to `/login`. The caller's promise
+    `UNAUTHORIZED_EVENT`; `AuthContext` then signs the user out and sends them to
+    `/login?returnTo=<path and query string they were on>`, with "Your session has expired". The caller's promise
     never settles, so pages show no error on the way out. Only the calls in `services/auth.js` opt out
     (`redirectOn401: false`), because a 401 there means wrong credentials or a stale token.
+    - This is the one place a 401 is handled. Every backend call goes through `apiFetch`, so a new service
+      function gets it for nothing; a page never checks for 401 itself.
+    - **After signing in again** `LoginPage` goes to `returnTo`, else to the page `ProtectedRoute` remembered
+      (`state.from`), else `/projects`. `returnTo` is only followed when it is a path in this app (it starts
+      with one `/`, and isn't `/login`). Sign Out carries no `returnTo`.
+    - When several requests fail together, the first one sets `returnTo` and the rest change nothing.
   - Every route except `/login` sits inside `<ProtectedRoute>` in `App.jsx`; a new page goes there too.
   - **The user never goes in a URL or a request body.** The backend takes the project list's user, an IDR's
     reporter and an attachment's uploader from the token. `?reporter_uuid=` on the IDR list is only a filter.
@@ -139,7 +146,30 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     else shows up at the next sign-in, reload or action.
   - **The Archive** is a table (`IdrTable`, shared with the queue) of every IDR past draft, sorted by work date,
     with names from the list itself (`reporter_name`, `stage1_reviewer_name`, `re_reviewer_name`); it no longer
-    calls `GET /v1/users/`. No filters yet.
+    calls `GET /v1/users/`.
+    - **Filters** (`ArchiveFilters`, above the table): an IDR # box (the start of the number, any case; it
+      filters 300 ms after the last keystroke), a work date or a from / to range, and a checkbox per
+      discipline. The backend does the filtering: `listIdrs` takes `idrNumber`, `workDate`, `from`, `to` and
+      `disciplines`. The page still drops drafts and sorts by work date itself.
+    - **Work date and range exclude each other.** Setting a work date clears from and to, and setting either
+      bound clears the work date, quietly, because the backend refuses both together (400). Either bound works
+      alone. The pickers limit each other (`min` / `max`); a range typed backwards is still the backend's 400.
+    - **The disciplines** are the six names in `src/data/disciplines.js`, spelled exactly as the backend's
+      mapping has them; it refuses any other spelling with a 400. A new discipline there needs adding here.
+    - **The URL holds the filters** (`useSearchParams`), under the backend's own names: `?idr_number=`,
+      `?work_date=`, `?from=`, `?to=` and a `?discipline=` per ticked discipline. The page keeps no filter state
+      of its own: it reads the query string, and every change writes it, so a filtered view can be linked,
+      reloaded and gone back to. Typing replaces the history entry; every other change adds one. This is the
+      convention for a list page with filters.
+    - A URL the backend refuses (edited by hand) shows the usual error with the backend's message; Clear
+      filters is still there. Filters that leave nothing read "No submitted IDRs match these filters."
+    - **Chips.** Each row lists the IDR's `disciplines` (alphabetical, as the backend sends them) under its
+      IDR #. `IdrTable` shows them only with `showDisciplines`, which the archive alone passes; the queue and
+      the admin list get the same field and leave it out.
+    - **Back from an IDR returns to the filtered view.** The archive opens an IDR with
+      `state: { from: 'archive', archiveSearch }`, and `listOrigin` (`lib/listOrigin.js`) hands both on with
+      every navigation between the IDR page, its reports and their addendums. A new navigation among those
+      pages passes `listOrigin(location)` as its state.
 - **Reviewer edits (redlines).** While an IDR is in review, the reviewer who accepted it at its current stage (or
   an admin) can change its fields. The backend applies each edit and logs it, so the IDR and its reports always
   hold the current values and `field_edits` (on `GET /v1/idrs/{id}`, oldest first) is their history.
@@ -251,7 +281,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
-    `include_all_drafts=`, admin only) · `GET /v1/idrs/{id}`
+    `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and
+    repeatable `discipline=`; each row carries `disciplines`) · `GET /v1/idrs/{id}`
   - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
     `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`

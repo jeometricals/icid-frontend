@@ -1,14 +1,17 @@
 /**
  * Lists every IDR on one project (route param :projectId) that has been submitted, wherever it now stands in
  * review: submitted, in Stage 1 or Stage 2 review, or approved. Sorted by work date, newest first. Each row shows
- * the IDR #, its status, the inspector, the latest reviewer and when it was submitted.
+ * the IDR # with the disciplines its reports cover, its status, the inspector, the latest reviewer and when it was
+ * submitted.
  * Project-wide on purpose: submitted IDRs are shared project records, not per-inspector.
- * Clicking an IDR opens its IDR page read-only. No filters yet.
+ * The filter panel above the table (IDR #, work date or a range, discipline) keeps its filters in the URL's query
+ * string, so a filtered view can be linked and reloaded. Clicking an IDR opens its IDR page read-only.
  */
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { listIdrs } from '../services/api'
+import ArchiveFilters from '../components/ArchiveFilters'
 import IdrTable from '../components/IdrTable'
 
 // Newest work date first; on the same day, the most recently submitted first
@@ -16,9 +19,40 @@ function byWorkDate(a, b) {
   return b.report_date.localeCompare(a.report_date) || (b.submitted_at || '').localeCompare(a.submitted_at || '')
 }
 
+// The filters a query string holds, under the names the backend's IDR list takes them by
+function filtersIn(searchParams) {
+  return {
+    idrNumber: (searchParams.get('idr_number') || '').trim(),
+    workDate: searchParams.get('work_date') || '',
+    from: searchParams.get('from') || '',
+    to: searchParams.get('to') || '',
+    disciplines: searchParams.getAll('discipline'),
+  }
+}
+
+// The query string for a set of filters; one that isn't set leaves no parameter behind
+function paramsFor(filters) {
+  const params = new URLSearchParams()
+  if (filters.idrNumber) params.set('idr_number', filters.idrNumber)
+  if (filters.workDate) params.set('work_date', filters.workDate)
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
+  filters.disciplines.forEach(discipline => params.append('discipline', discipline))
+  return params
+}
+
+// Only the filters that are set, as listIdrs takes them
+function setFilters(filters) {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => value.length > 0))
+}
+
 export default function ReportArchivePage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.toString()
+  const filters = useMemo(() => filtersIn(new URLSearchParams(search)), [search])
+  const filtered = Object.keys(setFilters(filters)).length > 0
   const [idrs, setIdrs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -30,15 +64,22 @@ export default function ReportArchivePage() {
     setError(null)
     // No status filter: the archive spans every status after draft. The list still carries the user's own drafts
     // (a returned IDR among them), which belong on the Drafts page.
-    listIdrs({ projectId })
+    listIdrs({ projectId, ...setFilters(filters) })
       .then(data => { if (!ignore) setIdrs(data.filter(idr => idr.status !== 'draft').sort(byWorkDate)) })
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [projectId, attempt])
+  }, [projectId, filters, attempt])
+
+  const changeFilters = (patch, { replace }) => {
+    setSearchParams(paramsFor({ ...filters, ...patch }), { replace })
+  }
 
   const openIdr = (idr) => {
-    navigate(`/project/${projectId}/idr/${idr.idr_id}`, { state: { from: 'archive' } })
+    // archiveSearch lets the IDR page's Back return to this filtered view
+    navigate(`/project/${projectId}/idr/${idr.idr_id}`, {
+      state: { from: 'archive', archiveSearch: search ? `?${search}` : '' },
+    })
   }
 
   return (
@@ -54,6 +95,9 @@ export default function ReportArchivePage() {
 
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Report Archive — {projectId}</h2>
 
+        {/* Stays mounted while the list reloads, so the IDR # box keeps its focus */}
+        <ArchiveFilters filters={filters} onChange={changeFilters} />
+
         {loading ? (
           <div className="flex justify-center py-12">
             <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
@@ -67,10 +111,12 @@ export default function ReportArchivePage() {
           </div>
         ) : idrs.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-            No submitted IDRs for this project yet. Submitted IDRs will appear here.
+            {filtered
+              ? 'No submitted IDRs match these filters.'
+              : 'No submitted IDRs for this project yet. Submitted IDRs will appear here.'}
           </div>
         ) : (
-          <IdrTable idrs={idrs} onOpen={openIdr} />
+          <IdrTable idrs={idrs} onOpen={openIdr} showDisciplines />
         )}
       </main>
     </div>

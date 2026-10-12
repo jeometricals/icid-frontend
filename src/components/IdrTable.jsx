@@ -5,15 +5,18 @@ import StatusBadge from './StatusBadge'
 
 /**
  * Table of IDRs, one row each, for the Report Archive, the review queues and the admin's list of every IDR: work
- * date, IDR #, status, inspector (with a "Signed" mark when the IDR was submitted with a signature), latest
+ * date, IDR # (with the disciplines its reports cover, when asked for), status, inspector (with a "Signed" mark when the IDR was submitted with a signature), latest
  * reviewer and when it was submitted. A row opens its IDR. The rows are shown in the order given.
  * Props: idrs (listIdrs / getReviewQueue rows), onOpen(idr) (leave it out and the rows don't open anything),
- * showProject (adds a Project column; default false), sort ({key, direction: 'asc' | 'desc'}) with onSort(key)
+ * showProject (adds a Project column; default false), showDisciplines (lists each IDR's disciplines as chips
+ * under its number; default false), sort ({key, direction: 'asc' | 'desc'}) with onSort(key)
  * (makes the Work date, Status and Submitted headings buttons; key is 'report_date' | 'status' | 'submitted_at'),
  * renderActions(idr) (adds an Actions column holding what it returns), blankNumber (shown for an IDR with no
  * number; default the "No IDR # yet" badge).
  */
-export default function IdrTable({ idrs, onOpen, showProject = false, sort, onSort, renderActions, blankNumber }) {
+export default function IdrTable({
+  idrs, onOpen, showProject = false, showDisciplines = false, sort, onSort, renderActions, blankNumber,
+}) {
   const heading = (label, sortKey) => (
     <ColumnHeading label={label} sortKey={sortKey} sort={sort} onSort={onSort} />
   )
@@ -60,6 +63,18 @@ export default function IdrTable({ idrs, onOpen, showProject = false, sort, onSo
                 {!idr.idr_number && blankNumber !== undefined
                   ? <span className="text-gray-400">{blankNumber}</span>
                   : <IDRNumberBadge number={idr.idr_number} />}
+                {showDisciplines && idr.disciplines?.length > 0 && (
+                  <ul aria-label="Disciplines" className="mt-1 flex flex-wrap gap-1">
+                    {idr.disciplines.map(discipline => (
+                      <li
+                        key={discipline}
+                        className="rounded-full bg-construction-50 px-2 py-0.5 text-xs font-medium text-construction-800 whitespace-nowrap"
+                      >
+                        {discipline}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </td>
               <td className="px-4 py-3"><StatusBadge status={idr.status} returned={Boolean(idr.return_reason)} /></td>
               <td className="px-4 py-3 text-gray-700">
