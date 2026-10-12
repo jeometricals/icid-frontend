@@ -266,6 +266,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   first, a refusal shows in the dialog, and after a success the page reads the list again rather than patching
   the row, then refreshes the task count. Rows don't open the IDR page. A non-admin who opens the URL is told it
   is for admins; the backend returns 403 / 400 to them anyway.
+- **All Users (admin).** `/admin/users` (`AdminUsersPage`), "All Users (Admin)" in the user menu, which only an
+  admin sees. One `GET /v1/admin/users` (`listAdminUsers` in `services/users.js`), shown in the backend's order:
+  email, first name, last name, role (`Admin` for `role === 'admin'`, `Demo` for a demo user, otherwise
+  `Regular`) and a tick for a signature. Each row's "Edit" opens `EditUserModal` with both names filled in; Save
+  sends only the names that changed (`patchAdminUser`, `PATCH /v1/admin/users/{id}`) and is off until one has.
+  A name can't be cleared, so emptying one that was set is an inline error and nothing is sent. A refusal shows
+  in the dialog; after a success the page reads the list again, and re-reads the signed-in user (`refreshUser`)
+  when the admin renamed themselves. Email, role and demo status aren't editable here. A non-admin who opens the
+  URL is told it is for admins; the backend returns 403 to them anyway.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with

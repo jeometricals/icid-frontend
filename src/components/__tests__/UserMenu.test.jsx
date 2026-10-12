@@ -307,7 +307,7 @@ describe('UserMenu — All IDRs (Admin)', () => {
   it('sits after the signature item for an admin', async () => {
     renderMenu(ADMIN)
     await open()
-    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'All IDRs (Admin)', 'Sign Out'])
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'All IDRs (Admin)', 'All Users (Admin)', 'Sign Out'])
   })
 
   it.each([
@@ -325,6 +325,28 @@ describe('UserMenu — All IDRs (Admin)', () => {
     await open()
     await userEvent.click(item('All IDRs (Admin)'))
     expect(screen.getByTestId('url')).toHaveTextContent('/admin/idrs')
+    expect(menu()).not.toBeInTheDocument()
+  })
+})
+
+describe('UserMenu — All Users (Admin)', () => {
+  const ADMIN = { ...TEST_USER, role: 'admin' }
+
+  it.each([
+    ['an inspector', TEST_USER, { HWS0023: ['inspector'] }],
+    ['an RE', TEST_USER, { HWS0023: ['re'] }],
+    ['a demo user', DEMO_USER, { DEMO01: ['inspector'] }],
+  ])('is hidden for %s', async (_, user, roles) => {
+    renderMenu(user, roles)
+    await open()
+    expect(itemNames()).not.toContain('All Users (Admin)')
+  })
+
+  it('opens the users page and closes the menu', async () => {
+    renderMenu(ADMIN)
+    await open()
+    await userEvent.click(item('All Users (Admin)'))
+    expect(screen.getByTestId('url')).toHaveTextContent('/admin/users')
     expect(menu()).not.toBeInTheDocument()
   })
 })

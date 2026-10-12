@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, CircleUserRound, ClipboardCheck, LogOut, PenLine, ShieldCheck } from 'lucide-react'
+import { ChevronDown, CircleUserRound, ClipboardCheck, LogOut, PenLine, ShieldCheck, Users } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
@@ -14,7 +14,7 @@ import SignatureSetupModal from './SignatureSetupModal'
  * The signed-in user's menu in the app header: their first name (or email), with a "Demo Mode" badge for a demo
  * user, opening a dropdown with My Tasks (only for someone who reviews IDRs: an OE or RE on some project, or an
  * admin; it carries the number of IDRs waiting on them, and the name gets a red dot while there are any), their
- * signature (set up or update; not for demo users, who can't submit), "All IDRs (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
+ * signature (set up or update; not for demo users, who can't submit), "All IDRs (Admin)" and "All Users (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
  * the page's leave guard, so a report form saves unsaved edits first.
  * Opens on click; closes on a pick, Escape or a click elsewhere. Arrow keys, Home and End move between items.
  * Takes no props; reads the user from AuthContext.
@@ -77,6 +77,12 @@ export default function UserMenu() {
       label: 'All IDRs (Admin)',
       icon: ShieldCheck,
       onSelect: () => leave(() => navigate('/admin/idrs')),
+    },
+    isAdmin(user) && {
+      id: 'admin-users',
+      label: 'All Users (Admin)',
+      icon: Users,
+      onSelect: () => leave(() => navigate('/admin/users')),
     },
     {
       id: 'sign-out',
