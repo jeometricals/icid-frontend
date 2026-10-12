@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { listAdminUsers, listUsers, patchAdminUser } from '../users'
+import { createAdminUser, listAdminUsers, listUsers, patchAdminUser } from '../users'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
 import { TEST_USER_ID } from '../../test/users'
 
@@ -52,6 +52,42 @@ describe('listAdminUsers', () => {
   it('throws the backend message for someone who is not an admin', async () => {
     mockFetch(403, { detail: 'Admin access required' })
     await expect(listAdminUsers()).rejects.toMatchObject({ message: 'Admin access required', status: 403 })
+  })
+})
+
+describe('createAdminUser', () => {
+  const NEW_USER = { ...ADMIN_USERS[0], uuid: 'c0000000-0000-4000-8000-000000000003', email: 'test1@icid.local',
+    first_name: 'Test', last_name: null }
+
+  it('POSTs the whole user to /v1/admin/users and returns the user', async () => {
+    mockFetch(201, { data: NEW_USER })
+    const created = await createAdminUser(
+      { email: 'test1@icid.local', first_name: 'Test', last_name: 'One', password: 'test1234', is_admin: true })
+    expect(created).toEqual(NEW_USER)
+    expect(fetchUrl().pathname).toBe('/v1/admin/users')
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual(
+      { email: 'test1@icid.local', first_name: 'Test', last_name: 'One', password: 'test1234', is_admin: true })
+  })
+
+  it('sends an empty last name and no admin role when neither is given', async () => {
+    mockFetch(201, { data: NEW_USER })
+    await createAdminUser({ email: 'test1@icid.local', first_name: 'Test', password: 'test1234' })
+    expect(JSON.parse(fetchInit().body)).toEqual(
+      { email: 'test1@icid.local', first_name: 'Test', last_name: '', password: 'test1234', is_admin: false })
+  })
+
+  it('throws the backend message for a taken email, with the user who has it', async () => {
+    mockFetch(409, { detail: 'A user with this email already exists', existing_user_uuid: TEST_USER_ID })
+    await expect(createAdminUser({ email: 'KHANG@magnoleng.pc', first_name: 'G', password: 'test1234' }))
+      .rejects.toMatchObject({ message: 'A user with this email already exists', status: 409,
+        body: { existing_user_uuid: TEST_USER_ID } })
+  })
+
+  it('throws the backend message on a refusal', async () => {
+    mockFetch(400, { detail: 'password must be at least 6 characters' })
+    await expect(createAdminUser({ email: 'a@icid.local', first_name: 'A', password: '123' }))
+      .rejects.toMatchObject({ message: 'password must be at least 6 characters', status: 400 })
   })
 })
 

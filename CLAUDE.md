@@ -273,7 +273,14 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   sends only the names that changed (`patchAdminUser`, `PATCH /v1/admin/users/{id}`) and is off until one has.
   A name can't be cleared, so emptying one that was set is an inline error and nothing is sent. A refusal shows
   in the dialog; after a success the page reads the list again, and re-reads the signed-in user (`refreshUser`)
-  when the admin renamed themselves. Email, role and demo status aren't editable here. A non-admin who opens the
+  when the admin renamed themselves. An existing user's email, role and demo status aren't editable here.
+  "Create user" (right of the heading) opens `CreateUserModal`: email, first name, last name (optional), a
+  password shown as typed (the admin passes it on) and "Grant admin role". Save is off until the email, the
+  first name and a password of at least 6 characters are in; `createAdminUser` (`POST /v1/admin/users`) sends
+  them. A refusal shows in the dialog as the backend worded it, a taken email's 409 included (its
+  `existing_user_uuid` isn't used yet), and the form keeps what was typed. After a success the list is read
+  again and a one-time banner names the new email and says to share the password, until it is dismissed or
+  another dialog is opened. The new user is on no project until given a role on the project roles page. A non-admin who opens the
   URL is told it is for admins; the backend returns 403 to them anyway.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved

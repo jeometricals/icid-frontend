@@ -19,6 +19,19 @@ export async function listAdminUsers() {
 }
 
 /**
+ * Admin only: creates a user who signs in with the password given, and returns them. last_name is optional (blank
+ * is none); is_admin makes them an admin. The backend answers 400 for a value that doesn't fit and 409 when the
+ * email is taken, whatever its capitals (the thrown error's body then carries existing_user_uuid).
+ */
+export async function createAdminUser({ email, first_name, last_name, password, is_admin }) {
+  const json = await apiFetch('/v1/admin/users', {
+    method: 'POST',
+    body: { email, first_name, last_name: last_name ?? '', password, is_admin: !!is_admin },
+  })
+  return json.data
+}
+
+/**
  * Admin only: changes a user's first name, last name or both, and returns the user as they now are. A name left
  * out (undefined) keeps its value. The backend trims the names and answers 400 for a blank or over-long one, or
  * when neither is sent, and 404 for an unknown user.

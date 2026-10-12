@@ -16,7 +16,7 @@ const ADMIN = { ...TEST_USER, uuid: 'a0000000-0000-4000-8000-000000000001', emai
 // As the backend lists them: by last name, first name and email
 const LISTED = [{ ...TEST_USER, has_signature: false, signature_set_at: null }, DEMO_USER, ADMIN]
 
-vi.mock('../../services/api', () => ({ listAdminUsers: vi.fn(), patchAdminUser: vi.fn() }))
+vi.mock('../../services/api', () => ({ listAdminUsers: vi.fn(), patchAdminUser: vi.fn(), createAdminUser: vi.fn() }))
 
 let server
 let refreshUser
@@ -29,6 +29,12 @@ beforeEach(() => {
   api.patchAdminUser.mockImplementation(async (userId, names) => {
     server = server.map(row => (row.uuid === userId ? { ...row, ...names } : row))
     return server.find(row => row.uuid === userId)
+  })
+  api.createAdminUser.mockImplementation(async ({ email, first_name, last_name, is_admin }) => {
+    const created = { uuid: 'c0000000-0000-4000-8000-000000000003', email, first_name, last_name: last_name || null,
+      role: is_admin ? 'admin' : null, is_demo: false, has_signature: false, signature_set_at: null }
+    server = [...server, created]
+    return created
   })
 })
 
@@ -244,6 +250,148 @@ describe('AdminUsersPage — editing a user', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Creating a user
+// ---------------------------------------------------------------------------
+
+describe('AdminUsersPage — creating a user', () => {
+  const openCreate = () => userEvent.click(screen.getByRole('button', { name: 'Create user' }))
+  const submit = () => userEvent.click(within(dialog()).getByRole('button', { name: 'Create user' }))
+  const banner = () => screen.queryByRole('status')
+
+  async function fillIn({ email = 'test1@icid.local', firstName = 'Test', password = 'test1234' } = {}) {
+    await userEvent.type(within(dialog()).getByLabelText('Email'), email)
+    await userEvent.type(within(dialog()).getByLabelText('First name'), firstName)
+    await userEvent.type(within(dialog()).getByLabelText('Password'), password)
+  }
+
+  it('has a Create user button that opens the dialog', async () => {
+    renderPage()
+    await ready()
+    expect(dialog()).not.toBeInTheDocument()
+    await openCreate()
+    expect(screen.getByRole('dialog', { name: 'Create User' })).toBeInTheDocument()
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue('')
+  })
+
+  it('creates the user, closes the dialog, reads the list again and announces them once', async () => {
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await submit()
+    expect(api.createAdminUser).toHaveBeenCalledTimes(1)
+    expect(api.createAdminUser).toHaveBeenCalledWith(
+      { email: 'test1@icid.local', first_name: 'Test', last_name: '', password: 'test1234', is_admin: false })
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(2)
+    expect(cells('test1@icid.local').slice(0, 4)).toEqual(['test1@icid.local', 'Test', '—', 'Regular'])
+    expect(banner()).toHaveTextContent(
+      "Created user test1@icid.local. Share the password with them securely — it won't be shown again.")
+    expect(banner()).not.toHaveTextContent('test1234')
+  })
+
+  it('creates an admin when the box is ticked', async () => {
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await userEvent.click(within(dialog()).getByLabelText('Grant admin role'))
+    await submit()
+    expect(api.createAdminUser.mock.calls[0][0].is_admin).toBe(true)
+    expect(cells('test1@icid.local')[3]).toBe('Admin')
+  })
+
+  it('drops the banner when it is dismissed', async () => {
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await submit()
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['the Create User dialog', () => userEvent.click(screen.getByRole('button', { name: 'Create user' }))],
+    ['an Edit User dialog', () => editRow(TEST_USER.email)],
+  ])('drops the banner when %s is opened', async (_, open) => {
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await submit()
+    expect(banner()).toBeInTheDocument()
+    await open()
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('shows a taken email inline, keeps what was typed and announces nothing', async () => {
+    const taken = Object.assign(new Error('A user with this email already exists'),
+      { status: 409, body: { existing_user_uuid: TEST_USER.uuid } })
+    api.createAdminUser.mockRejectedValueOnce(taken)
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn({ email: 'KHANG@magnoleng.pc' })
+    await submit()
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('A user with this email already exists')
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue('KHANG@magnoleng.pc')
+    expect(within(dialog()).getByLabelText('Password')).toHaveValue('test1234')
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(1)
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('shows any other refusal as the backend worded it', async () => {
+    api.createAdminUser.mockRejectedValueOnce(
+      Object.assign(new Error('email is not a valid email address'), { status: 400 }))
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn({ email: 'no-at-sign' })
+    await submit()
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('email is not a valid email address')
+    expect(dialog()).toBeInTheDocument()
+  })
+
+  it('forgets a refusal when the dialog is opened again', async () => {
+    api.createAdminUser.mockRejectedValueOnce(new Error('A user with this email already exists'))
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await submit()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    await openCreate()
+    expect(within(dialog()).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue('')
+  })
+
+  it('still announces the user when the list could not be read again', async () => {
+    renderPage()
+    await ready()
+    api.listAdminUsers.mockRejectedValueOnce(new Error('Network error'))
+    await openCreate()
+    await fillIn()
+    await submit()
+    expect(dialog()).not.toBeInTheDocument()
+    expect(banner()).toHaveTextContent('Created user test1@icid.local.')
+    expect(screen.getByRole('alert'))
+      .toHaveTextContent("The change was saved, but the list couldn't be refreshed: Network error")
+  })
+
+  it('cancels without creating', async () => {
+    renderPage()
+    await ready()
+    await openCreate()
+    await fillIn()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.createAdminUser).not.toHaveBeenCalled()
+    expect(banner()).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Admins only
 // ---------------------------------------------------------------------------
 
@@ -255,6 +403,7 @@ describe('AdminUsersPage — admins only', () => {
     renderPage(user)
     expect(screen.getByText('Only an admin can manage users.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create user' })).not.toBeInTheDocument()
     expect(api.listAdminUsers).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Back to Projects' }))
     expect(screen.getByTestId('url')).toHaveTextContent('/projects')

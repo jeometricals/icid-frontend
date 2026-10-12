@@ -1,16 +1,19 @@
 /**
  * Every user, at /admin/users. Admins only: a table (email, first name, last name, role, whether they have a
  * signature) in the backend's order, with an Edit button on each row that opens a dialog for the user's first and
- * last name. After a save the list is read again, so a row shows what the backend wrote; when the admin renamed
- * themselves, the signed-in user is re-read too, so the header shows the new name. Anyone who isn't an admin is
- * told so instead.
+ * last name, and a "Create user" button that opens one for a new user. After a save the list is read again, so a
+ * row shows what the backend wrote; when the admin renamed themselves, the signed-in user is re-read too, so the
+ * header shows the new name. A created user is announced once, in a banner that reminds the admin to pass the
+ * password on; it goes when dismissed or when another dialog is opened. Anyone who isn't an admin is told so
+ * instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check } from 'lucide-react'
+import { ArrowLeft, Check, UserPlus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { listAdminUsers, patchAdminUser } from '../services/api'
+import { createAdminUser, listAdminUsers, patchAdminUser } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
+import CreateUserModal from '../components/CreateUserModal'
 import EditUserModal from '../components/EditUserModal'
 
 // What the Role column says: an admin, a demo user, or anyone else
@@ -30,6 +33,8 @@ export default function AdminUsersPage() {
   const [attempt, setAttempt] = useState(0) // bump to retry
 
   const [editing, setEditing] = useState(null) // the user whose names are being edited
+  const [creating, setCreating] = useState(false) // whether the Create User dialog is open
+  const [createdEmail, setCreatedEmail] = useState(null) // the user just created, for the one-time banner
   const [busy, setBusy] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [refreshError, setRefreshError] = useState(null) // a save worked but the list couldn't be read again
@@ -49,19 +54,27 @@ export default function AdminUsersPage() {
 
   const edit = (row) => {
     setSaveError(null)
+    setCreatedEmail(null)
     setEditing(row)
   }
 
-  // Saves the names, then reads the list again rather than guessing what the backend wrote
-  const save = async (changes) => {
+  const startCreating = () => {
+    setSaveError(null)
+    setCreatedEmail(null)
+    setCreating(true)
+  }
+
+  // Runs a save; on success reads the list again rather than guessing what the backend wrote.
+  // Resolves to whether the save went through.
+  const run = async (request, failure) => {
     setBusy(true)
     setSaveError(null)
     try {
-      await patchAdminUser(editing.uuid, changes)
+      await request()
     } catch (err) {
-      setSaveError(`Couldn't save the user: ${err.message}`)
+      setSaveError(failure(err))
       setBusy(false)
-      return
+      return false
     }
     try {
       setUsers(await listAdminUsers())
@@ -69,10 +82,24 @@ export default function AdminUsersPage() {
     } catch (err) {
       setRefreshError(`The change was saved, but the list couldn't be refreshed: ${err.message}`)
     }
+    setBusy(false)
+    return true
+  }
+
+  const save = async (changes) => {
+    const saved = await run(() => patchAdminUser(editing.uuid, changes), err => `Couldn't save the user: ${err.message}`)
+    if (!saved) return
     // The admin renamed themselves: the header shows their name
     if (editing.uuid === user.uuid) refreshUser().catch(() => {})
     setEditing(null)
-    setBusy(false)
+  }
+
+  // A refusal is shown as the backend worded it: a taken email, or the value that doesn't fit
+  const create = async (values) => {
+    const saved = await run(() => createAdminUser(values), err => err.message)
+    if (!saved) return
+    setCreatedEmail(values.email)
+    setCreating(false)
   }
 
   const back = (
@@ -103,7 +130,23 @@ export default function AdminUsersPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {back}
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">All Users (Admin)</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">All Users (Admin)</h2>
+          <button type="button" onClick={startCreating} className="btn-primary inline-flex items-center space-x-2">
+            <UserPlus className="h-4 w-4" />
+            <span>Create user</span>
+          </button>
+        </div>
+
+        {createdEmail && (
+          <div role="status" className="flex items-start justify-between gap-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-md px-4 py-3 mb-4">
+            <p>
+              Created user <span className="font-medium">{createdEmail}</span>. Share the password with them
+              securely — it won't be shown again.
+            </p>
+            <button type="button" onClick={() => setCreatedEmail(null)} className="underline font-medium">Dismiss</button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -165,6 +208,15 @@ export default function AdminUsersPage() {
               </div>
             )}
           </>
+        )}
+
+        {creating && (
+          <CreateUserModal
+            onCreate={create}
+            onCancel={() => setCreating(false)}
+            busy={busy}
+            error={saveError}
+          />
         )}
 
         {editing && (
