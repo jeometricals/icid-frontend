@@ -1,25 +1,33 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DeleteIdrForeverModal from '../DeleteIdrForeverModal'
+import DeleteForeverModal from '../DeleteForeverModal'
 
 function renderModal(props = {}) {
   const onConfirm = vi.fn()
   const onCancel = vi.fn()
-  render(<DeleteIdrForeverModal name="IDR 004" phrase="004" onConfirm={onConfirm} onCancel={onCancel} {...props} />)
+  render(
+    <DeleteForeverModal
+      title="Delete IDR forever?"
+      warning="This will permanently remove IDR 004 and all its data. This can't be undone."
+      phrase="004"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      {...props}
+    />
+  )
   return { onConfirm, onCancel }
 }
 
 const phraseBox = () => screen.getByLabelText('Type 004 to confirm.')
 const confirmButton = () => screen.getByRole('button', { name: 'Delete forever' })
 
-describe('DeleteIdrForeverModal', () => {
+describe('DeleteForeverModal', () => {
   it('warns what will go, in red, and starts with an empty box and its button off', () => {
     renderModal({ note: 'IDR: Sep 16, 2026 on HWS0023 (Genghis Khan)' })
     expect(screen.getByRole('dialog', { name: 'Delete IDR forever?' })).toBeInTheDocument()
     const warning = screen.getByRole('alert')
-    expect(warning).toHaveTextContent('This will permanently remove IDR 004 and all its data: pay-item quantities, '
-      + "reviewer redlines, attachments. This can't be undone.")
+    expect(warning).toHaveTextContent("This will permanently remove IDR 004 and all its data. This can't be undone.")
     expect(warning).toHaveClass('bg-red-50')
     expect(screen.getByText('IDR: Sep 16, 2026 on HWS0023 (Genghis Khan)')).toBeInTheDocument()
     expect(phraseBox()).toHaveValue('')

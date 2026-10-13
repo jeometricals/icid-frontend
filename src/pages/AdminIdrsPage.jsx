@@ -16,7 +16,7 @@ import { useTaskCount } from '../contexts/TaskCountContext'
 import { adminDeleteIdr, adminUnlockIdr, listIdrs, permanentDeleteIdr, undeleteIdr } from '../services/api'
 import { ADMIN_UNLOCKABLE_STATUSES, STATUS_LABELS, isAdmin } from '../lib/reviewRoles'
 import ConfirmDialog from '../components/ConfirmDialog'
-import DeleteIdrForeverModal from '../components/DeleteIdrForeverModal'
+import DeleteForeverModal from '../components/DeleteForeverModal'
 import IdrTable from '../components/IdrTable'
 import Toast from '../components/Toast'
 
@@ -65,7 +65,7 @@ const ACTIONS = {
       return status ? `${idrName(idr)} restored to ${status}.` : `${idrName(idr)} restored.`
     },
   },
-  // Confirmed in DeleteIdrForeverModal, not ConfirmDialog, so it has no dialog words here
+  // Confirmed in DeleteForeverModal, not ConfirmDialog, so it has no dialog words here
   purge: {
     run: idrId => permanentDeleteIdr(idrId),
     failure: "Couldn't delete the IDR",
@@ -308,8 +308,9 @@ export default function AdminIdrsPage() {
         )}
 
         {pending?.action === 'purge' && (
-          <DeleteIdrForeverModal
-            name={idrName(pending.idr)}
+          <DeleteForeverModal
+            title="Delete IDR forever?"
+            warning={`This will permanently remove ${idrName(pending.idr)} and all its data: pay-item quantities, reviewer redlines, attachments. This can't be undone.`}
             phrase={deleteForeverPhrase(pending.idr)}
             note={`IDR: ${describeIdr(pending.idr)}`}
             onConfirm={confirm}

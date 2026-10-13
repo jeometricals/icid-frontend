@@ -10,12 +10,43 @@ export async function listUsers() {
 
 /**
  * Admin only: lists every user, demo users included, by last name, first name and email, each as the backend
- * returns a signed-in user ({uuid, email, first_name, last_name, role, is_demo, has_signature, signature_set_at}).
- * Anyone else gets a 403.
+ * returns a signed-in user ({uuid, email, first_name, last_name, role, is_demo, has_signature, signature_set_at})
+ * plus deleted_at and deleted_by (both null for a user who isn't deleted). Soft-deleted users are left out unless
+ * include_deleted is true. Anyone else gets a 403.
  */
-export async function listAdminUsers() {
-  const json = await apiFetch('/v1/admin/users')
+export async function listAdminUsers({ include_deleted = false } = {}) {
+  const query = include_deleted ? '?include_deleted=true' : ''
+  const json = await apiFetch(`/v1/admin/users${query}`)
   return json.data
+}
+
+/**
+ * Admin only: soft-deletes a user and returns them. They can no longer sign in, and leave the lists; their IDRs,
+ * roles and signature stay. The backend answers 400 for the admin's own account and 404 for an unknown user or
+ * one already deleted.
+ */
+export async function softDeleteUser(userUuid) {
+  const json = await apiFetch(`/v1/admin/users/${userUuid}/delete`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only: brings a soft-deleted user back, able to sign in again, and returns them. The backend answers 404
+ * for a user who isn't deleted and 409 when another user now has their email (the thrown error's body then carries
+ * existing_user_uuid).
+ */
+export async function undeleteUser(userUuid) {
+  const json = await apiFetch(`/v1/admin/users/${userUuid}/undelete`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only: deletes a soft-deleted user for good. Returns nothing. It can't be undone. The backend answers 404
+ * for a user who isn't soft-deleted first and 409 for one something still names (the thrown error's body then
+ * carries references: {idrs, project_users, audit, field_edits, attachments}, the count of each).
+ */
+export async function permanentDeleteUser(userUuid) {
+  await apiFetch(`/v1/admin/users/${userUuid}/permanent`, { method: 'DELETE' })
 }
 
 /**

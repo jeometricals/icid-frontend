@@ -279,7 +279,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     the status it had when it was deleted (a draft when that isn't on record); the toast reads "IDR <number>
     restored to <status>." from the IDR the call returns. It answers 409 when another IDR has since taken the
     day or the number, which shows in the dialog.
-  - **Delete forever** (`permanentDeleteIdr`): `DeleteIdrForeverModal`, a red warning and a box; the button is
+  - **Delete forever** (`permanentDeleteIdr`): `DeleteForeverModal` (shared with the users page), a red warning and a box; the button is
     off until the box holds the IDR's number exactly as written (no trimming, capitals count). Then the row is
     gone and the toast reads "IDR <number> permanently deleted." The backend only takes an IDR that was
     soft-deleted first (404 otherwise), which is why only a deleted row has the button.
@@ -307,6 +307,23 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **After a success** the page reads the list again, re-reads the signed-in user (`refreshUser`) when the
     admin changed themselves, and shows "User <email> updated." in its one-time banner, with the new email when
     it changed.
+  - **Deleted users.** "Include deleted" above the table (off to start; the page's only filter) asks the backend
+    again with `?include_deleted=true` while it is ticked, and every re-read after a save keeps to it; the table
+    stays on screen meanwhile. A deleted user (`deleted_at` set) has their email crossed out and reads Deleted in
+    the Role column (the date as a tooltip).
+    - **Actions by state.** A live user has Edit, Reset password (not on a demo row) and "Soft-delete", which is
+      disabled on the admin's own row with the tooltip "You cannot delete your own account." (the backend's 400).
+      A deleted user has "Un-delete" and "Delete forever" instead. Each is confirmed first, a refusal shows in
+      its dialog, and after a success the page reads the list again and says so in a toast (not the banner).
+    - **Soft-delete** (`softDeleteUser`): the user can no longer sign in and leaves the lists; their IDRs, roles
+      and signature stay. Toast: "User <email> deleted."
+    - **Un-delete** (`undeleteUser`): toast "User <email> restored." A 409 means another user now has the email;
+      it shows as the backend words it, and there is nothing to do about it from the dialog.
+    - **Delete forever** (`permanentDeleteUser`): `DeleteForeverModal`, typing the email exactly (capitals
+      count, no trimming). The backend only takes a soft-deleted user that nothing names; its 409 carries
+      `references` (`idrs`, `project_users`, `audit`, `field_edits`, `attachments`; a signature doesn't count),
+      which `historyMessage` words as "User has history and can't be permanently deleted: 3 IDRs, 1 project
+      assignment. Keep the user soft-deleted." Toast on success: "User <email> permanently deleted."
   "Create user" (right of the heading) opens `CreateUserModal`: email, first name, last name (optional), a
   password shown as typed (the admin passes it on) and "Grant admin role". Save is off until the email, the
   first name and a password of at least 6 characters are in; `createAdminUser` (`POST /v1/admin/users`) sends
@@ -431,8 +448,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
   - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` ·
-    `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's names,
-    email, admin role and demo flag, and resetting a user's password)
+    `POST /v1/admin/users/{user_id}/password` (admin only: every user, with `?include_deleted=true` for the
+    soft-deleted ones too, creating one, changing a user's names, email, admin role and demo flag, and resetting
+    a user's password) · `POST /v1/admin/users/{user_id}/delete` (a soft delete) ·
+    `POST /v1/admin/users/{user_id}/undelete` · `DELETE /v1/admin/users/{user_id}/permanent` (a soft-deleted
+    user with no history only)
   - `POST /v1/users/me/password` (the signed-in user changes their own password)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and

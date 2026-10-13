@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  changeOwnPassword, createAdminUser, listAdminUsers, listUsers, patchAdminUser, resetUserPassword,
+  changeOwnPassword, createAdminUser, listAdminUsers, listUsers, patchAdminUser, permanentDeleteUser, resetUserPassword,
+  softDeleteUser, undeleteUser,
 } from '../users'
-import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { mockFetch, mockFetchFailure, mockFetchNoContent, fetchUrl, fetchInit } from '../../test/mockFetch'
 import { TEST_USER_ID } from '../../test/users'
 
 beforeEach(() => {
@@ -176,5 +177,66 @@ describe('patchAdminUser — email, admin role and demo flag', () => {
     mockFetch(400, { detail: 'You cannot revoke your own admin role.' })
     await expect(patchAdminUser(TEST_USER_ID, { is_admin: false }))
       .rejects.toMatchObject({ message: 'You cannot revoke your own admin role.', status: 400 })
+  })
+})
+
+describe('listAdminUsers — include_deleted', () => {
+  it('asks for deleted users too when told to', async () => {
+    mockFetch(200, { data: ADMIN_USERS })
+    await listAdminUsers({ include_deleted: true })
+    expect(fetchUrl().pathname).toBe('/v1/admin/users')
+    expect(fetchUrl().search).toBe('?include_deleted=true')
+  })
+
+  it.each([[undefined], [{}], [{ include_deleted: false }]])('leaves the query off for %j', async (options) => {
+    mockFetch(200, { data: ADMIN_USERS })
+    await listAdminUsers(options)
+    expect(fetchUrl().search).toBe('')
+  })
+})
+
+describe.each([
+  ['softDeleteUser', softDeleteUser, 'delete'],
+  ['undeleteUser', undeleteUser, 'undelete'],
+])('%s', (_, call, segment) => {
+  it(`POSTs to /${segment} with no body and returns the user`, async () => {
+    const user = { ...ADMIN_USERS[0], deleted_at: null, deleted_by: null }
+    mockFetch(200, { data: user })
+    expect(await call(TEST_USER_ID)).toEqual(user)
+    expect(fetchUrl().pathname).toBe(`/v1/admin/users/${TEST_USER_ID}/${segment}`)
+    expect(fetchInit().method).toBe('POST')
+    expect(fetchInit().body).toBeUndefined()
+  })
+
+  it('throws the backend message on a refusal', async () => {
+    mockFetch(404, { detail: 'User not found' })
+    await expect(call(TEST_USER_ID)).rejects.toMatchObject({ message: 'User not found', status: 404 })
+  })
+})
+
+describe('undeleteUser — a taken email', () => {
+  it('throws the backend message, with the user who has the email', async () => {
+    mockFetch(409, { detail: 'Email is now in use by another user', existing_user_uuid: TEST_USER_ID })
+    await expect(undeleteUser(TEST_USER_ID)).rejects.toMatchObject({
+      message: 'Email is now in use by another user', status: 409, body: { existing_user_uuid: TEST_USER_ID },
+    })
+  })
+})
+
+describe('permanentDeleteUser', () => {
+  it('DELETEs /permanent with no body and returns nothing', async () => {
+    mockFetchNoContent()
+    expect(await permanentDeleteUser(TEST_USER_ID)).toBeUndefined()
+    expect(fetchUrl().pathname).toBe(`/v1/admin/users/${TEST_USER_ID}/permanent`)
+    expect(fetchInit().method).toBe('DELETE')
+    expect(fetchInit().body).toBeUndefined()
+  })
+
+  it('throws the backend message for a user with history, with what still names them', async () => {
+    const references = { idrs: 3, project_users: 1, audit: 12, field_edits: 0, attachments: 0 }
+    mockFetch(409, { detail: "User has history and can't be permanently deleted", references })
+    await expect(permanentDeleteUser(TEST_USER_ID)).rejects.toMatchObject({
+      message: "User has history and can't be permanently deleted", status: 409, body: { references },
+    })
   })
 })

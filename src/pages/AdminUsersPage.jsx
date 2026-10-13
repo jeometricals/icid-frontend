@@ -6,20 +6,81 @@
  * themselves, the signed-in user is re-read too, so the header shows the new name. A created or updated user is
  * announced once, in a banner (a created one's reminds the admin to pass the password on); it goes when
  * dismissed or when another dialog is opened. Each row but a demo user's also has
- * "Reset password", which opens a dialog for a new password and is announced in the same banner. Anyone who isn't
- * an admin is told so instead.
+ * "Reset password", which opens a dialog for a new password and is announced in the same banner. Every row has
+ * "Soft-delete" (off on the admin's own). "Include deleted" (off to start) asks the backend for the list again with
+ * soft-deleted users in it; a deleted user is crossed out, reads Deleted, and has "Un-delete" and "Delete forever"
+ * instead. Those three are confirmed first (Delete forever by typing the email) and announced in a toast. Anyone
+ * who isn't an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, UserPlus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createAdminUser, listAdminUsers, patchAdminUser } from '../services/api'
+import { format, parseISO } from 'date-fns'
+import {
+  createAdminUser, listAdminUsers, patchAdminUser, permanentDeleteUser, softDeleteUser, undeleteUser,
+} from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import CreateUserModal from '../components/CreateUserModal'
+import DeleteForeverModal from '../components/DeleteForeverModal'
 import EditUserModal from '../components/EditUserModal'
+import StatusBadge from '../components/StatusBadge'
+import Toast from '../components/Toast'
 
 export const EMAIL_TAKEN = 'Another user already has this email.'
+export const OWN_ACCOUNT_TOOLTIP = 'You cannot delete your own account.'
+
+const isDeleted = (row) => Boolean(row.deleted_at)
+
+// What still names a user, as the backend counts it for a refused permanent delete
+const REFERENCES = [
+  ['idrs', 'IDR', 'IDRs'],
+  ['project_users', 'project assignment', 'project assignments'],
+  ['audit', 'audit row', 'audit rows'],
+  ['field_edits', 'field edit', 'field edits'],
+  ['attachments', 'attachment', 'attachments'],
+]
+
+// "User has history and can't be permanently deleted: 3 IDRs, 1 project assignment. Keep the user soft-deleted."
+// Takes the references of the backend's 409 ({idrs, project_users, audit, field_edits, attachments}).
+export function historyMessage(references = {}) {
+  const counts = REFERENCES
+    .filter(([key]) => references[key] > 0)
+    .map(([key, one, many]) => `${references[key]} ${references[key] === 1 ? one : many}`)
+  const what = counts.length > 0 ? `: ${counts.join(', ')}` : ''
+  return `User has history and can't be permanently deleted${what}. Keep the user soft-deleted.`
+}
+
+// The three delete actions: the call, the words of its confirm dialog (Delete forever has its own dialog), what
+// to say when it is refused and what the toast says once it went through
+const ACTIONS = {
+  delete: {
+    run: row => softDeleteUser(row.uuid),
+    title: row => `Soft-delete ${row.email}?`,
+    message: 'This removes them from most lists and prevents sign-in. Their IDRs, signatures and history stay intact.',
+    confirmLabel: 'Soft-delete',
+    confirmClassName: 'btn-danger',
+    failure: err => `Couldn't delete the user: ${err.message}`,
+    done: row => `User ${row.email} deleted.`,
+  },
+  undelete: {
+    run: row => undeleteUser(row.uuid),
+    title: row => `Un-delete ${row.email}?`,
+    message: 'This brings the user back and lets them sign in again.',
+    confirmLabel: 'Un-delete',
+    confirmClassName: 'btn-primary',
+    // A 409 is their email gone to someone else, said as the backend words it
+    failure: err => (err.status === 409 ? err.message : `Couldn't un-delete the user: ${err.message}`),
+    done: row => `User ${row.email} restored.`,
+  },
+  purge: {
+    run: row => permanentDeleteUser(row.uuid),
+    failure: err => (err.status === 409 ? historyMessage(err.body?.references) : `Couldn't delete the user: ${err.message}`),
+    done: row => `User ${row.email} permanently deleted.`,
+  },
+}
 
 // What the Role column says: an admin, a demo user, or anyone else
 export function roleLabel(user) {
@@ -34,12 +95,16 @@ export default function AdminUsersPage() {
 
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false) // whether there is a list to keep on screen while it is read again
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
+  const [includeDeleted, setIncludeDeleted] = useState(false)
 
   const [editing, setEditing] = useState(null) // the user whose names are being edited
   const [creating, setCreating] = useState(false) // whether the Create User dialog is open
   const [resetting, setResetting] = useState(null) // the user whose password is being reset
+  const [pending, setPending] = useState(null) // {row, action}: the delete action waiting to be confirmed
+  const [toast, setToast] = useState(null)
   // What the one-time banner announces: {kind: 'created' | 'updated' | 'reset', email}
   const [announced, setAnnounced] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -52,12 +117,20 @@ export default function AdminUsersPage() {
     setLoading(true)
     setLoadError(null)
     setRefreshError(null)
-    listAdminUsers()
-      .then(data => { if (!ignore) setUsers(data) })
-      .catch(err => { if (!ignore) setLoadError(err.message) })
+    listAdminUsers({ include_deleted: includeDeleted })
+      .then(data => {
+        if (ignore) return
+        setUsers(data)
+        setLoaded(true)
+      })
+      .catch(err => {
+        if (ignore) return
+        setLoadError(err.message)
+        setLoaded(false)
+      })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [admin, attempt])
+  }, [admin, includeDeleted, attempt])
 
   const edit = (row) => {
     setSaveError(null)
@@ -76,6 +149,13 @@ export default function AdminUsersPage() {
     setResetting(row)
   }
 
+  const ask = (row, action) => {
+    setSaveError(null)
+    setAnnounced(null)
+    setToast(null)
+    setPending({ row, action })
+  }
+
   // Runs a save; on success reads the list again rather than guessing what the backend wrote.
   // Resolves to whether the save went through.
   const run = async (request, failure) => {
@@ -89,7 +169,7 @@ export default function AdminUsersPage() {
       return false
     }
     try {
-      setUsers(await listAdminUsers())
+      setUsers(await listAdminUsers({ include_deleted: includeDeleted }))
       setRefreshError(null)
     } catch (err) {
       setRefreshError(`The change was saved, but the list couldn't be refreshed: ${err.message}`)
@@ -116,6 +196,15 @@ export default function AdminUsersPage() {
     if (!saved) return
     setAnnounced({ kind: 'created', email: values.email })
     setCreating(false)
+  }
+
+  // Runs the confirmed delete action; the list read afterwards is what moves, restyles or drops the row
+  const confirm = async () => {
+    const { row, action } = pending
+    const done = await run(() => ACTIONS[action].run(row), ACTIONS[action].failure)
+    if (!done) return
+    setToast(ACTIONS[action].done(row))
+    setPending(null)
   }
 
   const back = (
@@ -173,7 +262,7 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        {loading ? (
+        {loading && !loaded ? (
           <div className="flex justify-center py-12">
             <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
           </div>
@@ -184,6 +273,14 @@ export default function AdminUsersPage() {
           </div>
         ) : (
           <>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm text-gray-700">
+              <label className="inline-flex items-center space-x-2">
+                <input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />
+                <span>Include deleted</span>
+              </label>
+              {loading && <span className="text-gray-500">Loading...</span>}
+            </div>
+
             {refreshError && (
               <p role="alert" className="text-sm text-red-600 mb-4">
                 {refreshError}{' '}
@@ -214,24 +311,52 @@ export default function AdminUsersPage() {
                   <tbody className="divide-y divide-gray-200">
                     {users.map(row => (
                       <tr key={row.uuid}>
-                        <td className="px-6 py-4 text-sm text-gray-900">{row.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {isDeleted(row) ? <span className="text-gray-400 line-through">{row.email}</span> : row.email}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-900">{row.first_name || '—'}</td>
                         <td className="px-6 py-4 text-sm text-gray-900">{row.last_name || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(row)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {isDeleted(row) ? (
+                            <span title={`Deleted ${format(parseISO(row.deleted_at), 'MMM d, yyyy')}`}>
+                              <StatusBadge status="deleted" />
+                            </span>
+                          ) : roleLabel(row)}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {row.has_signature
                             ? <Check role="img" aria-label="Has a signature" className="h-5 w-5 text-green-600" />
                             : <span aria-label="No signature">—</span>}
                         </td>
                         <td className="px-6 py-4 text-sm">
-                          <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => edit(row)} className="btn-secondary">Edit</button>
-                            {!row.is_demo && (
-                              <button type="button" onClick={() => startResetting(row)} className="btn-secondary">
-                                Reset password
+                          {isDeleted(row) ? (
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => ask(row, 'undelete')} className="btn-secondary">
+                                Un-delete
                               </button>
-                            )}
-                          </div>
+                              <button type="button" onClick={() => ask(row, 'purge')} className="btn-danger">
+                                Delete forever
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => edit(row)} className="btn-secondary">Edit</button>
+                              {!row.is_demo && (
+                                <button type="button" onClick={() => startResetting(row)} className="btn-secondary">
+                                  Reset password
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => ask(row, 'delete')}
+                                disabled={row.uuid === user.uuid}
+                                title={row.uuid === user.uuid ? OWN_ACCOUNT_TOOLTIP : undefined}
+                                className="btn-danger"
+                              >
+                                Soft-delete
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -262,6 +387,32 @@ export default function AdminUsersPage() {
           />
         )}
 
+        {pending && pending.action !== 'purge' && (
+          <ConfirmDialog
+            title={ACTIONS[pending.action].title(pending.row)}
+            message={ACTIONS[pending.action].message}
+            confirmLabel={ACTIONS[pending.action].confirmLabel}
+            cancelLabel="Cancel"
+            confirmClassName={ACTIONS[pending.action].confirmClassName}
+            onConfirm={confirm}
+            onCancel={() => setPending(null)}
+            busy={busy}
+            error={saveError}
+          />
+        )}
+
+        {pending?.action === 'purge' && (
+          <DeleteForeverModal
+            title="Delete user forever?"
+            warning={`This permanently removes ${pending.row.email} from the system. Only possible for a user with no IDRs, project assignments or other history. This can't be undone.`}
+            phrase={pending.row.email}
+            onConfirm={confirm}
+            onCancel={() => setPending(null)}
+            busy={busy}
+            error={saveError}
+          />
+        )}
+
         {resetting && (
           <AdminResetPasswordModal
             user={resetting}
@@ -269,6 +420,8 @@ export default function AdminUsersPage() {
             onSuccess={(row) => setAnnounced({ kind: 'reset', email: row.email })}
           />
         )}
+
+        <Toast message={toast} onDone={() => setToast(null)} />
       </main>
     </div>
   )

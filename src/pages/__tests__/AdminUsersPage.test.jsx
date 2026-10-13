@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminUsersPage, { roleLabel } from '../AdminUsersPage'
+import AdminUsersPage, { historyMessage, roleLabel } from '../AdminUsersPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
@@ -16,8 +16,14 @@ const ADMIN = { ...TEST_USER, uuid: 'a0000000-0000-4000-8000-000000000001', emai
 // As the backend lists them: by last name, first name and email
 const LISTED = [{ ...TEST_USER, has_signature: false, signature_set_at: null }, DEMO_USER, ADMIN]
 
+// A user an admin soft-deleted a while ago; in the list only when deleted users are asked for
+const GONE = { ...TEST_USER, uuid: 'f0000000-0000-4000-8000-000000000006', email: 'Gone.User@magnoleng.pc',
+  first_name: 'Gone', last_name: 'User', has_signature: false, signature_set_at: null,
+  deleted_at: '2026-10-01T12:00:00Z', deleted_by: ADMIN.uuid }
+
 vi.mock('../../services/api', () => ({
   listAdminUsers: vi.fn(), patchAdminUser: vi.fn(), createAdminUser: vi.fn(), resetUserPassword: vi.fn(),
+  softDeleteUser: vi.fn(), undeleteUser: vi.fn(), permanentDeleteUser: vi.fn(),
 }))
 
 let server
@@ -26,8 +32,21 @@ let refreshUser
 beforeEach(() => {
   vi.clearAllMocks()
   refreshUser = vi.fn().mockResolvedValue(ADMIN)
-  server = structuredClone(LISTED)
-  api.listAdminUsers.mockImplementation(async () => structuredClone(server))
+  server = structuredClone([...LISTED, GONE])
+  api.listAdminUsers.mockImplementation(async ({ include_deleted } = {}) => (
+    structuredClone(server.filter(row => include_deleted || !row.deleted_at))
+  ))
+  const mark = (userId, fields) => {
+    server = server.map(row => (row.uuid === userId ? { ...row, ...fields } : row))
+    return server.find(row => row.uuid === userId)
+  }
+  api.softDeleteUser.mockImplementation(async (userId) => mark(userId, {
+    deleted_at: '2026-10-13T12:00:00Z', deleted_by: ADMIN.uuid,
+  }))
+  api.undeleteUser.mockImplementation(async (userId) => mark(userId, { deleted_at: null, deleted_by: null }))
+  api.permanentDeleteUser.mockImplementation(async (userId) => {
+    server = server.filter(row => row.uuid !== userId)
+  })
   api.patchAdminUser.mockImplementation(async (userId, { is_admin, ...fields }) => {
     const role = is_admin === undefined ? {} : { role: is_admin ? 'admin' : null }
     server = server.map(row => (row.uuid === userId ? { ...row, ...fields, ...role } : row))
@@ -513,9 +532,10 @@ describe('AdminUsersPage — resetting a password', () => {
     await ready()
     for (const email of [TEST_USER.email, ADMIN.email]) {
       expect(within(rowFor(email)).getAllByRole('button').map(button => button.textContent))
-        .toEqual(['Edit', 'Reset password'])
+        .toEqual(['Edit', 'Reset password', 'Soft-delete'])
     }
-    expect(within(rowFor(DEMO_USER.email)).getAllByRole('button').map(button => button.textContent)).toEqual(['Edit'])
+    expect(within(rowFor(DEMO_USER.email)).getAllByRole('button').map(button => button.textContent))
+      .toEqual(['Edit', 'Soft-delete'])
   })
 
   it('opens the dialog for that row\'s user and resets their password', async () => {
@@ -564,6 +584,299 @@ describe('AdminUsersPage — resetting a password', () => {
     expect(dialog()).not.toBeInTheDocument()
     expect(api.resetUserPassword).not.toHaveBeenCalled()
     expect(banner()).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Deleted users: the filter, soft-delete, un-delete and delete forever
+// ---------------------------------------------------------------------------
+
+describe('AdminUsersPage — deleted users', () => {
+  const includeBox = () => screen.getByLabelText('Include deleted')
+  const actionsIn = (email) => within(rowFor(email)).getAllByRole('button').map(button => button.textContent)
+  const emails = () => rows().map(row => within(row).getAllByRole('cell')[0].textContent)
+  const inDialog = (name) => within(dialog()).getByRole('button', { name })
+  const toast = (text) => screen.queryByText(text)
+  const HISTORY = "User has history and can't be permanently deleted: 3 IDRs, 1 project assignment, 12 audit rows. "
+    + 'Keep the user soft-deleted.'
+
+  async function includeDeleted() {
+    await userEvent.click(includeBox())
+    await waitFor(() => expect(emails()).toContain(GONE.email))
+  }
+
+  describe('the filter', () => {
+    it('starts unticked, with deleted users left out and not asked for', async () => {
+      renderPage()
+      await ready()
+      expect(includeBox()).not.toBeChecked()
+      expect(api.listAdminUsers).toHaveBeenCalledTimes(1)
+      expect(api.listAdminUsers).toHaveBeenCalledWith({ include_deleted: false })
+      expect(emails()).toEqual([TEST_USER.email, DEMO_USER.email, ADMIN.email])
+    })
+
+    it('asks the backend again with deleted users when ticked, and without them when unticked', async () => {
+      renderPage()
+      await ready()
+      await userEvent.click(includeBox())
+      await waitFor(() => expect(api.listAdminUsers).toHaveBeenCalledTimes(2))
+      expect(api.listAdminUsers).toHaveBeenLastCalledWith({ include_deleted: true })
+      await waitFor(() => expect(emails()).toContain(GONE.email))
+      await userEvent.click(includeBox())
+      await waitFor(() => expect(emails()).not.toContain(GONE.email))
+      expect(api.listAdminUsers).toHaveBeenLastCalledWith({ include_deleted: false })
+    })
+
+    it('keeps the table on screen while the list is read again', async () => {
+      renderPage()
+      await ready()
+      let finish
+      api.listAdminUsers.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+      await userEvent.click(includeBox())
+      expect(screen.getByText('Loading...')).toBeInTheDocument()
+      expect(rows()).toHaveLength(3)
+      await act(async () => finish(structuredClone(server)))
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+      expect(rows()).toHaveLength(4)
+    })
+
+    it('reads the list with deleted users again after a save made while it is ticked', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await editRow(TEST_USER.email)
+      await retype('Last name', 'Borjigin')
+      await userEvent.click(saveButton())
+      expect(api.listAdminUsers).toHaveBeenLastCalledWith({ include_deleted: true })
+      expect(emails()).toContain(GONE.email)
+    })
+  })
+
+  describe('how the rows look', () => {
+    it('gives a live user Edit, Reset password and Soft-delete', async () => {
+      renderPage()
+      await ready()
+      expect(actionsIn(TEST_USER.email)).toEqual(['Edit', 'Reset password', 'Soft-delete'])
+      expect(within(rowFor(TEST_USER.email)).getByRole('button', { name: 'Soft-delete' })).toBeEnabled()
+    })
+
+    it('turns Soft-delete off, with a tooltip, on the admin\'s own row', async () => {
+      renderPage()
+      await ready()
+      const own = within(rowFor(ADMIN.email)).getByRole('button', { name: 'Soft-delete' })
+      expect(own).toBeDisabled()
+      expect(own).toHaveAttribute('title', 'You cannot delete your own account.')
+      await userEvent.click(own)
+      expect(dialog()).not.toBeInTheDocument()
+      expect(within(rowFor(TEST_USER.email)).getByRole('button', { name: 'Soft-delete' })).not.toHaveAttribute('title')
+    })
+
+    it('crosses out a deleted user\'s email, reads Deleted for their role and swaps their actions', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      expect(within(rowFor(GONE.email)).getByText(GONE.email)).toHaveClass('line-through')
+      expect(cells(GONE.email)[3]).toBe('Deleted')
+      expect(within(rowFor(GONE.email)).getByText('Deleted').parentElement).toHaveAttribute('title', 'Deleted Oct 1, 2026')
+      expect(actionsIn(GONE.email)).toEqual(['Un-delete', 'Delete forever'])
+      // A live user is as before
+      expect(within(rowFor(TEST_USER.email)).getByText(TEST_USER.email)).not.toHaveClass('line-through')
+      expect(cells(TEST_USER.email)[3]).toBe('Regular')
+    })
+  })
+
+  describe('soft-delete', () => {
+    const clickDelete = (email) => userEvent.click(within(rowFor(email)).getByRole('button', { name: 'Soft-delete' }))
+
+    it('asks first, in the agreed words, and does nothing on Cancel', async () => {
+      renderPage()
+      await ready()
+      await clickDelete(TEST_USER.email)
+      expect(dialog()).toHaveAccessibleName(`Soft-delete ${TEST_USER.email}?`)
+      expect(dialog()).toHaveTextContent(
+        'This removes them from most lists and prevents sign-in. Their IDRs, signatures and history stay intact.')
+      expect(inDialog('Soft-delete')).toHaveClass('btn-danger')
+      await userEvent.click(inDialog('Cancel'))
+      expect(dialog()).not.toBeInTheDocument()
+      expect(api.softDeleteUser).not.toHaveBeenCalled()
+      expect(emails()).toContain(TEST_USER.email)
+    })
+
+    it('deletes the user, reads the list again and says so; the user is gone from it', async () => {
+      renderPage()
+      await ready()
+      await clickDelete(TEST_USER.email)
+      await userEvent.click(inDialog('Soft-delete'))
+      expect(api.softDeleteUser).toHaveBeenCalledTimes(1)
+      expect(api.softDeleteUser).toHaveBeenCalledWith(TEST_USER.uuid)
+      expect(dialog()).not.toBeInTheDocument()
+      expect(api.listAdminUsers).toHaveBeenCalledTimes(2)
+      expect(emails()).not.toContain(TEST_USER.email)
+      expect(toast(`User ${TEST_USER.email} deleted.`)).toBeInTheDocument()
+    })
+
+    it('with "Include deleted" ticked, the row stays and turns into a deleted one', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickDelete(TEST_USER.email)
+      await userEvent.click(inDialog('Soft-delete'))
+      expect(cells(TEST_USER.email)[3]).toBe('Deleted')
+      expect(actionsIn(TEST_USER.email)).toEqual(['Un-delete', 'Delete forever'])
+    })
+
+    it('shows a refusal in the dialog and says nothing in a toast', async () => {
+      api.softDeleteUser.mockRejectedValueOnce(Object.assign(new Error('User is already deleted'), { status: 404 }))
+      renderPage()
+      await ready()
+      await clickDelete(TEST_USER.email)
+      await userEvent.click(inDialog('Soft-delete'))
+      expect(within(dialog()).getByRole('alert')).toHaveTextContent("Couldn't delete the user: User is already deleted")
+      expect(toast(/deleted\.$/)).not.toBeInTheDocument()
+      expect(api.listAdminUsers).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('un-delete', () => {
+    const clickUndelete = () => userEvent.click(within(rowFor(GONE.email)).getByRole('button', { name: 'Un-delete' }))
+
+    it('asks first, restores the user, reads the list again and says so', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickUndelete()
+      expect(dialog()).toHaveAccessibleName(`Un-delete ${GONE.email}?`)
+      expect(dialog()).toHaveTextContent('This brings the user back and lets them sign in again.')
+      expect(api.undeleteUser).not.toHaveBeenCalled()
+
+      await userEvent.click(inDialog('Un-delete'))
+      expect(api.undeleteUser).toHaveBeenCalledTimes(1)
+      expect(api.undeleteUser).toHaveBeenCalledWith(GONE.uuid)
+      expect(dialog()).not.toBeInTheDocument()
+      expect(cells(GONE.email)[3]).toBe('Regular')
+      expect(within(rowFor(GONE.email)).getByText(GONE.email)).not.toHaveClass('line-through')
+      expect(actionsIn(GONE.email)).toEqual(['Edit', 'Reset password', 'Soft-delete'])
+      expect(toast(`User ${GONE.email} restored.`)).toBeInTheDocument()
+    })
+
+    it('shows a taken email in the dialog, as the backend worded it, with no toast', async () => {
+      api.undeleteUser.mockRejectedValueOnce(Object.assign(
+        new Error('Email is now in use by another user'), { status: 409, body: { existing_user_uuid: TEST_USER.uuid } }))
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickUndelete()
+      await userEvent.click(inDialog('Un-delete'))
+      expect(within(dialog()).getByRole('alert')).toHaveTextContent(/^Email is now in use by another user$/)
+      expect(toast(/restored/)).not.toBeInTheDocument()
+      await userEvent.click(inDialog('Cancel'))
+      expect(cells(GONE.email)[3]).toBe('Deleted')
+    })
+
+    it('does nothing on Cancel', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickUndelete()
+      await userEvent.click(inDialog('Cancel'))
+      expect(dialog()).not.toBeInTheDocument()
+      expect(api.undeleteUser).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('delete forever', () => {
+    const clickForever = () => userEvent.click(within(rowFor(GONE.email)).getByRole('button', { name: 'Delete forever' }))
+    const phraseBox = () => within(dialog()).getByRole('textbox')
+
+    it('opens a dialog that warns what goes, with its button off', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      expect(dialog()).toHaveAccessibleName('Delete user forever?')
+      expect(dialog()).toHaveTextContent(`This permanently removes ${GONE.email} from the system. Only possible for a `
+        + "user with no IDRs, project assignments or other history. This can't be undone.")
+      expect(within(dialog()).getByLabelText(`Type ${GONE.email} to confirm.`)).toHaveValue('')
+      expect(inDialog('Delete forever')).toBeDisabled()
+      expect(inDialog('Delete forever')).toHaveClass('btn-danger')
+    })
+
+    it('turns the button on once the email is typed, then deletes, drops the row and says so', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      await userEvent.type(phraseBox(), GONE.email)
+      expect(inDialog('Delete forever')).toBeEnabled()
+      await userEvent.click(inDialog('Delete forever'))
+      expect(api.permanentDeleteUser).toHaveBeenCalledTimes(1)
+      expect(api.permanentDeleteUser).toHaveBeenCalledWith(GONE.uuid)
+      expect(dialog()).not.toBeInTheDocument()
+      expect(emails()).not.toContain(GONE.email)
+      expect(toast(`User ${GONE.email} permanently deleted.`)).toBeInTheDocument()
+    })
+
+    it.each([
+      ['another user\'s email', TEST_USER.email],
+      ['the email in other capitals', GONE.email.toLowerCase()],
+      ['the email with a space after it', `${GONE.email} `],
+    ])('keeps the button off for %s, and sends nothing', async (_, typed) => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      await userEvent.type(phraseBox(), `${typed}{Enter}`)
+      expect(inDialog('Delete forever')).toBeDisabled()
+      expect(api.permanentDeleteUser).not.toHaveBeenCalled()
+    })
+
+    it('shows what still names the user when the backend refuses, keeps the row and says nothing in a toast', async () => {
+      api.permanentDeleteUser.mockRejectedValueOnce(Object.assign(
+        new Error("User has history and can't be permanently deleted"),
+        { status: 409, body: { references: { idrs: 3, project_users: 1, audit: 12, field_edits: 0, attachments: 0 } } }))
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      await userEvent.type(phraseBox(), GONE.email)
+      await userEvent.click(inDialog('Delete forever'))
+      expect(within(dialog()).getByText(HISTORY)).toBeInTheDocument()
+      expect(toast(/permanently deleted\.$/)).not.toBeInTheDocument()
+      expect(api.listAdminUsers).toHaveBeenCalledTimes(2) // the first load and the re-list, nothing after the refusal
+      await userEvent.click(inDialog('Cancel'))
+      expect(emails()).toContain(GONE.email)
+    })
+
+    it('words the history from the counts, leaving out what there is none of', () => {
+      expect(historyMessage({ idrs: 3, project_users: 1, audit: 12, field_edits: 0, attachments: 0 })).toBe(HISTORY)
+      expect(historyMessage({ idrs: 1, project_users: 0, audit: 0, field_edits: 2, attachments: 1 })).toBe(
+        "User has history and can't be permanently deleted: 1 IDR, 2 field edits, 1 attachment. Keep the user soft-deleted.")
+      expect(historyMessage()).toBe("User has history and can't be permanently deleted. Keep the user soft-deleted.")
+    })
+
+    it('shows any other refusal as the backend worded it', async () => {
+      api.permanentDeleteUser.mockRejectedValueOnce(
+        Object.assign(new Error('User must be soft-deleted first'), { status: 404 }))
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      await userEvent.type(phraseBox(), GONE.email)
+      await userEvent.click(inDialog('Delete forever'))
+      expect(within(dialog()).getByText("Couldn't delete the user: User must be soft-deleted first")).toBeInTheDocument()
+    })
+
+    it('does nothing on Cancel, even with the email typed', async () => {
+      renderPage()
+      await ready()
+      await includeDeleted()
+      await clickForever()
+      await userEvent.type(phraseBox(), GONE.email)
+      await userEvent.click(inDialog('Cancel'))
+      expect(dialog()).not.toBeInTheDocument()
+      expect(api.permanentDeleteUser).not.toHaveBeenCalled()
+      expect(emails()).toContain(GONE.email)
+    })
   })
 })
 
