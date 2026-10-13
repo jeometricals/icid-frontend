@@ -16,7 +16,9 @@ const ADMIN = { ...TEST_USER, uuid: 'a0000000-0000-4000-8000-000000000001', emai
 // As the backend lists them: by last name, first name and email
 const LISTED = [{ ...TEST_USER, has_signature: false, signature_set_at: null }, DEMO_USER, ADMIN]
 
-vi.mock('../../services/api', () => ({ listAdminUsers: vi.fn(), patchAdminUser: vi.fn(), createAdminUser: vi.fn() }))
+vi.mock('../../services/api', () => ({
+  listAdminUsers: vi.fn(), patchAdminUser: vi.fn(), createAdminUser: vi.fn(), resetUserPassword: vi.fn(),
+}))
 
 let server
 let refreshUser
@@ -36,6 +38,7 @@ beforeEach(() => {
     server = [...server, created]
     return created
   })
+  api.resetUserPassword.mockImplementation(async (userId) => server.find(row => row.uuid === userId))
 })
 
 function CurrentUrl() {
@@ -314,6 +317,8 @@ describe('AdminUsersPage — creating a user', () => {
   it.each([
     ['the Create User dialog', () => userEvent.click(screen.getByRole('button', { name: 'Create user' }))],
     ['an Edit User dialog', () => editRow(TEST_USER.email)],
+    ['a Reset Password dialog', () => userEvent.click(
+      within(rowFor(TEST_USER.email)).getByRole('button', { name: 'Reset password' }))],
   ])('drops the banner when %s is opened', async (_, open) => {
     renderPage()
     await ready()
@@ -387,6 +392,73 @@ describe('AdminUsersPage — creating a user', () => {
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
     expect(dialog()).not.toBeInTheDocument()
     expect(api.createAdminUser).not.toHaveBeenCalled()
+    expect(banner()).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Resetting a password
+// ---------------------------------------------------------------------------
+
+describe('AdminUsersPage — resetting a password', () => {
+  const resetButton = (email) => within(rowFor(email)).queryByRole('button', { name: 'Reset password' })
+  const banner = () => screen.queryByRole('status')
+
+  it('has a Reset password button after Edit on each row but a demo user\'s', async () => {
+    renderPage()
+    await ready()
+    for (const email of [TEST_USER.email, ADMIN.email]) {
+      expect(within(rowFor(email)).getAllByRole('button').map(button => button.textContent))
+        .toEqual(['Edit', 'Reset password'])
+    }
+    expect(within(rowFor(DEMO_USER.email)).getAllByRole('button').map(button => button.textContent)).toEqual(['Edit'])
+  })
+
+  it('opens the dialog for that row\'s user and resets their password', async () => {
+    renderPage()
+    await ready()
+    await userEvent.click(resetButton(TEST_USER.email))
+    expect(screen.getByRole('dialog', { name: 'Reset Password' })).toBeInTheDocument()
+    expect(within(dialog()).getByText(TEST_USER.email)).toBeInTheDocument()
+    await userEvent.type(within(dialog()).getByLabelText('New password'), 'test1234')
+    await userEvent.click(saveButton())
+    expect(api.resetUserPassword).toHaveBeenCalledTimes(1)
+    expect(api.resetUserPassword).toHaveBeenCalledWith(TEST_USER.uuid, { new_password: 'test1234' })
+    expect(dialog()).not.toBeInTheDocument()
+    expect(banner()).toHaveTextContent(
+      `Password reset for ${TEST_USER.email}. Share with them securely — it won't be shown again.`)
+    expect(banner()).not.toHaveTextContent('test1234')
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(1) // nothing in the list changed
+  })
+
+  it('drops the banner when it is dismissed', async () => {
+    renderPage()
+    await ready()
+    await userEvent.click(resetButton(ADMIN.email))
+    await userEvent.type(within(dialog()).getByLabelText('New password'), 'test1234')
+    await userEvent.click(saveButton())
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('keeps the dialog open with the backend\'s reason when the reset is refused, and announces nothing', async () => {
+    api.resetUserPassword.mockRejectedValueOnce(Object.assign(new Error('User not found'), { status: 404 }))
+    renderPage()
+    await ready()
+    await userEvent.click(resetButton(TEST_USER.email))
+    await userEvent.type(within(dialog()).getByLabelText('New password'), 'test1234')
+    await userEvent.click(saveButton())
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('User not found')
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('cancels without resetting', async () => {
+    renderPage()
+    await ready()
+    await userEvent.click(resetButton(TEST_USER.email))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.resetUserPassword).not.toHaveBeenCalled()
     expect(banner()).not.toBeInTheDocument()
   })
 })

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, CircleUserRound, ClipboardCheck, FolderKanban, LogOut, PenLine, ShieldCheck, Users } from 'lucide-react'
+import { ChevronDown, CircleUserRound, ClipboardCheck, FolderKanban, KeyRound, LogOut, PenLine, ShieldCheck, Users } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
 import { countBadgeText, isAdmin, reviewQueuesFor } from '../lib/reviewRoles'
+import ChangePasswordModal from './ChangePasswordModal'
 import ConfirmDialog from './ConfirmDialog'
 import SignatureSetupModal from './SignatureSetupModal'
 
@@ -14,7 +15,8 @@ import SignatureSetupModal from './SignatureSetupModal'
  * The signed-in user's menu in the app header: their first name (or email), with a "Demo Mode" badge for a demo
  * user, opening a dropdown with My Tasks (only for someone who reviews IDRs: an OE or RE on some project, or an
  * admin; it carries the number of IDRs waiting on them, and the name gets a red dot while there are any), their
- * signature (set up or update; not for demo users, who can't submit), "All IDRs (Admin)", "All Users (Admin)" and "All Projects (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
+ * signature (set up or update; not for demo users, who can't submit), Change password (not for demo users; a
+ * change is announced once in a green banner under the header, until dismissed), "All IDRs (Admin)", "All Users (Admin)" and "All Projects (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
  * the page's leave guard, so a report form saves unsaved edits first.
  * Opens on click; closes on a pick, Escape or a click elsewhere. Arrow keys, Home and End move between items.
  * Takes no props; reads the user from AuthContext.
@@ -27,6 +29,8 @@ export default function UserMenu() {
   const leave = useGuardedLeave()
   const [open, setOpen] = useState(false)
   const [signatureOpen, setSignatureOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [passwordChanged, setPasswordChanged] = useState(false) // the one-time banner after a change
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const rootRef = useRef(null)
@@ -71,6 +75,15 @@ export default function UserMenu() {
         ? `Set on ${format(parseISO(user.signature_set_at), 'MMM d, yyyy')}`
         : undefined,
       onSelect: () => setSignatureOpen(true),
+    },
+    !user.is_demo && {
+      id: 'password',
+      label: 'Change password',
+      icon: KeyRound,
+      onSelect: () => {
+        setPasswordChanged(false)
+        setPasswordOpen(true)
+      },
     },
     isAdmin(user) && {
       id: 'admin-idrs',
@@ -211,6 +224,22 @@ export default function UserMenu() {
         onClose={() => setSignatureOpen(false)}
         title={hasSignature ? 'Update Your Signature' : 'Set Up Your Signature'}
       />
+
+      {passwordOpen && (
+        <ChangePasswordModal onClose={() => setPasswordOpen(false)} onSuccess={() => setPasswordChanged(true)} />
+      )}
+
+      {passwordChanged && (
+        <div className="fixed top-20 inset-x-0 z-30 px-4 pointer-events-none">
+          <div
+            role="status"
+            className="pointer-events-auto max-w-xl mx-auto flex items-start justify-between gap-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-md shadow-md px-4 py-3"
+          >
+            <p>Password updated. Use it on next sign-in.</p>
+            <button type="button" onClick={() => setPasswordChanged(false)} className="underline font-medium">Dismiss</button>
+          </div>
+        </div>
+      )}
 
       {confirmOpen && (
         <ConfirmDialog

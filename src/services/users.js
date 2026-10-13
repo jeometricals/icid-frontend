@@ -43,3 +43,28 @@ export async function patchAdminUser(userId, { first_name, last_name }) {
   const json = await apiFetch(`/v1/admin/users/${userId}`, { method: 'PATCH', body })
   return json.data
 }
+
+/**
+ * Changes the signed-in user's own password, both passwords as typed. Returns nothing (the backend's data is
+ * null). The backend answers 400 for a wrong current password, a new one under 6 characters or over 72 bytes, or
+ * one the same as the current. Tokens already issued stay valid, so the user stays signed in.
+ */
+export async function changeOwnPassword({ current_password, new_password }) {
+  const json = await apiFetch('/v1/users/me/password', {
+    method: 'POST',
+    body: { current_password, new_password },
+  })
+  return json.data
+}
+
+/**
+ * Admin only: gives a user a new password to sign in with, as typed, and returns the user. The backend answers
+ * 400 for a password under 6 characters or over 72 bytes and 404 for an unknown user.
+ */
+export async function resetUserPassword(user_id, { new_password }) {
+  const json = await apiFetch(`/v1/admin/users/${user_id}/password`, {
+    method: 'POST',
+    body: { new_password },
+  })
+  return json.data
+}

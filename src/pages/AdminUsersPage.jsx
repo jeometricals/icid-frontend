@@ -4,8 +4,9 @@
  * last name, and a "Create user" button that opens one for a new user. After a save the list is read again, so a
  * row shows what the backend wrote; when the admin renamed themselves, the signed-in user is re-read too, so the
  * header shows the new name. A created user is announced once, in a banner that reminds the admin to pass the
- * password on; it goes when dismissed or when another dialog is opened. Anyone who isn't an admin is told so
- * instead.
+ * password on; it goes when dismissed or when another dialog is opened. Each row but a demo user's also has
+ * "Reset password", which opens a dialog for a new password and is announced in the same banner. Anyone who isn't
+ * an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +14,7 @@ import { ArrowLeft, Check, UserPlus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createAdminUser, listAdminUsers, patchAdminUser } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
+import AdminResetPasswordModal from '../components/AdminResetPasswordModal'
 import CreateUserModal from '../components/CreateUserModal'
 import EditUserModal from '../components/EditUserModal'
 
@@ -34,7 +36,9 @@ export default function AdminUsersPage() {
 
   const [editing, setEditing] = useState(null) // the user whose names are being edited
   const [creating, setCreating] = useState(false) // whether the Create User dialog is open
-  const [createdEmail, setCreatedEmail] = useState(null) // the user just created, for the one-time banner
+  const [resetting, setResetting] = useState(null) // the user whose password is being reset
+  // What the one-time banner announces: {kind: 'created' | 'reset', email}
+  const [announced, setAnnounced] = useState(null)
   const [busy, setBusy] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [refreshError, setRefreshError] = useState(null) // a save worked but the list couldn't be read again
@@ -54,14 +58,19 @@ export default function AdminUsersPage() {
 
   const edit = (row) => {
     setSaveError(null)
-    setCreatedEmail(null)
+    setAnnounced(null)
     setEditing(row)
   }
 
   const startCreating = () => {
     setSaveError(null)
-    setCreatedEmail(null)
+    setAnnounced(null)
     setCreating(true)
+  }
+
+  const startResetting = (row) => {
+    setAnnounced(null)
+    setResetting(row)
   }
 
   // Runs a save; on success reads the list again rather than guessing what the backend wrote.
@@ -98,7 +107,7 @@ export default function AdminUsersPage() {
   const create = async (values) => {
     const saved = await run(() => createAdminUser(values), err => err.message)
     if (!saved) return
-    setCreatedEmail(values.email)
+    setAnnounced({ kind: 'created', email: values.email })
     setCreating(false)
   }
 
@@ -138,13 +147,20 @@ export default function AdminUsersPage() {
           </button>
         </div>
 
-        {createdEmail && (
+        {announced && (
           <div role="status" className="flex items-start justify-between gap-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-md px-4 py-3 mb-4">
-            <p>
-              Created user <span className="font-medium">{createdEmail}</span>. Share the password with them
-              securely — it won't be shown again.
-            </p>
-            <button type="button" onClick={() => setCreatedEmail(null)} className="underline font-medium">Dismiss</button>
+            {announced.kind === 'created' ? (
+              <p>
+                Created user <span className="font-medium">{announced.email}</span>. Share the password with them
+                securely — it won't be shown again.
+              </p>
+            ) : (
+              <p>
+                Password reset for <span className="font-medium">{announced.email}</span>. Share with them
+                securely — it won't be shown again.
+              </p>
+            )}
+            <button type="button" onClick={() => setAnnounced(null)} className="underline font-medium">Dismiss</button>
           </div>
         )}
 
@@ -199,7 +215,14 @@ export default function AdminUsersPage() {
                             : <span aria-label="No signature">—</span>}
                         </td>
                         <td className="px-6 py-4 text-sm">
-                          <button type="button" onClick={() => edit(row)} className="btn-secondary">Edit</button>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={() => edit(row)} className="btn-secondary">Edit</button>
+                            {!row.is_demo && (
+                              <button type="button" onClick={() => startResetting(row)} className="btn-secondary">
+                                Reset password
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -226,6 +249,14 @@ export default function AdminUsersPage() {
             onCancel={() => setEditing(null)}
             busy={busy}
             error={saveError}
+          />
+        )}
+
+        {resetting && (
+          <AdminResetPasswordModal
+            user={resetting}
+            onClose={() => setResetting(null)}
+            onSuccess={(row) => setAnnounced({ kind: 'reset', email: row.email })}
           />
         )}
       </main>

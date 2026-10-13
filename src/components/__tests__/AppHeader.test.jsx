@@ -49,7 +49,7 @@ describe('AppHeader', () => {
     expect(screen.queryByRole('button', { name: 'Sign Out' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /signature/i })).not.toBeInTheDocument()
     await userEvent.click(userMenu())
-    expect(screen.getAllByRole('menuitem').map(el => el.textContent)).toEqual(['Update signature', 'Sign Out'])
+    expect(screen.getAllByRole('menuitem').map(el => el.textContent)).toEqual(['Update signature', 'Change password', 'Sign Out'])
   })
 
   it('signs out from the menu', async () => {

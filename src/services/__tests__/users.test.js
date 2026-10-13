@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createAdminUser, listAdminUsers, listUsers, patchAdminUser } from '../users'
+import {
+  changeOwnPassword, createAdminUser, listAdminUsers, listUsers, patchAdminUser, resetUserPassword,
+} from '../users'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
 import { TEST_USER_ID } from '../../test/users'
 
@@ -115,5 +117,37 @@ describe('patchAdminUser', () => {
     mockFetch(400, { detail: 'last_name cannot be blank' })
     await expect(patchAdminUser(TEST_USER_ID, { last_name: ' ' }))
       .rejects.toMatchObject({ message: 'last_name cannot be blank', status: 400 })
+  })
+})
+
+describe('changeOwnPassword', () => {
+  it('POSTs both passwords to /v1/users/me/password and returns the (empty) data', async () => {
+    mockFetch(200, { status: 'success', message: 'Password changed', data: null })
+    expect(await changeOwnPassword({ current_password: 'old-pass', new_password: 'new-pass' })).toBeNull()
+    expect(fetchUrl().pathname).toBe('/v1/users/me/password')
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual({ current_password: 'old-pass', new_password: 'new-pass' })
+  })
+
+  it('throws the backend message for a wrong current password', async () => {
+    mockFetch(400, { detail: 'Current password is incorrect' })
+    await expect(changeOwnPassword({ current_password: 'wrong', new_password: 'new-pass' }))
+      .rejects.toMatchObject({ message: 'Current password is incorrect', status: 400 })
+  })
+})
+
+describe('resetUserPassword', () => {
+  it('POSTs the new password to /v1/admin/users/{id}/password and returns the user', async () => {
+    mockFetch(200, { data: ADMIN_USERS[0] })
+    expect(await resetUserPassword(TEST_USER_ID, { new_password: 'test1234' })).toEqual(ADMIN_USERS[0])
+    expect(fetchUrl().pathname).toBe(`/v1/admin/users/${TEST_USER_ID}/password`)
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual({ new_password: 'test1234' })
+  })
+
+  it('throws the backend message on a refusal', async () => {
+    mockFetch(400, { detail: 'new_password must be at least 6 characters' })
+    await expect(resetUserPassword(TEST_USER_ID, { new_password: '123' }))
+      .rejects.toMatchObject({ message: 'new_password must be at least 6 characters', status: 400 })
   })
 })

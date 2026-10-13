@@ -18,6 +18,16 @@ vi.mock('../SignatureSetupModal', () => ({
   ) : null),
 }))
 
+// The real modal calls the backend; here it is a stand-in that can succeed or be cancelled
+vi.mock('../ChangePasswordModal', () => ({
+  default: ({ onClose, onSuccess }) => (
+    <div role="dialog" aria-label="Change Password">
+      <button onClick={() => { onSuccess?.(); onClose() }}>finish password</button>
+      <button onClick={onClose}>cancel password</button>
+    </div>
+  ),
+}))
+
 let logout
 
 function CurrentUrl() {
@@ -146,6 +156,8 @@ describe('UserMenu — keyboard', () => {
     renderMenu(TEST_USER)
     await open()
     await userEvent.keyboard('{ArrowDown}')
+    expect(item('Change password')).toHaveFocus()
+    await userEvent.keyboard('{ArrowDown}')
     expect(item('Sign Out')).toHaveFocus()
     await userEvent.keyboard('{ArrowDown}')
     expect(item('Update signature')).toHaveFocus() // wrapped
@@ -160,7 +172,7 @@ describe('UserMenu — keyboard', () => {
   it('activates the focused item with Enter', async () => {
     renderMenu(TEST_USER)
     await open()
-    await userEvent.keyboard('{ArrowDown}{Enter}')
+    await userEvent.keyboard('{End}{Enter}')
     expect(logout).toHaveBeenCalledTimes(1)
     expect(menu()).not.toBeInTheDocument()
   })
@@ -170,7 +182,7 @@ describe('UserMenu — signature item', () => {
   it('reads "Set up signature" for a user without one, and opens the setup dialog', async () => {
     renderMenu(UNSIGNED_USER)
     await open()
-    expect(itemNames()).toEqual(['Set up signature', 'Sign Out'])
+    expect(itemNames()).toEqual(['Set up signature', 'Change password', 'Sign Out'])
     expect(item('Set up signature')).not.toHaveAttribute('title')
     await userEvent.click(item('Set up signature'))
     expect(signatureDialog('Set Up Your Signature')).toBeInTheDocument()
@@ -179,7 +191,7 @@ describe('UserMenu — signature item', () => {
   it('reads "Update signature" for a user with one, with a tooltip saying when it was set', async () => {
     renderMenu(TEST_USER)
     await open()
-    expect(itemNames()).toEqual(['Update signature', 'Sign Out'])
+    expect(itemNames()).toEqual(['Update signature', 'Change password', 'Sign Out'])
     expect(item('Update signature')).toHaveAttribute('title', 'Set on Oct 1, 2026')
     await userEvent.click(item('Update signature'))
     expect(signatureDialog('Update Your Signature')).toBeInTheDocument()
@@ -210,6 +222,61 @@ describe('UserMenu — signature item', () => {
     renderMenu(TEST_USER)
     await open()
     expect(screen.getAllByRole('separator')).toHaveLength(1)
+  })
+})
+
+describe('UserMenu — Change password', () => {
+  const passwordDialog = () => screen.queryByRole('dialog', { name: 'Change Password' })
+  const banner = () => screen.queryByRole('status')
+
+  it('sits between the signature item and Sign Out for a regular user', async () => {
+    renderMenu(TEST_USER, { HWS0023: ['oe'] })
+    await open()
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Change password', 'Sign Out'])
+  })
+
+  it('is hidden for a demo user', async () => {
+    renderMenu(DEMO_USER)
+    await open()
+    expect(screen.queryByRole('menuitem', { name: 'Change password' })).not.toBeInTheDocument()
+  })
+
+  it('opens the dialog and closes the menu', async () => {
+    renderMenu(TEST_USER)
+    expect(passwordDialog()).not.toBeInTheDocument()
+    await open()
+    await userEvent.click(item('Change password'))
+    expect(passwordDialog()).toBeInTheDocument()
+    expect(menu()).not.toBeInTheDocument()
+  })
+
+  it('announces a change once, until dismissed, without signing out', async () => {
+    renderMenu(TEST_USER)
+    await open()
+    await userEvent.click(item('Change password'))
+    await userEvent.click(screen.getByRole('button', { name: 'finish password' }))
+    expect(passwordDialog()).not.toBeInTheDocument()
+    expect(banner()).toHaveTextContent('Password updated. Use it on next sign-in.')
+    expect(logout).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('announces nothing when the dialog is cancelled, and drops the banner when it is opened again', async () => {
+    renderMenu(TEST_USER)
+    await open()
+    await userEvent.click(item('Change password'))
+    await userEvent.click(screen.getByRole('button', { name: 'cancel password' }))
+    expect(passwordDialog()).not.toBeInTheDocument()
+    expect(banner()).not.toBeInTheDocument()
+
+    await open()
+    await userEvent.click(item('Change password'))
+    await userEvent.click(screen.getByRole('button', { name: 'finish password' }))
+    expect(banner()).toBeInTheDocument()
+    await open()
+    await userEvent.click(item('Change password'))
+    expect(banner()).not.toBeInTheDocument()
   })
 })
 
@@ -262,7 +329,7 @@ describe('UserMenu — My Tasks', () => {
   it('is hidden for a user who only inspects', async () => {
     renderMenu(TEST_USER, { HWS0023: ['inspector'], SE384: ['inspector'] })
     await open()
-    expect(itemNames()).toEqual(['Update signature', 'Sign Out'])
+    expect(itemNames()).toEqual(['Update signature', 'Change password', 'Sign Out'])
   })
 
   it.each([
@@ -271,7 +338,7 @@ describe('UserMenu — My Tasks', () => {
   ])('is the first item for %s', async (_, user, roles) => {
     renderMenu(user, roles)
     await open()
-    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Sign Out'])
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Change password', 'Sign Out'])
   })
 
   it('is the first item for an admin with no project roles', async () => {
@@ -304,11 +371,11 @@ describe('UserMenu — My Tasks', () => {
 describe('UserMenu — All IDRs (Admin)', () => {
   const ADMIN = { ...TEST_USER, role: 'admin' }
 
-  it('sits after the signature item for an admin', async () => {
+  it('sits after the signature and password items for an admin', async () => {
     renderMenu(ADMIN)
     await open()
-    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'All IDRs (Admin)', 'All Users (Admin)',
-      'All Projects (Admin)', 'Sign Out'])
+    expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Change password', 'All IDRs (Admin)',
+      'All Users (Admin)', 'All Projects (Admin)', 'Sign Out'])
   })
 
   it.each([

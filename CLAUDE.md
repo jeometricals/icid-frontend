@@ -45,7 +45,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - React Router for navigation (`useNavigate`, `<Navigate>`, `<Link>`), never `window.location`.
 - **Navigation.** Every signed-in page renders inside `AppLayout` (`App.jsx`), which supplies the app header: the
   ICID Co. logo (a link to `/projects`) and the user menu (`UserMenu`: the user's name, opening a dropdown with
-  their signature and Sign Out; a new entry is one more object in its `items` list). Pages don't render a header of their own,
+  their signature, Change password and Sign Out; a new entry is one more object in its `items` list). Pages don't render a header of their own,
   and size their root with `flex-1` (the layout owns the screen height), not `min-h-screen`.
   - A page deep inside a project shows `GoToProjectButton` beside its Back button, unless Back already goes to the
     project page.
@@ -284,6 +284,22 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   again and a one-time banner names the new email and says to share the password, until it is dismissed or
   another dialog is opened. The new user is on no project until given a role on the project roles page. A non-admin who opens the
   URL is told it is for admins; the backend returns 403 to them anyway.
+- **Passwords.** A user changes their own; an admin resets anyone's. Neither signs anyone out: tokens already
+  issued stay valid.
+  - **Change password** (`ChangePasswordModal`, "Change password" in the user menu, after the signature item and
+    before the admin entries): current, new and confirm, each masked with a show / hide button. Save is off until
+    all three are in, the new one has at least 6 characters, matches its confirmation and differs from the current
+    one. The modal runs `changeOwnPassword` (`POST /v1/users/me/password`) itself. A refusal, a wrong current
+    password included (a 400, not a 401, so it doesn't sign the user out), shows inline as the backend worded it
+    and the form keeps what was typed. After a success `UserMenu` shows "Password updated. Use it on next
+    sign-in." once, in a green banner fixed under the header, until it is dismissed or the dialog is opened again.
+  - **Reset password** (`AdminResetPasswordModal`, a button after "Edit" on each `/admin/users` row): one new
+    password, shown as typed since the admin passes it on; Save is off under 6 characters. The modal runs
+    `resetUserPassword` (`POST /v1/admin/users/{user_id}/password`) itself, and the list isn't read again. A
+    refusal shows inline. After a success the page's one-time banner reads "Password reset for <email>. Share
+    with them securely — it won't be shown again."
+  - **Demo users** get neither: no menu item, and no button on their row. That is only hidden here; the backend
+    would still take an admin's reset of a demo user.
 - **All Projects (admin).** `/admin/projects` (`AdminProjectsPage`), "All Projects (Admin)" in the user menu, which
   only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
   backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
@@ -335,8 +351,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
   - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
-  - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` (admin only: every user,
-    creating one, and changing a user's first and last name)
+  - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` ·
+    `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's first and
+    last name, and resetting a user's password)
+  - `POST /v1/users/me/password` (the signed-in user changes their own password)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
     `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and
