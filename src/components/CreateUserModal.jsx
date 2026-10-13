@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import Modal from './Modal'
-import { MAX_NAME_LENGTH } from './EditUserModal'
+import { MAX_EMAIL_LENGTH, MAX_NAME_LENGTH } from './EditUserModal'
 
 // What the backend takes: an email of at most 254 characters and a password of 6 characters to 72 bytes
-export const MAX_EMAIL_LENGTH = 254
+export { MAX_EMAIL_LENGTH }
 export const MIN_PASSWORD_LENGTH = 6
 export const MAX_PASSWORD_LENGTH = 72
 

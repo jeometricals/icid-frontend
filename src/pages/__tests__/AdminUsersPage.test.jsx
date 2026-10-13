@@ -28,8 +28,9 @@ beforeEach(() => {
   refreshUser = vi.fn().mockResolvedValue(ADMIN)
   server = structuredClone(LISTED)
   api.listAdminUsers.mockImplementation(async () => structuredClone(server))
-  api.patchAdminUser.mockImplementation(async (userId, names) => {
-    server = server.map(row => (row.uuid === userId ? { ...row, ...names } : row))
+  api.patchAdminUser.mockImplementation(async (userId, { is_admin, ...fields }) => {
+    const role = is_admin === undefined ? {} : { role: is_admin ? 'admin' : null }
+    server = server.map(row => (row.uuid === userId ? { ...row, ...fields, ...role } : row))
     return server.find(row => row.uuid === userId)
   })
   api.createAdminUser.mockImplementation(async ({ email, first_name, last_name, is_admin }) => {
@@ -150,7 +151,110 @@ describe('AdminUsersPage — editing a user', () => {
     expect(screen.getByRole('dialog', { name: 'Edit User' })).toBeInTheDocument()
     expect(within(dialog()).getByLabelText('First name')).toHaveValue('Genghis')
     expect(within(dialog()).getByLabelText('Last name')).toHaveValue('Khan')
-    expect(within(dialog()).getByText(TEST_USER.email)).toBeInTheDocument()
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue(TEST_USER.email)
+    expect(within(dialog()).getByLabelText('Grant admin role')).not.toBeChecked()
+    expect(within(dialog()).getByLabelText('Grant admin role')).toBeEnabled()
+    expect(within(dialog()).queryByLabelText('Promote to real user')).not.toBeInTheDocument()
+  })
+
+  it('changes the email and grants the admin role: confirmed first, then the list is read and the new email announced', async () => {
+    renderPage()
+    await ready()
+    await editRow(TEST_USER.email)
+    await retype('Email', 'khan@magnoleng.pc')
+    await userEvent.click(within(dialog()).getByLabelText('Grant admin role'))
+    await userEvent.click(saveButton())
+    expect(dialog()).toHaveAccessibleName('Save changes?')
+    expect(within(dialog()).getAllByRole('listitem').map(li => li.textContent)).toEqual([
+      'Change email from KhanG@magnoleng.pc to khan@magnoleng.pc? The user will need to sign in with the new email.',
+      'Grant admin role to KhanG@magnoleng.pc?',
+    ])
+    expect(api.patchAdminUser).not.toHaveBeenCalled()
+
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+    expect(api.patchAdminUser).toHaveBeenCalledTimes(1)
+    expect(api.patchAdminUser).toHaveBeenCalledWith(TEST_USER.uuid, { email: 'khan@magnoleng.pc', is_admin: true })
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(2)
+    expect(cells('khan@magnoleng.pc').slice(0, 4)).toEqual(['khan@magnoleng.pc', 'Genghis', 'Khan', 'Admin'])
+    expect(screen.getByRole('status')).toHaveTextContent('User khan@magnoleng.pc updated.')
+  })
+
+  it('announces a name change under the email the user keeps', async () => {
+    renderPage()
+    await ready()
+    await editRow(TEST_USER.email)
+    await retype('Last name', 'Borjigin')
+    await userEvent.click(saveButton())
+    expect(screen.getByRole('status')).toHaveTextContent(`User ${TEST_USER.email} updated.`)
+  })
+
+  it('promotes a demo user to a real one', async () => {
+    renderPage()
+    await ready()
+    await editRow(DEMO_USER.email)
+    await userEvent.click(within(dialog()).getByLabelText('Promote to real user'))
+    await userEvent.click(saveButton())
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+    expect(api.patchAdminUser).toHaveBeenCalledWith(DEMO_USER.uuid, { is_demo: false })
+    expect(cells(DEMO_USER.email)[3]).toBe('Regular')
+    expect(within(rowFor(DEMO_USER.email)).getByRole('button', { name: 'Reset password' })).toBeInTheDocument()
+  })
+
+  it('turns the admin box off on the admin\'s own row, and leaves it on for another admin\'s', async () => {
+    server = server.map(row => (row.uuid === TEST_USER.uuid ? { ...row, role: 'admin' } : row))
+    renderPage()
+    await ready()
+    await editRow(ADMIN.email)
+    const own = within(dialog()).getByLabelText('Grant admin role')
+    expect(own).toBeChecked()
+    expect(own).toBeDisabled()
+    expect(own).toHaveAttribute('title', 'You cannot change your own admin role.')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    await editRow(TEST_USER.email)
+    expect(within(dialog()).getByLabelText('Grant admin role')).toBeChecked()
+    expect(within(dialog()).getByLabelText('Grant admin role')).toBeEnabled()
+  })
+
+  it('shows a taken email inline, keeps what was typed and announces nothing', async () => {
+    api.patchAdminUser.mockRejectedValueOnce(Object.assign(
+      new Error('A user with this email already exists'), { status: 409, body: { existing_user_uuid: ADMIN.uuid } }))
+    renderPage()
+    await ready()
+    await editRow(TEST_USER.email)
+    await retype('Email', 'REZA@icid.local')
+    await userEvent.click(saveButton())
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+    expect(dialog()).toHaveAccessibleName('Edit User')
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Another user already has this email.')
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue('REZA@icid.local')
+    expect(api.listAdminUsers).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('shows any other refusal as the backend worded it', async () => {
+    api.patchAdminUser.mockRejectedValueOnce(
+      Object.assign(new Error('email is not a valid email address'), { status: 400 }))
+    renderPage()
+    await ready()
+    await editRow(TEST_USER.email)
+    await retype('Email', 'no-at-sign')
+    await userEvent.click(saveButton())
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+    expect(within(dialog()).getByRole('alert'))
+      .toHaveTextContent("Couldn't save the user: email is not a valid email address")
+  })
+
+  it('goes back to the form when the confirmation is cancelled, and sends nothing', async () => {
+    renderPage()
+    await ready()
+    await editRow(TEST_USER.email)
+    await retype('Email', 'khan@magnoleng.pc')
+    await userEvent.click(saveButton())
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dialog()).toHaveAccessibleName('Edit User')
+    expect(within(dialog()).getByLabelText('Email')).toHaveValue('khan@magnoleng.pc')
+    expect(api.patchAdminUser).not.toHaveBeenCalled()
   })
 
   it('saves the changed name, closes the dialog and reads the list again', async () => {

@@ -289,11 +289,24 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **All Users (admin).** `/admin/users` (`AdminUsersPage`), "All Users (Admin)" in the user menu, which only an
   admin sees. One `GET /v1/admin/users` (`listAdminUsers` in `services/users.js`), shown in the backend's order:
   email, first name, last name, role (`Admin` for `role === 'admin'`, `Demo` for a demo user, otherwise
-  `Regular`) and a tick for a signature. Each row's "Edit" opens `EditUserModal` with both names filled in; Save
-  sends only the names that changed (`patchAdminUser`, `PATCH /v1/admin/users/{id}`) and is off until one has.
-  A name can't be cleared, so emptying one that was set is an inline error and nothing is sent. A refusal shows
-  in the dialog; after a success the page reads the list again, and re-reads the signed-in user (`refreshUser`)
-  when the admin renamed themselves. An existing user's email, role and demo status aren't editable here.
+  `Regular`) and a tick for a signature. Each row's "Edit" opens `EditUserModal`, everything pre-filled: first
+  name, last name, email, "Grant admin role" and, on a demo user's row only, "Promote to real user" (unticked).
+  Save sends only what changed (`patchAdminUser`, `PATCH /v1/admin/users/{id}`: any of `first_name`,
+  `last_name`, `email`, `is_admin`, `is_demo: false`) and is off until something has. A name or the email can't
+  be cleared, so emptying one that was set is an inline error and nothing is sent.
+  - **Sensitive changes are confirmed first:** a new email, the admin role granted or revoked, a promotion from
+    demo. The confirmation (`ConfirmDialog` with its `items` list, "Save changes") takes the form's place and
+    lists each one; Cancel returns to the form as it was. A change of names alone saves straight away.
+  - **The admin's own row** has the admin box disabled, with the tooltip "You cannot change your own admin
+    role." (`isSelf`); the backend refuses an admin revoking their own role with a 400 anyway.
+  - **A real user can't be made a demo user** (the backend's 400), so the promotion box only appears on demo
+    rows and there is no way back from it here.
+  - **A refusal shows in the form**, which keeps what was typed: a taken email's 409 reads "Another user already
+    has this email." (its `existing_user_uuid` isn't used), anything else "Couldn't save the user: <the
+    backend's message>".
+  - **After a success** the page reads the list again, re-reads the signed-in user (`refreshUser`) when the
+    admin changed themselves, and shows "User <email> updated." in its one-time banner, with the new email when
+    it changed.
   "Create user" (right of the heading) opens `CreateUserModal`: email, first name, last name (optional), a
   password shown as typed (the admin passes it on) and "Grant admin role". Save is off until the email, the
   first name and a password of at least 6 characters are in; `createAdminUser` (`POST /v1/admin/users`) sends
@@ -418,8 +431,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
   - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` ·
-    `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's first and
-    last name, and resetting a user's password)
+    `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's names,
+    email, admin role and demo flag, and resetting a user's password)
   - `POST /v1/users/me/password` (the signed-in user changes their own password)
   - `GET /v1/users/` (the IDR page's banner resolves reporter_uuid → name; the roles page lists who can be given a role; not available to demo users)
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and

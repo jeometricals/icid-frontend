@@ -1,10 +1,11 @@
 /**
  * Every user, at /admin/users. Admins only: a table (email, first name, last name, role, whether they have a
- * signature) in the backend's order, with an Edit button on each row that opens a dialog for the user's first and
- * last name, and a "Create user" button that opens one for a new user. After a save the list is read again, so a
- * row shows what the backend wrote; when the admin renamed themselves, the signed-in user is re-read too, so the
- * header shows the new name. A created user is announced once, in a banner that reminds the admin to pass the
- * password on; it goes when dismissed or when another dialog is opened. Each row but a demo user's also has
+ * signature) in the backend's order, with an Edit button on each row that opens a dialog for the user's names,
+ * email, admin role and (for a demo user) promotion to a real one, and a "Create user" button that opens one for
+ * a new user. After a save the list is read again, so a row shows what the backend wrote; when the admin changed
+ * themselves, the signed-in user is re-read too, so the header shows the new name. A created or updated user is
+ * announced once, in a banner (a created one's reminds the admin to pass the password on); it goes when
+ * dismissed or when another dialog is opened. Each row but a demo user's also has
  * "Reset password", which opens a dialog for a new password and is announced in the same banner. Anyone who isn't
  * an admin is told so instead.
  */
@@ -17,6 +18,8 @@ import { isAdmin } from '../lib/reviewRoles'
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal'
 import CreateUserModal from '../components/CreateUserModal'
 import EditUserModal from '../components/EditUserModal'
+
+export const EMAIL_TAKEN = 'Another user already has this email.'
 
 // What the Role column says: an admin, a demo user, or anyone else
 export function roleLabel(user) {
@@ -37,7 +40,7 @@ export default function AdminUsersPage() {
   const [editing, setEditing] = useState(null) // the user whose names are being edited
   const [creating, setCreating] = useState(false) // whether the Create User dialog is open
   const [resetting, setResetting] = useState(null) // the user whose password is being reset
-  // What the one-time banner announces: {kind: 'created' | 'reset', email}
+  // What the one-time banner announces: {kind: 'created' | 'updated' | 'reset', email}
   const [announced, setAnnounced] = useState(null)
   const [busy, setBusy] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -96,10 +99,14 @@ export default function AdminUsersPage() {
   }
 
   const save = async (changes) => {
-    const saved = await run(() => patchAdminUser(editing.uuid, changes), err => `Couldn't save the user: ${err.message}`)
+    const saved = await run(
+      () => patchAdminUser(editing.uuid, changes),
+      err => (err.status === 409 ? EMAIL_TAKEN : `Couldn't save the user: ${err.message}`),
+    )
     if (!saved) return
-    // The admin renamed themselves: the header shows their name
+    // The admin changed themselves: the header shows their name
     if (editing.uuid === user.uuid) refreshUser().catch(() => {})
+    setAnnounced({ kind: 'updated', email: changes.email ?? editing.email })
     setEditing(null)
   }
 
@@ -154,6 +161,8 @@ export default function AdminUsersPage() {
                 Created user <span className="font-medium">{announced.email}</span>. Share the password with them
                 securely — it won't be shown again.
               </p>
+            ) : announced.kind === 'updated' ? (
+              <p>User <span className="font-medium">{announced.email}</span> updated.</p>
             ) : (
               <p>
                 Password reset for <span className="font-medium">{announced.email}</span>. Share with them
@@ -245,6 +254,7 @@ export default function AdminUsersPage() {
         {editing && (
           <EditUserModal
             user={editing}
+            isSelf={editing.uuid === user.uuid}
             onSave={save}
             onCancel={() => setEditing(null)}
             busy={busy}

@@ -151,3 +151,30 @@ describe('resetUserPassword', () => {
       .rejects.toMatchObject({ message: 'new_password must be at least 6 characters', status: 400 })
   })
 })
+
+describe('patchAdminUser — email, admin role and demo flag', () => {
+  it('sends the email, is_admin and is_demo when given', async () => {
+    mockFetch(200, { data: ADMIN_USERS[0] })
+    await patchAdminUser(TEST_USER_ID, { email: 'khan@magnoleng.pc', is_admin: true, is_demo: false })
+    expect(JSON.parse(fetchInit().body)).toEqual({ email: 'khan@magnoleng.pc', is_admin: true, is_demo: false })
+  })
+
+  it('sends is_admin false, and leaves out what it was not given', async () => {
+    mockFetch(200, { data: ADMIN_USERS[0] })
+    await patchAdminUser(TEST_USER_ID, { is_admin: false, email: undefined })
+    expect(JSON.parse(fetchInit().body)).toEqual({ is_admin: false })
+  })
+
+  it('throws the backend message for a taken email, with the user who has it', async () => {
+    mockFetch(409, { detail: 'A user with this email already exists', existing_user_uuid: TEST_USER_ID })
+    await expect(patchAdminUser(TEST_USER_ID, { email: 'reza@icid.local' })).rejects.toMatchObject({
+      message: 'A user with this email already exists', status: 409, body: { existing_user_uuid: TEST_USER_ID },
+    })
+  })
+
+  it('throws the backend message when an admin takes their own role away', async () => {
+    mockFetch(400, { detail: 'You cannot revoke your own admin role.' })
+    await expect(patchAdminUser(TEST_USER_ID, { is_admin: false }))
+      .rejects.toMatchObject({ message: 'You cannot revoke your own admin role.', status: 400 })
+  })
+})

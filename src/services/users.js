@@ -32,14 +32,20 @@ export async function createAdminUser({ email, first_name, last_name, password, 
 }
 
 /**
- * Admin only: changes a user's first name, last name or both, and returns the user as they now are. A name left
- * out (undefined) keeps its value. The backend trims the names and answers 400 for a blank or over-long one, or
- * when neither is sent, and 404 for an unknown user.
+ * Admin only: changes any of a user's first name, last name, email, admin role (is_admin) and demo flag (is_demo:
+ * false makes a demo user a real one), and returns the user as they now are. A field left out (undefined) keeps
+ * its value. The backend trims the names and the email and answers 400 for a value that doesn't fit, when nothing
+ * is sent, when an admin takes their own admin role away or when a real user is made a demo user; 404 for an
+ * unknown user; and 409 when another user has the email, whatever its capitals (the thrown error's body then
+ * carries existing_user_uuid).
  */
-export async function patchAdminUser(userId, { first_name, last_name }) {
+export async function patchAdminUser(userId, { first_name, last_name, email, is_admin, is_demo }) {
   const body = {}
   if (first_name !== undefined) body.first_name = first_name
   if (last_name !== undefined) body.last_name = last_name
+  if (email !== undefined) body.email = email
+  if (is_admin !== undefined) body.is_admin = is_admin
+  if (is_demo !== undefined) body.is_demo = is_demo
   const json = await apiFetch(`/v1/admin/users/${userId}`, { method: 'PATCH', body })
   return json.data
 }
