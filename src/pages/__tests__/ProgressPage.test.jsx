@@ -54,8 +54,6 @@ const url = () => screen.getByTestId('progress-url').textContent
 const fromInput = () => screen.getByLabelText('From')
 const toInput = () => screen.getByLabelText('To')
 const pick = (input, value) => fireEvent.change(input, { target: { value } })
-const tiles = () => within(screen.getByRole('region', { name: 'Totals by unit' })).getAllByRole('group')
-  .map(tile => [...tile.children].map(part => part.textContent))
 const tableRows = () => screen.getAllByRole('row').slice(1).map(tr => within(tr).getAllByRole('cell').map(td => td.textContent))
 const lastCall = () => api.listQuantities.mock.calls.at(-1)[0]
 
@@ -70,13 +68,12 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers() })
 
 describe('ProgressPage — first load', () => {
-  it('shows the title, the range pickers and empty tiles while the quantities load', () => {
+  it('shows the title and the range pickers while the quantities load', () => {
     api.listQuantities.mockReturnValue(new Promise(() => {}))
     renderPage()
     expect(screen.getByRole('heading', { name: 'Progress — HWS0023' })).toBeInTheDocument()
     expect(fromInput()).toHaveAttribute('type', 'date')
     expect(toInput()).toHaveAttribute('type', 'date')
-    expect(tiles()).toEqual([['TN', '—'], ['LF', '—'], ['SF', '—'], ['EA', '—']])
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
@@ -99,24 +96,7 @@ describe('ProgressPage — first load', () => {
   })
 })
 
-describe('ProgressPage — totals and rollup', () => {
-  it('shows the response\'s total per unit: TN, LF, SF, EA', async () => {
-    renderPage()
-    await screen.findByRole('table')
-    expect(tiles()).toEqual([['TN', '3.2'], ['LF', '171'], ['SF', '901'], ['EA', '54']])
-  })
-
-  it('puts any other unit after those four, and a dash where a unit has no rows', async () => {
-    api.listQuantities.mockResolvedValue({
-      ...FOUND, totals_by_unit: { SY: 1250.25, SF: 901, '(unknown)': 2, CY: 7.5 },
-    })
-    renderPage()
-    await screen.findByRole('table')
-    expect(tiles()).toEqual([
-      ['TN', '—'], ['LF', '—'], ['SF', '901'], ['EA', '—'], ['CY', '7.5'], ['SY', '1,250.25'], ['(unknown)', '2'],
-    ])
-  })
-
+describe('ProgressPage — rollup', () => {
   it('lists one row per pay item, budget code and unit, with its quantities summed', async () => {
     renderPage()
     await screen.findByRole('table')
@@ -193,7 +173,6 @@ describe('ProgressPage — the date range', () => {
     expect(url()).toBe('?from=2026-10-20&to=2026-10-12')
     expect(api.listQuantities).toHaveBeenCalledTimes(1) // the first load only
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Totals by unit' })).not.toBeInTheDocument()
 
     pick(toInput(), '2026-10-25')
     await screen.findByRole('table')
@@ -209,12 +188,11 @@ describe('ProgressPage — the date range', () => {
 })
 
 describe('ProgressPage — nothing, failures and truncation', () => {
-  it('says so when the range has no approved quantities, with empty tiles', async () => {
+  it('says so when the range has no approved quantities', async () => {
     api.listQuantities.mockResolvedValue(NOTHING)
     renderPage()
     expect(await screen.findByText('No approved quantities in this range')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    expect(tiles()).toEqual([['TN', '—'], ['LF', '—'], ['SF', '—'], ['EA', '—']])
   })
 
   it('shows why the quantities couldn\'t be loaded, and Retry loads them', async () => {

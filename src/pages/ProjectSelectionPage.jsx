@@ -91,13 +91,6 @@ export default function ProjectSelectionPage() {
             </button>
           ))}
         </div>
-
-        {/* Sign-up for Project Button */}
-        <div className="mt-8 text-center">
-          <button className="btn-secondary">
-            Sign-up for a Project
-          </button>
-        </div>
       </main>
     </div>
   )

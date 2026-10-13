@@ -1,6 +1,6 @@
 /**
  * Progress on one project (route param :projectId): the pay-item quantities of its approved IDRs over a range of
- * work dates. A total per unit as tiles, then one row per pay item with its summed quantity.
+ * work dates. One row per pay item with its summed quantity.
  * The range lives in the URL (?from=&to=, YYYY-MM-DD), so a view can be linked and reloaded; a URL with neither
  * means the last 30 days. One request per range; the rows are rolled up here.
  */
@@ -9,7 +9,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { format, subDays } from 'date-fns'
 import { listQuantities } from '../services/api'
-import { formatQuantity, rollupByItem, unitTiles } from '../lib/progressRollup'
+import { formatQuantity, rollupByItem } from '../lib/progressRollup'
 
 export const DEFAULT_RANGE_DAYS = 30
 
@@ -101,15 +101,6 @@ export default function ProgressPage() {
 
         {backwards ? null : (
           <>
-            <section aria-label="Totals by unit" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {unitTiles(shown?.totals_by_unit).map(({ unit, total }) => (
-                <div key={unit} role="group" aria-label={`${unit} total`} className="bg-white rounded-lg shadow-sm p-4">
-                  <div className="text-2xl font-bold text-construction-700">{unit}</div>
-                  <div className="text-lg text-gray-900 tabular-nums">{total === null ? '—' : formatQuantity(total)}</div>
-                </div>
-              ))}
-            </section>
-
             {loading ? (
               <div className="flex justify-center py-12">
                 <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatQuantity, rollupByItem, unitTiles } from '../progressRollup'
+import { formatQuantity, rollupByItem } from '../progressRollup'
 
 const row = (pay_item_ref, budget_code, unit, amount, description = `Item ${pay_item_ref}`) => (
   { pay_item_ref, budget_code, unit, amount, description }
@@ -71,21 +71,6 @@ describe('rollupByItem', () => {
 
   it('gives an empty list for no rows', () => {
     expect(rollupByItem([])).toEqual([])
-  })
-})
-
-describe('unitTiles', () => {
-  it('always has TN, LF, SF and EA, in that order, empty where there are no rows', () => {
-    expect(unitTiles({ SF: 901, TN: 3.2 })).toEqual([
-      { unit: 'TN', total: 3.2 }, { unit: 'LF', total: null }, { unit: 'SF', total: 901 }, { unit: 'EA', total: null },
-    ])
-    expect(unitTiles().map(tile => tile.total)).toEqual([null, null, null, null])
-  })
-
-  it('puts any other unit after them, alphabetically, the unknown unit last', () => {
-    expect(unitTiles({ '(unknown)': 4, SY: 12, EA: 54, CY: 7.5, GAL: 0 }).map(tile => [tile.unit, tile.total])).toEqual([
-      ['TN', null], ['LF', null], ['SF', null], ['EA', 54], ['CY', 7.5], ['GAL', 0], ['SY', 12], ['(unknown)', 4],
-    ])
   })
 })
 

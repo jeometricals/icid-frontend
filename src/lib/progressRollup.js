@@ -1,9 +1,3 @@
-// The units the Progress page always shows a total for, in this order; any other unit follows them
-export const STANDING_UNITS = ['TN', 'LF', 'SF', 'EA']
-
-// What the backend sums rows without a unit under
-export const UNKNOWN_UNIT = '(unknown)'
-
 // Sums of amounts are sums of floats; this trims what that leaves behind (0.1 + 0.2)
 const tidy = amount => Math.round(amount * 1e6) / 1e6
 
@@ -44,22 +38,6 @@ function byItem(a, b) {
   if (Boolean(a.pay_item_ref) !== Boolean(b.pay_item_ref)) return a.pay_item_ref ? -1 : 1
   return compareText(a.pay_item_ref, b.pay_item_ref) || compareText(a.budget_code, b.budget_code)
     || compareText(a.unit, b.unit) || compareText(a.description, b.description)
-}
-
-/**
- * Lays a response's totals_by_unit out as the page's tiles.
- * Takes the totals ({unit: sum}; undefined or {} when there are none to show).
- * Returns [{unit, total}]: the standing units first, total null for one with no rows, then every other unit in
- * alphabetical order, the unknown unit last.
- */
-export function unitTiles(totalsByUnit = {}) {
-  const others = Object.keys(totalsByUnit)
-    .filter(unit => !STANDING_UNITS.includes(unit))
-    .sort((a, b) => (a === UNKNOWN_UNIT) - (b === UNKNOWN_UNIT) || a.localeCompare(b))
-  return [...STANDING_UNITS, ...others].map(unit => ({
-    unit,
-    total: unit in totalsByUnit ? tidy(totalsByUnit[unit]) : null,
-  }))
 }
 
 // A quantity as the page prints it: thousands separated, three decimals at most

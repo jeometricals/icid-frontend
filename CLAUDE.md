@@ -18,7 +18,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping, tiles and number format) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping and number format) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, and `disciplines.js`: the discipline names the archive filters by).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, and the archive's `ArchiveFilters`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -182,15 +182,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     always means "the latest 30 days". A URL naming either bound is taken as it stands: a cleared picker is an
     open bound, and clearing both is the default again.
   - **From after To** shows a red hint under the pickers, hides the results and asks the backend nothing.
-  - **Tiles:** a total per unit from the response's `totals_by_unit`: TN, LF, SF and EA always, in that order
-    (a dash for one with no rows), then any other unit alphabetically, `(unknown)` last (`unitTiles`).
+  - **No totals per unit.** The response's `totals_by_unit` isn't shown: a sum across unrelated pay items that
+    share a unit means nothing.
   - **The table is rolled up here** (`rollupByItem` in `lib/progressRollup.js`): one row per item number, budget
     code and unit, its amounts summed. Rows with no item number (a reviewer can add an item by description
     alone) are grouped by description as well, so unrelated ones don't merge. A group shows the first
     description it has. Sorted by item number as numbers (`4.13` before `10.02`), items without one last.
   - **Numbers** print with thousands separators and three decimals at most (`formatQuantity`).
   - **Truncated.** When the response says `truncated` (more than 10,000 rows matched), a banner above the table
-    says the view is of the first 10,000; the tiles and the table are then totals of those rows only.
+    says the view is of the first 10,000; the table is then totals of those rows only.
   - No comparison with contract quantities, no export and no breakdown by inspector or day yet.
 - **Reviewer edits (redlines).** While an IDR is in review, the reviewer who accepted it at its current stage (or
   an admin) can change its fields. The backend applies each edit and logs it, so the IDR and its reports always
