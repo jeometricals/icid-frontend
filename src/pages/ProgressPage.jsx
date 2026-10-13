@@ -1,15 +1,19 @@
 /**
- * Progress on one project (route param :projectId): the pay-item quantities of its approved IDRs over a range of
- * work dates. One row per pay item with its summed quantity.
- * The range lives in the URL (?from=&to=, YYYY-MM-DD), so a view can be linked and reloaded; a URL with neither
- * means the last 30 days. One request per range; the rows are rolled up here.
+ * Progress on one project (route param :projectId): what the pay-item quantities of its approved IDRs come to
+ * against the project's budget (its contract items), by contract value. Three sections, top to bottom: the project
+ * total, a card per budget code, and a table with a row per pay item that has quantities.
+ * The quantities are those of a range of work dates, or all of them with "Show cumulative" ticked; the budget is
+ * always the whole project's. Both live in the URL (?from=&to=, YYYY-MM-DD, and ?cumulative=true), so a view can
+ * be linked and reloaded; a URL with no dates means the last 30 days. One request per view.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { format, subDays } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 import { listQuantities } from '../services/api'
-import { formatQuantity, rollupByItem } from '../lib/progressRollup'
+import { formatDollars, formatPayItemQuantity, formatPercent } from '../lib/payItemFormat'
+import Bar from '../components/Bar'
+import BudgetCodeCard from '../components/BudgetCodeCard'
 
 export const DEFAULT_RANGE_DAYS = 30
 
@@ -18,6 +22,22 @@ function defaultRange() {
   const today = new Date()
   return { from: format(subDays(today, DEFAULT_RANGE_DAYS), 'yyyy-MM-dd'), to: format(today, 'yyyy-MM-dd') }
 }
+
+// "Sep 13", with its year when that isn't this one
+function dayLabel(day) {
+  const date = parseISO(day)
+  return format(date, date.getFullYear() === new Date().getFullYear() ? 'MMM d' : 'MMM d, yyyy')
+}
+
+// Which quantities the figures are of: "Sep 13 – Oct 13", "from Sep 13", "through Oct 13" or "full project"
+function actualsLabel({ from, to, cumulative }) {
+  if (cumulative || (!from && !to)) return 'full project'
+  if (!to) return `from ${dayLabel(from)}`
+  if (!from) return `through ${dayLabel(to)}`
+  return `${dayLabel(from)} – ${dayLabel(to)}`
+}
+
+const dash = <span className="text-gray-400">—</span>
 
 export default function ProgressPage() {
   const { projectId } = useParams()
@@ -28,7 +48,9 @@ export default function ProgressPage() {
   const ranged = searchParams.has('from') || searchParams.has('to')
   const from = ranged ? searchParams.get('from') || '' : defaults.from
   const to = ranged ? searchParams.get('to') || '' : defaults.to
-  const backwards = Boolean(from && to && from > to)
+  const cumulative = searchParams.get('cumulative') === 'true'
+  // Cumulative leaves the dates out of the request, so a backwards range is no trouble then
+  const backwards = !cumulative && Boolean(from && to && from > to)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -39,24 +61,36 @@ export default function ProgressPage() {
     let ignore = false
     setLoading(true)
     setError(null)
-    listQuantities({ projectId, from, to })
+    listQuantities(cumulative ? { projectId, cumulative: true } : { projectId, from, to })
       .then(found => { if (!ignore) setData(found) })
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [projectId, from, to, backwards, attempt])
+  }, [projectId, from, to, cumulative, backwards, attempt])
 
-  // Clearing both pickers leaves a bare URL, which is the default range again
+  // Clearing both pickers leaves no dates in the URL, which is the default range again
   const changeRange = (bound, value) => {
     const next = { from, to, [bound]: value }
     const params = new URLSearchParams()
     if (next.from) params.set('from', next.from)
     if (next.to) params.set('to', next.to)
+    if (cumulative) params.set('cumulative', 'true')
+    setSearchParams(params, { replace: true })
+  }
+
+  // The dates in the URL stay as they are, for when the box is unticked again
+  const changeCumulative = (on) => {
+    const params = new URLSearchParams(searchParams)
+    if (on) params.set('cumulative', 'true')
+    else params.delete('cumulative')
     setSearchParams(params, { replace: true })
   }
 
   const shown = !loading && !error && data ? data : null
-  const items = useMemo(() => (shown ? rollupByItem(shown.rows) : []), [shown])
+  const total = shown?.project_total
+  // A project with no contract items has no budget codes, and nothing to measure against
+  const noBudget = shown ? shown.totals_by_budget_code.length === 0 : false
+  const unbudgetedCount = shown ? shown.unbudgeted_total.row_count : 0
 
   return (
     <div className="flex-1 bg-gray-50">
@@ -72,7 +106,7 @@ export default function ProgressPage() {
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Progress — {projectId}</h2>
 
         <section aria-label="Date range" className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
             <div>
               <label htmlFor="progress-from" className="input-label">From</label>
               <input
@@ -80,6 +114,7 @@ export default function ProgressPage() {
                 type="date"
                 className="input-field"
                 value={from}
+                disabled={cumulative}
                 onChange={(e) => changeRange('from', e.target.value)}
               />
             </div>
@@ -90,72 +125,132 @@ export default function ProgressPage() {
                 type="date"
                 className="input-field"
                 value={to}
+                disabled={cumulative}
                 onChange={(e) => changeRange('to', e.target.value)}
               />
             </div>
+            <label className="inline-flex items-center space-x-2 text-sm text-gray-700 sm:pb-2">
+              <input type="checkbox" checked={cumulative} onChange={(e) => changeCumulative(e.target.checked)} />
+              <span>Show cumulative</span>
+            </label>
           </div>
+          {cumulative && (
+            <p className="mt-2 text-sm text-gray-500">The date range is off: actuals are for the full project.</p>
+          )}
           {backwards && (
             <p role="alert" className="mt-2 text-sm text-red-600">From can't be after To.</p>
           )}
         </section>
 
-        {backwards ? null : (
+        {backwards ? null : loading ? (
+          <div className="flex justify-center py-12">
+            <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <p className="text-red-600 mb-4">Couldn't load quantities: {error}</p>
+            <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">
+              Retry
+            </button>
+          </div>
+        ) : shown && (
           <>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
-              </div>
-            ) : error ? (
-              <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-                <p className="text-red-600 mb-4">Couldn't load quantities: {error}</p>
-                <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">
-                  Retry
-                </button>
-              </div>
-            ) : items.length === 0 ? (
+            <section aria-label="Project total" className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              {noBudget ? (
+                <p className="text-2xl font-bold text-gray-900">No budget set for this project</p>
+              ) : (
+                <>
+                  <p className={`text-5xl font-bold tabular-nums ${total.percent > 100 ? 'text-warn' : 'text-gray-900'}`}>
+                    {formatPercent(total.percent)}
+                  </p>
+                  <p className="mt-2 text-gray-700 tabular-nums">
+                    {formatDollars(total.actual_value)} of {formatDollars(total.budgeted_value)} billed
+                  </p>
+                  <div className="mt-4">
+                    <Bar percent={total.percent} tone={total.percent > 100 ? 'warn' : 'default'} label="Project progress" />
+                  </div>
+                </>
+              )}
+              {unbudgetedCount > 0 && (
+                <p className="mt-3 text-sm text-gray-600">
+                  {unbudgetedCount === 1
+                    ? '1 unbudgeted pay item has quantities; it has no value here.'
+                    : `${unbudgetedCount} unbudgeted pay items have quantities; they have no value here.`}
+                </p>
+              )}
+              <p className="mt-3 text-xs text-gray-500">
+                actuals: {actualsLabel({ from, to, cumulative })} · budget: full project
+              </p>
+            </section>
+
+            {!noBudget && (
+              <section aria-label="Budget codes" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start mb-6">
+                {shown.totals_by_budget_code.map(code => (
+                  <BudgetCodeCard
+                    key={code.budget_code}
+                    total={code}
+                    items={shown.pay_items.filter(item => item.budget_code === code.budget_code)}
+                  />
+                ))}
+              </section>
+            )}
+
+            {shown.pay_items.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-                No approved quantities in this range
+                {cumulative ? 'No approved quantities yet' : 'No approved quantities in this range'}
               </div>
             ) : (
-              <>
-                {shown.truncated && (
-                  <div role="alert" className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm mb-4">
-                    Showing the first 10,000 rows — narrow the date range for a full view.
-                  </div>
-                )}
-                <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th scope="col" className="px-4 py-3">Pay Item</th>
-                        <th scope="col" className="px-4 py-3">Description</th>
-                        <th scope="col" className="px-4 py-3">Budget Code</th>
-                        <th scope="col" className="px-4 py-3 text-right">Total Qty</th>
-                        <th scope="col" className="px-4 py-3">Unit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {items.map(item => (
-                        <tr key={JSON.stringify([item.pay_item_ref, item.budget_code, item.unit, item.description])}>
+              <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th scope="col" className="px-4 py-3">Pay Item</th>
+                      <th scope="col" className="px-4 py-3">Description</th>
+                      <th scope="col" className="px-4 py-3">Budget Code</th>
+                      <th scope="col" className="px-4 py-3 text-right">Total Qty</th>
+                      <th scope="col" className="px-4 py-3">Unit</th>
+                      <th scope="col" className="px-4 py-3 text-right">Budgeted</th>
+                      <th scope="col" className="px-4 py-3 text-right">%</th>
+                      <th scope="col" className="px-4 py-3">Progress</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {shown.pay_items.map(item => {
+                      const over = item.percent > 100
+                      return (
+                        <tr key={JSON.stringify([item.pay_item_ref, item.budget_code, item.unit, item.unbudgeted])}>
                           <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">
                             {item.pay_item_ref || <span className="font-normal text-gray-400">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{item.description || <span className="text-gray-400">—</span>}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                            {item.budget_code || <span className="text-gray-400">—</span>}
-                          </td>
+                          <td className="px-4 py-3 text-gray-700">{item.description || dash}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">{item.budget_code || dash}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums text-gray-900">
-                            {formatQuantity(item.total_qty)}
+                            {formatPayItemQuantity(item.actual_quantity)}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                            {item.unit || <span className="text-gray-400">—</span>}
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-700">{item.unit || dash}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums text-gray-700">
+                            {item.unbudgeted ? dash : formatDollars(item.budgeted_value, { cents: true })}
+                          </td>
+                          <td className={`px-4 py-3 whitespace-nowrap text-right tabular-nums ${over ? 'text-warn font-semibold' : 'text-gray-900'}`}>
+                            {item.unbudgeted
+                              ? <span className="text-xs text-gray-400">— unbudgeted</span>
+                              : formatPercent(item.percent)}
+                          </td>
+                          <td className="px-4 py-3 w-40">
+                            {!item.unbudgeted && (
+                              <Bar
+                                percent={item.percent}
+                                tone={over ? 'warn' : 'default'}
+                                label={`${item.pay_item_ref} progress`}
+                              />
+                            )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </>
         )}

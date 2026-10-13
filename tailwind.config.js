@@ -7,6 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Over budget; the value is the --warn token in src/index.css
+        warn: 'var(--warn)',
         construction: {
           50: '#fef9ee',
           100: '#fef3d6',

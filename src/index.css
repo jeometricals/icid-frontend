@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Over budget: an amber of its own, apart from the construction accent (Tailwind's "warn") */
+    --warn: #c57a00;
+  }
+
   body {
     @apply bg-gray-50 text-gray-900;
   }
