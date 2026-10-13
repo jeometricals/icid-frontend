@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminPayItemsPage, { formatPayItemQuantity, formatUnitPrice } from '../AdminPayItemsPage'
+import AdminPayItemsPage from '../AdminPayItemsPage'
+import { formatPayItemQuantity, formatUnitPrice } from '../../lib/payItemFormat'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
@@ -33,6 +34,7 @@ const byBudgetCodeThenRef = (a, b) => a.budget_code.localeCompare(b.budget_code)
 vi.mock('../../services/api', () => ({
   listProjectPayItems: vi.fn(), listAdminProjects: vi.fn(), createProjectPayItem: vi.fn(),
   updateProjectPayItem: vi.fn(), deleteProjectPayItem: vi.fn(), clearProjectPayItems: vi.fn(),
+  previewPayItemImport: vi.fn(), commitPayItemImport: vi.fn(),
 }))
 
 let server
@@ -89,7 +91,7 @@ const clearButton = () => screen.getByRole('button', { name: 'Clear all pay item
 const inDialog = (name) => within(dialog()).getByRole('button', { name })
 const rowButton = (ref, name) => within(rowFor(ref)).getByRole('button', { name })
 const EMPTY = 'No pay items yet for this project. Click Add pay item to add one manually, or Import CSV to '
-  + 'bulk-seed from a file (coming in next release).'
+  + 'bulk-seed from a file.'
 
 async function fillIn({ ref = '10.02', budgetCode = 'EP0007-CONS', description = 'Asphaltic concrete', unit = 'TN',
   quantity = '3.2', unitPrice = '185' } = {}) {
@@ -461,6 +463,92 @@ describe('AdminPayItemsPage — clearing all pay items', () => {
     expect(dialog()).not.toBeInTheDocument()
     expect(api.clearProjectPayItems).not.toHaveBeenCalled()
     expect(refs()).toHaveLength(3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Importing a CSV
+// ---------------------------------------------------------------------------
+
+describe('AdminPayItemsPage — importing a CSV', () => {
+  const FILE = new File(['pay_item_ref,description\n'], 'items.csv', { type: 'text/csv' })
+  const IMPORTED = item(9, '10.02', 'EP0007-CONS', 'Asphaltic concrete', 'TN', 3.2, 185)
+  const importButton = () => screen.getByRole('button', { name: 'Import CSV' })
+
+  beforeEach(() => {
+    const { pay_item_uuid, ...incoming } = IMPORTED
+    api.previewPayItemImport.mockResolvedValue({ parsed_rows: 1, new_count: 1, overwrite_count: 0, error_count: 0,
+      ignored_columns: [], new: [{ row: 2, ...incoming }], overwrites: [], errors: [] })
+    api.commitPayItemImport.mockImplementation(async () => {
+      server = [...server, IMPORTED].sort(byBudgetCodeThenRef)
+      return { inserted: 1, updated: 0 }
+    })
+  })
+
+  async function importFile() {
+    await userEvent.click(importButton())
+    await userEvent.upload(within(dialog()).getByLabelText('CSV file'), FILE)
+    await userEvent.click(inDialog('Preview'))
+    await userEvent.click(inDialog('Confirm import'))
+  }
+
+  it('has an Import CSV button between Clear all and Add, which opens the dialog', async () => {
+    renderPage()
+    await ready()
+    const names = screen.getAllByRole('button').map(button => button.textContent)
+    expect(names.slice(names.indexOf('Clear all pay items'), names.indexOf('Add pay item') + 1))
+      .toEqual(['Clear all pay items', 'Import CSV', 'Add pay item'])
+    await userEvent.click(importButton())
+    expect(screen.getByRole('dialog', { name: 'Import Pay Items' })).toBeInTheDocument()
+    expect(within(dialog()).getByLabelText('CSV file')).toBeInTheDocument()
+  })
+
+  it('is there for a project with no pay items, whose empty state no longer says it is coming', async () => {
+    server = []
+    renderPage()
+    expect(await screen.findByText(EMPTY)).toBeInTheDocument()
+    expect(screen.queryByText(/coming in next release/)).not.toBeInTheDocument()
+    expect(importButton()).toBeEnabled()
+  })
+
+  it('imports the file, closes the dialog, reads the list again and announces the counts', async () => {
+    renderPage()
+    await ready()
+    await importFile()
+    expect(api.previewPayItemImport).toHaveBeenCalledWith('HWS0023', FILE)
+    expect(api.commitPayItemImport).toHaveBeenCalledWith('HWS0023', FILE)
+    expect(dialog()).not.toBeInTheDocument()
+    expect(banner()).toHaveTextContent('Imported 1 new and 0 updated pay items.')
+    await waitFor(() => expect(refs()).toEqual(['10.02', '6.02', '4.13 AAS', '7.13 B']))
+    expect(api.listProjectPayItems).toHaveBeenCalledTimes(2)
+  })
+
+  it('seeds an empty project', async () => {
+    server = []
+    renderPage()
+    await screen.findByText(EMPTY)
+    await importFile()
+    await waitFor(() => expect(refs()).toEqual(['10.02']))
+    expect(clearButton()).toBeEnabled()
+  })
+
+  it('drops the banner when a dialog is opened', async () => {
+    renderPage()
+    await ready()
+    await importFile()
+    expect(banner()).toBeInTheDocument()
+    await userEvent.click(importButton())
+    expect(banner()).not.toBeInTheDocument()
+  })
+
+  it('changes nothing when the dialog is cancelled', async () => {
+    renderPage()
+    await ready()
+    await userEvent.click(importButton())
+    await userEvent.click(inDialog('Cancel'))
+    expect(dialog()).not.toBeInTheDocument()
+    expect(banner()).not.toBeInTheDocument()
+    expect(api.listProjectPayItems).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -57,3 +57,36 @@ export async function clearProjectPayItems(projectId) {
   })
   return json.data
 }
+
+/**
+ * Shows what importing a CSV of pay items would do, writing nothing. Takes the project's id and the File.
+ * Returns {parsed_rows, new_count, overwrite_count, error_count, ignored_columns, new, overwrites, errors}, the
+ * three lists in file order: a new row is a pay item's values with its row number; an overwrite is {row,
+ * pay_item_ref, budget_code, existing, incoming}; an error is {row, reason, raw} (raw: the row's cells as typed).
+ * The backend answers 400 for a file that can't be read as a pay-item CSV and 413 for one over 2 MB.
+ */
+export async function previewPayItemImport(projectId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  const json = await apiFetch(
+    `/v1/admin/projects/${projectId}/pay-items/import/preview`,
+    { method: 'POST', body: form },  // apiFetch skips JSON serialization for FormData
+  )
+  return json.data
+}
+
+/**
+ * Imports a CSV of pay items: new ones are added, and those the project already has under the same ref and
+ * budget code are overwritten. Takes the project's id and the File. Returns {inserted, updated}. The backend reads
+ * and checks the file again: it answers 400, writing nothing, for a file it can't read, one with no rows, or one
+ * with a row in error (the thrown error's body then carries error_count and errors).
+ */
+export async function commitPayItemImport(projectId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  const json = await apiFetch(
+    `/v1/admin/projects/${projectId}/pay-items/import/commit`,
+    { method: 'POST', body: form },
+  )
+  return json.data
+}

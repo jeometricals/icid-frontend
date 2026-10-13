@@ -18,7 +18,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping and number format) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping and number format), `payItemFormat.js` (how the admin's pay-item pages print a quantity and a unit price) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, and `disciplines.js`: the discipline names the archive filters by).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, and the archive's `ArchiveFilters`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -301,10 +301,33 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     isn't used yet) and the form keeps what was typed. After a save the list is read again.
   - **Delete** is confirmed first and then drops the row without reading the list again. **Clear all pay
     items** (off while the list is empty) is confirmed with the count, then reads the list again and shows a
-    one-time banner, "Cleared <N> pay items from <project_id>.", until it is dismissed or a dialog is opened.
+    one-time banner, "Cleared <N> pay items from <project_id>.", until it is dismissed or a dialog is opened
+    (the same banner announces an import).
     A refusal of either shows in its dialog. Reports that already use an item keep their copy of it.
-  - No CSV import yet (the empty state says it is coming). A non-admin who opens the URL is told it is for
-    admins; the backend returns 403 to them anyway.
+  - **Import CSV** (between Clear all and Add; `PayItemImportModal`, which runs both calls itself) is two
+    screens in one dialog.
+    - **Upload:** a `.csv` file input, the column instructions and Preview. A file over 2 MB is refused here
+      (`MAX_IMPORT_BYTES`; the backend's own answer would be a 413). Preview sends the file to
+      `previewPayItemImport`; a refusal (a missing column, not UTF-8, ...) shows inline as the backend worded it.
+    - **Preview:** "N new | M overwrites | K errors" in green, blue and red, then a callout: red when any row has
+      an error, amber when the file has no rows, otherwise green "Ready to import N pay items." Confirm import is
+      off for the first two. Errors (open by default) list each row's number, the reason and its cells as typed
+      (the backend gives `{row, reason, raw}`, not one offending field). New and Overwrites are folded away; an
+      overwrite reads `ref @ budget_code` and an "existing → incoming" line per field that would change
+      (`overwriteChanges`: description, unit, quantity, unit price, spec section). Columns the backend ignored
+      are named.
+    - **Confirm import** sends the same file to `commitPayItemImport`, which reads and checks it again. On
+      success the dialog closes, the page shows "Imported X new and Y updated pay items." in its one-time banner
+      (from `{inserted, updated}`) and reads the list again. A 400 there means the file no longer passes: the
+      dialog returns to Upload with "The file changed since the preview. Re-upload to try again." Any other
+      failure shows on the preview, which stays.
+    - **Back** returns to Upload with nothing picked (a file input can't be given its file back); Cancel closes
+      either screen and changes nothing.
+    - The two calls are the app's only multipart requests: `apiFetch` passes a `FormData` body through and
+      leaves the `Content-Type` to the browser.
+  - The amounts print through `lib/payItemFormat.js` (`formatPayItemQuantity`, `formatUnitPrice`), on the table
+    and in the import preview. A non-admin who opens the URL is told it is for admins; the backend returns 403
+    to them anyway.
 - **Passwords.** A user changes their own; an admin resets anyone's. Neither signs anyone out: tokens already
   issued stay valid.
   - **Change password** (`ChangePasswordModal`, "Change password" in the user menu, after the signature item and
@@ -374,7 +397,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
   - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
-    `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all)
+    `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
+    `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
   - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` ·
     `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's first and
     last name, and resetting a user's password)

@@ -23,8 +23,9 @@ function parseJson(text) {
 
 /**
  * Calls the ICID backend and returns the parsed JSON response.
- * Takes a path plus optional {method, body, redirectOn401}; a body is sent as JSON, and the stored session token,
- * when there is one, as a Bearer Authorization header. Returns null for 204 No Content.
+ * Takes a path plus optional {method, body, redirectOn401}; a body is sent as JSON (a FormData body as it is, for
+ * a file upload), and the stored session token, when there is one, as a Bearer Authorization header. Returns null
+ * for 204 No Content.
  * Throws on non-2xx responses, with the HTTP code on `error.status` and the parsed error body on `error.body`
  * (network failures throw without either). A 2xx response that isn't JSON throws with the status and a
  * preview of the body instead of a bare SyntaxError.
@@ -37,7 +38,10 @@ export async function apiFetch(path, { method = 'GET', body, redirectOn401 = tru
   const headers = {}
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // A file upload: the browser writes the multipart Content-Type itself, boundary included
+    init.body = body
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }

@@ -2,22 +2,26 @@
  * One project's pay items (route param :projectId), at /admin/projects/:projectId/pay-items. Admins only: a table
  * (pay item ref, description, unit, quantity, unit price, budget code) in the backend's order, which is by budget
  * code then ref, with Edit and Delete on each row, and "Add pay item" and "Clear all pay items" beside the
- * heading. Add and Edit share one dialog; after a save the list is read again, so a row shows what the backend
- * wrote and sits where the backend sorts it. Delete and Clear all are confirmed first; a cleared list is
- * announced once, in a banner that goes when dismissed or when a dialog is opened. The project's name, for the
- * heading, comes from the admin project list. Anyone who isn't an admin is told so instead.
+ * heading, with "Import CSV" between them. Add and Edit share one dialog; after a save the list is read again, so
+ * a row shows what the backend wrote and sits where the backend sorts it. Delete and Clear all are confirmed
+ * first. Import CSV opens a dialog that previews a file and then imports it, after which the list is read again.
+ * A cleared list and an import are each announced once, in a banner that goes when dismissed or when a dialog is
+ * opened. The project's name, for the heading, comes from the admin project list. Anyone who isn't an admin is
+ * told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
   clearProjectPayItems, createProjectPayItem, deleteProjectPayItem, listAdminProjects, listProjectPayItems,
   updateProjectPayItem,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
+import { formatPayItemQuantity, formatUnitPrice } from '../lib/payItemFormat'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PayItemFormModal from '../components/PayItemFormModal'
+import PayItemImportModal from '../components/PayItemImportModal'
 
 // How much of a description the Delete confirmation quotes
 export const DELETE_DESCRIPTION_LENGTH = 60
@@ -31,16 +35,6 @@ const HEADINGS = [
   { label: 'Budget Code' },
   { label: 'Actions' },
 ]
-
-// A quantity as the table prints it: thousands separated, three decimals at most
-export function formatPayItemQuantity(quantity) {
-  return quantity.toLocaleString('en-US', { maximumFractionDigits: 3 })
-}
-
-// A unit price as the table prints it: dollars, thousands separated, two decimals
-export function formatUnitPrice(price) {
-  return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 const countOf = (count) => `${count} pay item${count === 1 ? '' : 's'}`
 
@@ -63,7 +57,8 @@ export default function AdminPayItemsPage() {
   const [form, setForm] = useState(null) // the open Add / Edit dialog: {mode: 'add'} or {mode: 'edit', item}
   const [deleting, setDeleting] = useState(null) // the pay item whose deletion is being confirmed
   const [clearing, setClearing] = useState(false) // whether Clear all is being confirmed
-  const [clearedCount, setClearedCount] = useState(null) // how many a clear removed, for the one-time banner
+  const [importing, setImporting] = useState(false) // whether the Import CSV dialog is open
+  const [notice, setNotice] = useState(null) // what the one-time banner says: a clear or an import that went through
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null) // why the open dialog's action failed
   const [refreshError, setRefreshError] = useState(null) // a change worked but the list couldn't be read again
@@ -88,7 +83,7 @@ export default function AdminPayItemsPage() {
   // Opens one of the dialogs, forgetting the last one's error and the banner
   const open = (show) => {
     setActionError(null)
-    setClearedCount(null)
+    setNotice(null)
     show()
   }
 
@@ -141,12 +136,18 @@ export default function AdminPayItemsPage() {
   const clear = () => run(
     () => clearProjectPayItems(projectId),
     async (cleared) => {
-      setClearedCount(cleared?.deleted_count ?? items.length)
+      setNotice(`Cleared ${countOf(cleared?.deleted_count ?? items.length)} from ${projectId}.`)
       setItems([])
       setClearing(false)
       await reread()
     },
   )
+
+  // The import dialog ran the import itself and is closing
+  const imported = ({ inserted, updated }) => {
+    setNotice(`Imported ${inserted} new and ${updated} updated pay items.`)
+    reread()
+  }
 
   const back = (
     <button
@@ -194,6 +195,15 @@ export default function AdminPayItemsPage() {
             </button>
             <button
               type="button"
+              onClick={() => open(() => setImporting(true))}
+              disabled={!listed}
+              className="btn-secondary inline-flex items-center space-x-2"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Import CSV</span>
+            </button>
+            <button
+              type="button"
               onClick={() => open(() => setForm({ mode: 'add' }))}
               disabled={!listed}
               className="btn-primary inline-flex items-center space-x-2"
@@ -204,10 +214,10 @@ export default function AdminPayItemsPage() {
           </div>
         </div>
 
-        {clearedCount !== null && (
+        {notice && (
           <div role="status" className="flex items-start justify-between gap-4 bg-green-50 border border-green-200 text-green-800 text-sm rounded-md px-4 py-3 mb-4">
-            <p>Cleared {countOf(clearedCount)} from <span className="font-medium">{projectId}</span>.</p>
-            <button type="button" onClick={() => setClearedCount(null)} className="underline font-medium">Dismiss</button>
+            <p>{notice}</p>
+            <button type="button" onClick={() => setNotice(null)} className="underline font-medium">Dismiss</button>
           </div>
         )}
 
@@ -232,7 +242,7 @@ export default function AdminPayItemsPage() {
             {items.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
                 No pay items yet for this project. Click Add pay item to add one manually, or Import CSV to
-                bulk-seed from a file (coming in next release).
+                bulk-seed from a file.
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
@@ -301,6 +311,10 @@ export default function AdminPayItemsPage() {
             busy={busy}
             error={actionError}
           />
+        )}
+
+        {importing && (
+          <PayItemImportModal projectId={projectId} onClose={() => setImporting(false)} onImported={imported} />
         )}
 
         {deleting && (

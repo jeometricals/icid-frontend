@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  clearProjectPayItems, createProjectPayItem, deleteProjectPayItem, listProjectPayItems, updateProjectPayItem,
+  clearProjectPayItems, commitPayItemImport, createProjectPayItem, deleteProjectPayItem, listProjectPayItems,
+  previewPayItemImport, updateProjectPayItem,
 } from '../payItems'
 import { mockFetch, mockFetchNoContent, fetchUrl, fetchInit } from '../../test/mockFetch'
 
@@ -95,5 +96,39 @@ describe('clearProjectPayItems', () => {
   it('throws the backend message for someone who is not an admin', async () => {
     mockFetch(403, { detail: 'Admin access required' })
     await expect(clearProjectPayItems('HWS0023')).rejects.toMatchObject({ message: 'Admin access required', status: 403 })
+  })
+})
+
+describe('previewPayItemImport and commitPayItemImport', () => {
+  const FILE = new File(['pay_item_ref,description\n'], 'items.csv', { type: 'text/csv' })
+  const PREVIEW = { parsed_rows: 0, new_count: 0, overwrite_count: 0, error_count: 0, ignored_columns: [], new: [],
+    overwrites: [], errors: [] }
+
+  it.each([
+    ['preview', previewPayItemImport, PREVIEW],
+    ['commit', commitPayItemImport, { inserted: 2, updated: 1 }],
+  ])('%s POSTs the file as the multipart field "file" and returns the data', async (step, call, data) => {
+    mockFetch(200, { status: 'ok', data })
+    expect(await call('HWS0023', FILE)).toEqual(data)
+    expect(fetchUrl().pathname).toBe(`/v1/admin/projects/HWS0023/pay-items/import/${step}`)
+    expect(fetchInit().method).toBe('POST')
+    expect(fetchInit().body).toBeInstanceOf(FormData)
+    expect(fetchInit().body.get('file')).toBe(FILE)
+    expect(fetchInit().headers?.['Content-Type']).toBeUndefined()
+  })
+
+  it('preview throws the backend message for a file it can\'t read', async () => {
+    mockFetch(400, { detail: 'The file is missing the required column(s): unit' })
+    await expect(previewPayItemImport('HWS0023', FILE))
+      .rejects.toMatchObject({ message: 'The file is missing the required column(s): unit', status: 400 })
+  })
+
+  it('commit throws the backend message for a file with rows in error, with the errors', async () => {
+    const errors = [{ row: 2, reason: 'quantity cannot be blank', raw: { pay_item_ref: '6.02' } }]
+    mockFetch(400, { detail: 'The file has 1 row(s) with errors; fix them and upload it again', error_count: 1, errors })
+    await expect(commitPayItemImport('HWS0023', FILE)).rejects.toMatchObject({
+      message: 'The file has 1 row(s) with errors; fix them and upload it again', status: 400,
+      body: { error_count: 1, errors },
+    })
   })
 })

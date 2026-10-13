@@ -47,6 +47,16 @@ describe('apiFetch — Authorization header', () => {
     expect(fetchInit().headers).toEqual({ Authorization: 'Bearer token-abc', 'Content-Type': 'application/json' })
   })
 
+  it('sends a FormData body as it is, leaving the content type to the browser', async () => {
+    setToken('token-abc')
+    mockFetch(200, { ok: true })
+    const form = new FormData()
+    form.append('file', new File(['a,b'], 'items.csv', { type: 'text/csv' }))
+    await apiFetch('/v1/upload', { method: 'POST', body: form })
+    expect(fetchInit().body).toBe(form)
+    expect(fetchInit().headers).toEqual({ Authorization: 'Bearer token-abc' })
+  })
+
   it('sends no Authorization header when nobody is signed in', async () => {
     mockFetch(200, { ok: true })
     await apiFetch('/v1/projects/')
