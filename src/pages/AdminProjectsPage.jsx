@@ -2,8 +2,9 @@
  * Every project, at /admin/projects. Admins only: a table (project ID, name, description, borough, registration
  * code, status) in the backend's order, which is by project ID, and a "Create project" button that opens a dialog
  * for a new one. After a save the list is read again, so the new row shows what the backend wrote. A created
- * project is announced once, in a banner that goes when dismissed or when the dialog is opened again. Anyone who
- * isn't an admin is told so instead.
+ * project is announced once, in a banner that goes when dismissed or when the dialog is opened again. Each row
+ * has "Pay items" and "Manage roles", which open that project's pay items and roles pages. Anyone who isn't an
+ * admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -142,7 +143,7 @@ export default function AdminProjectsPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      {['Project ID', 'Name', 'Description', 'Borough', 'Registration Code', 'Status'].map(heading => (
+                      {['Project ID', 'Name', 'Description', 'Borough', 'Registration Code', 'Status', 'Actions'].map(heading => (
                         <th
                           key={heading}
                           scope="col"
@@ -162,6 +163,24 @@ export default function AdminProjectsPage() {
                         <td className="px-6 py-4 text-sm text-gray-600">{row.borough || '—'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{row.registration_code || '—'}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{row.status || '—'}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/admin/projects/${row.project_id}/pay-items`)}
+                              className="btn-secondary whitespace-nowrap"
+                            >
+                              Pay items
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/admin/projects/${row.project_id}/roles`)}
+                              className="btn-secondary whitespace-nowrap"
+                            >
+                              Manage roles
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

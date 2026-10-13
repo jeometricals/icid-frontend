@@ -55,7 +55,7 @@ const ready = () => screen.findByRole('table')
 const rows = () => screen.getAllByRole('row').slice(1)
 const ids = () => rows().map(row => within(row).getAllByRole('cell')[0].textContent)
 const cells = (id) => within(rows().find(row => within(row).getAllByRole('cell')[0].textContent === id))
-  .getAllByRole('cell').map(cell => cell.textContent)
+  .getAllByRole('cell').slice(0, 6).map(cell => cell.textContent) // every cell but Actions
 const dialog = () => screen.queryByRole('dialog')
 const banner = () => screen.queryByRole('status')
 const openCreate = () => userEvent.click(screen.getByRole('button', { name: 'Create project' }))
@@ -85,7 +85,7 @@ describe('AdminProjectsPage — the table', () => {
     renderPage()
     await ready()
     expect(screen.getAllByRole('columnheader').map(th => th.textContent))
-      .toEqual(['Project ID', 'Name', 'Description', 'Borough', 'Registration Code', 'Status'])
+      .toEqual(['Project ID', 'Name', 'Description', 'Borough', 'Registration Code', 'Status', 'Actions'])
   })
 
   it('shows each project\'s details, with a dash for what it lacks', async () => {
@@ -93,6 +93,24 @@ describe('AdminProjectsPage — the table', () => {
     await ready()
     expect(cells('HWS0023')).toEqual(['HWS0023', 'S/W Queens 2025', 'Curbs and sidewalks', 'Queens', '2024123457', 'active'])
     expect(cells('SE384')).toEqual(['SE384', 'Sewer Rehab', '—', 'Brooklyn', '—', '—'])
+  })
+
+  it('has Pay items and Manage roles on each row', async () => {
+    renderPage()
+    await ready()
+    for (const row of rows()) {
+      expect(within(row).getAllByRole('button').map(button => button.textContent)).toEqual(['Pay items', 'Manage roles'])
+    }
+  })
+
+  it.each([
+    ['Pay items', '/admin/projects/SE384/pay-items'],
+    ['Manage roles', '/admin/projects/SE384/roles'],
+  ])('%s opens that project\'s page', async (name, path) => {
+    renderPage()
+    await ready()
+    await userEvent.click(within(rows()[1]).getByRole('button', { name }))
+    expect(screen.getByTestId('url')).toHaveTextContent(path)
   })
 
   it('shows a spinner while loading, then says when there are none', async () => {

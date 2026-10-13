@@ -12,10 +12,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `progressRollup.js` (the Progress page's grouping and number format) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
@@ -284,6 +284,27 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   again and a one-time banner names the new email and says to share the password, until it is dismissed or
   another dialog is opened. The new user is on no project until given a role on the project roles page. A non-admin who opens the
   URL is told it is for admins; the backend returns 403 to them anyway.
+- **Pay items (admin).** `/admin/projects/:projectId/pay-items` (`AdminPayItemsPage`), reached from "Pay items" on
+  an `/admin/projects` row; Back returns there. The project's pay-item catalog, kept by hand: the same rows the
+  pay-item picker reads through `GET /v1/contract_items/`.
+  - **Load:** `listProjectPayItems` (`services/payItems.js`) and `listAdminProjects` together; the second only
+    gives the heading its project name ("Pay Items — <project_id> <project_name>"). A failure of either, an
+    unknown project's 404 included, is the load error with Retry.
+  - **The table** is in the backend's order (budget code, then ref): pay item ref, description (two lines at
+    most, the whole of it as a tooltip), unit, quantity (three decimals at most), unit price (dollars, two
+    decimals), budget code, and Edit / Delete. A pay item is `{pay_item_uuid, pay_item_ref, description, unit,
+    quantity, unit_price, budget_code, spec_section}`; `spec_section` isn't shown or edited.
+  - **Add and Edit** share `PayItemFormModal` (`mode`, `initial`): all six fields required, the unit put in
+    capitals on blur, Save off until every field is in and both amounts are numbers of zero or more. It passes
+    on all six in both modes, text trimmed and amounts as numbers. A refusal shows in the dialog as the backend
+    worded it (a ref the project already has under that budget code is a 409; its `existing_pay_item_uuid`
+    isn't used yet) and the form keeps what was typed. After a save the list is read again.
+  - **Delete** is confirmed first and then drops the row without reading the list again. **Clear all pay
+    items** (off while the list is empty) is confirmed with the count, then reads the list again and shows a
+    one-time banner, "Cleared <N> pay items from <project_id>.", until it is dismissed or a dialog is opened.
+    A refusal of either shows in its dialog. Reports that already use an item keep their copy of it.
+  - No CSV import yet (the empty state says it is coming). A non-admin who opens the URL is told it is for
+    admins; the backend returns 403 to them anyway.
 - **Passwords.** A user changes their own; an admin resets anyone's. Neither signs anyone out: tokens already
   issued stay valid.
   - **Change password** (`ChangePasswordModal`, "Change password" in the user menu, after the signature item and
@@ -303,7 +324,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **All Projects (admin).** `/admin/projects` (`AdminProjectsPage`), "All Projects (Admin)" in the user menu, which
   only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
   backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
-  for whatever a project lacks. Nothing on a row is editable or opens anything yet.
+  for whatever a project lacks. Nothing on a row is editable. Each row's Actions cell has "Pay items"
+  (`/admin/projects/<project_id>/pay-items`) and "Manage roles" (`/admin/projects/<project_id>/roles`).
   "Create project" (right of the heading) opens `CreateProjectModal`: project ID, project name, description,
   borough (free text: there is no borough list) and registration code (optional). Save is off until the first
   four are non-blank; `createAdminProject` (`POST /v1/admin/projects`) sends them trimmed, a blank registration
@@ -351,6 +373,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/projects/{id}/quantities?from=&to=` (the Progress page; for a user on the project, or an admin)
   - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
+  - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
+    `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all)
   - `GET /v1/admin/users` · `POST /v1/admin/users` · `PATCH /v1/admin/users/{user_id}` ·
     `POST /v1/admin/users/{user_id}/password` (admin only: every user, creating one, changing a user's first and
     last name, and resetting a user's password)
