@@ -6,7 +6,9 @@ import StatusBadge from './StatusBadge'
 /**
  * Table of IDRs, one row each, for the Report Archive, the review queues and the admin's list of every IDR: work
  * date, IDR # (with the disciplines its reports cover, when asked for), status, inspector (with a "Signed" mark when the IDR was submitted with a signature), latest
- * reviewer and when it was submitted. A row opens its IDR. The rows are shown in the order given.
+ * reviewer and when it was submitted. A row opens its IDR. The rows are shown in the order given. A deleted IDR
+ * (status 'deleted', which only the admin's list has) has its number crossed out, and its work date too where the
+ * rows don't open anything.
  * Props: idrs (listIdrs / getReviewQueue rows), onOpen(idr) (leave it out and the rows don't open anything),
  * showProject (adds a Project column; default false), showDisciplines (lists each IDR's disciplines as chips
  * under its number; default false), sort ({key, direction: 'asc' | 'desc'}) with onSort(key)
@@ -55,14 +57,16 @@ export default function IdrTable({
                     {format(parseISO(idr.report_date), 'MMM d, yyyy')}
                   </button>
                 ) : (
-                  <span className="font-semibold text-gray-900">{format(parseISO(idr.report_date), 'MMM d, yyyy')}</span>
+                  <span className={`font-semibold ${idr.status === 'deleted' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                    {format(parseISO(idr.report_date), 'MMM d, yyyy')}
+                  </span>
                 )}
               </td>
               {showProject && <td className="px-4 py-3 whitespace-nowrap text-gray-700">{idr.project_id}</td>}
               <td className="px-4 py-3">
                 {!idr.idr_number && blankNumber !== undefined
                   ? <span className="text-gray-400">{blankNumber}</span>
-                  : <IDRNumberBadge number={idr.idr_number} />}
+                  : <IDRNumberBadge number={idr.idr_number} struck={idr.status === 'deleted'} />}
                 {showDisciplines && idr.disciplines?.length > 0 && (
                   <ul aria-label="Disciplines" className="mt-1 flex flex-wrap gap-1">
                     {idr.disciplines.map(discipline => (

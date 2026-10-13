@@ -258,16 +258,34 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   table alone. When an admin changes their own roles the page reloads `ProjectRolesContext` and the task count.
   A non-admin who opens the URL is told it is for admins; the backend returns 403 to them anyway.
 - **All IDRs (admin).** `/admin/idrs` (`AdminIdrsPage`), "All IDRs (Admin)" in the user menu, which only an admin
-  sees. One `GET /v1/idrs/` with `include_deleted=true&include_all_drafts=true` and no project; the "Show deleted"
-  and "Show all drafts" toggles (both off to start) only filter what was fetched. `IdrTable` with its optional
-  `sort` / `onSort` (work date by default, submit date, status) and `renderActions`. Each row has "Soft-delete"
-  and, for `ADMIN_UNLOCKABLE_STATUSES` in `lib/reviewRoles.js` (`approved`, `stage2_review`: what the backend
-  accepts), "Unlock"; a deleted IDR (`status === 'deleted'`) shows a Deleted badge instead. Both are confirmed
-  first, a refusal shows in the dialog, and after a success the page reads the list again rather than patching
-  the row, then refreshes the task count. Unlock on an IDR in RE Review that no RE has accepted (no
-  `re_reviewer_uuid`) sends nothing and shows the toast "Already unlocked — IDR is in RE Review"; once an RE has
-  accepted it, Unlock still asks and goes through, since that takes the IDR off them. Rows don't open the IDR page. A non-admin who opens the URL is told it
-  is for admins; the backend returns 403 / 400 to them anyway.
+  sees. One `GET /v1/idrs/` with `include_all_drafts=true` and no project. `IdrTable` with its optional
+  `sort` / `onSort` (work date by default, submit date, status) and `renderActions`. Rows don't open the IDR page.
+  A non-admin who opens the URL is told it is for admins; the backend returns 403 / 400 to them anyway.
+  - **The two checkboxes** (both off to start; the page has no other filters). "Include deleted" asks the backend
+    again, with `include_deleted=true` while it is ticked; the table stays on screen meanwhile, and a failed
+    re-list is the load error with Retry. "Show all drafts" only filters what was fetched (other people's
+    drafts are always asked for).
+  - **A deleted IDR** (`status === 'deleted'`) reads Deleted in the status column, and `IdrTable` crosses out its
+    number (`IDRNumberBadge`'s `struck`) and its work date. It always shows once it was fetched, a deleted draft
+    of someone else's included.
+  - **Actions by state.** A live IDR has "Soft-delete" and, for `ADMIN_UNLOCKABLE_STATUSES` in
+    `lib/reviewRoles.js` (`approved`, `stage2_review`: what the backend accepts), "Unlock". A deleted IDR has
+    "Un-delete" and "Delete forever" instead. Each is confirmed first, a refusal shows in its dialog, and after
+    a success the page reads the list again rather than patching the row, then refreshes the task count.
+  - **Unlock** on an IDR in RE Review that no RE has accepted (no `re_reviewer_uuid`) sends nothing and shows
+    the toast "Already unlocked — IDR is in RE Review"; once an RE has accepted it, Unlock still asks and goes
+    through, since that takes the IDR off them.
+  - **Un-delete** (`undeleteIdr`): "Un-delete IDR <number>?" in `ConfirmDialog`. The backend gives the IDR back
+    the status it had when it was deleted (a draft when that isn't on record); the toast reads "IDR <number>
+    restored to <status>." from the IDR the call returns. It answers 409 when another IDR has since taken the
+    day or the number, which shows in the dialog.
+  - **Delete forever** (`permanentDeleteIdr`): `DeleteIdrForeverModal`, a red warning and a box; the button is
+    off until the box holds the IDR's number exactly as written (no trimming, capitals count). Then the row is
+    gone and the toast reads "IDR <number> permanently deleted." The backend only takes an IDR that was
+    soft-deleted first (404 otherwise), which is why only a deleted row has the button.
+  - **An IDR with no number** (deleted as a draft or before IDR Check) is named "IDR of <date> on <project>" in
+    both dialogs and toasts (`idrName`), and the phrase to type is its work date, `YYYY-MM-DD`
+    (`deleteForeverPhrase`).
 - **All Users (admin).** `/admin/users` (`AdminUsersPage`), "All Users (Admin)" in the user menu, which only an
   admin sees. One `GET /v1/admin/users` (`listAdminUsers` in `services/users.js`), shown in the backend's order:
   email, first name, last name, role (`Admin` for `role === 'admin'`, `Demo` for a demo user, otherwise
@@ -414,7 +432,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `POST /v1/idrs/{id}/pay-items/add` ·
     `POST /v1/idrs/{id}/pay-items/{item id}/approve` ·
     `POST /v1/idrs/{id}/reports/{report_id}/trucks/add` (each returns the IDR with `field_edits`, as `GET /v1/idrs/{id}` does)
-  - Admin: `POST /v1/idrs/{id}/admin/unlock` · `POST /v1/idrs/{id}/admin/delete` (a soft delete)
+  - Admin: `POST /v1/idrs/{id}/admin/unlock` · `POST /v1/idrs/{id}/admin/delete` (a soft delete) ·
+    `POST /v1/idrs/{id}/admin/undelete` · `DELETE /v1/idrs/{id}/admin/permanent` (a soft-deleted IDR only)
   - `POST /v1/idrs/{id}/reports` · `PUT /v1/idrs/{id}/reports/{report_id}` · `DELETE /v1/idrs/{id}/reports/{report_id}`
   - Attachments, under `/v1/idrs/{id}/reports/{report_id}/attachments`: `POST /upload-request` · `POST /upload-complete` ·
     `GET` (list) · `GET /{attachment_id}/download-url` · `PUT /{attachment_id}` · `DELETE /{attachment_id}`

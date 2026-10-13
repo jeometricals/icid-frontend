@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { render, screen, within, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminIdrsPage, { ALREADY_UNLOCKED } from '../AdminIdrsPage'
+import AdminIdrsPage, { ALREADY_UNLOCKED, deleteForeverPhrase, idrName } from '../AdminIdrsPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { TaskCountContext } from '../../contexts/TaskCountContext'
@@ -50,10 +50,16 @@ const LISTED = [
   idr({ idr_id: 'own-draft', report_date: '2026-09-30', status: 'draft', reporter_uuid: ADMIN.uuid, reporter_name: 'Reza' }),
   idr({ idr_id: 'their-draft', report_date: '2026-09-29', status: 'draft' }),
   idr({ idr_id: 'deleted', report_date: '2026-09-10', submitted_at: '2026-09-11T12:00:00Z', status: 'deleted',
-    deleted_at: '2026-10-01T12:00:00Z' }),
+    deleted_at: '2026-10-01T12:00:00Z', idr_number: '002', stage1_reviewer_name: 'Olive Engineer' }),
+  // Deleted while still a draft, so it never got a number
+  idr({ idr_id: 'deleted-draft', report_date: '2026-09-08', status: 'deleted', deleted_at: '2026-10-02T12:00:00Z' }),
 ]
+// The status each deleted IDR had, which an un-delete gives back
+const STATUS_BEFORE_DELETE = { deleted: 'approved', 'deleted-draft': 'draft' }
 
-vi.mock('../../services/api', () => ({ listIdrs: vi.fn(), adminUnlockIdr: vi.fn(), adminDeleteIdr: vi.fn() }))
+vi.mock('../../services/api', () => ({
+  listIdrs: vi.fn(), adminUnlockIdr: vi.fn(), adminDeleteIdr: vi.fn(), undeleteIdr: vi.fn(), permanentDeleteIdr: vi.fn(),
+}))
 
 let server
 let refreshTaskCount
@@ -67,7 +73,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   refreshTaskCount = vi.fn()
   server = structuredClone(LISTED)
-  api.listIdrs.mockImplementation(async () => structuredClone(server))
+  api.listIdrs.mockImplementation(async ({ includeDeleted } = {}) => (
+    structuredClone(server.filter(row => includeDeleted || !row.deleted_at))
+  ))
   api.adminUnlockIdr.mockImplementation(async (idrId) => change(idrId, {
     status: 'stage2_review', re_reviewer_uuid: null, re_reviewer_name: null, stage2_accepted_at: null,
     re_signature_path: null,
@@ -75,6 +83,12 @@ beforeEach(() => {
   api.adminDeleteIdr.mockImplementation(async (idrId) => change(idrId, {
     status: 'deleted', deleted_at: '2026-10-06T12:00:00Z',
   }))
+  api.undeleteIdr.mockImplementation(async (idrId) => change(idrId, {
+    status: STATUS_BEFORE_DELETE[idrId], deleted_at: null,
+  }))
+  api.permanentDeleteIdr.mockImplementation(async (idrId) => {
+    server = server.filter(row => row.idr_id !== idrId)
+  })
 })
 
 function CurrentUrl() {
@@ -95,7 +109,13 @@ function renderPage(user = ADMIN) {
   )
 }
 
-const ready = () => screen.findByLabelText('Show deleted')
+const ready = () => screen.findByLabelText('Include deleted')
+// Ticks "Include deleted" and waits for the list that comes back with them
+async function includeDeleted() {
+  await userEvent.click(screen.getByLabelText('Include deleted'))
+  await waitFor(() => expect(dates()).toContain('Sep 10, 2026'))
+}
+const toastText = (text) => screen.queryByText(text)
 const rows = () => screen.getAllByRole('row').slice(1)
 // Each body row's work date, top to bottom
 const dates = () => rows().map(row => within(row).getAllByRole('cell')[0].textContent)
@@ -110,11 +130,11 @@ const actionsIn = (date) => within(rowFor(date)).queryAllByRole('button').map(bu
 // ---------------------------------------------------------------------------
 
 describe('AdminIdrsPage — the table', () => {
-  it('asks for every IDR, deleted ones and all drafts included, on no one project', async () => {
+  it('asks for every IDR, all drafts included but not the deleted ones, on no one project', async () => {
     renderPage()
     await ready()
     expect(api.listIdrs).toHaveBeenCalledTimes(1)
-    expect(api.listIdrs).toHaveBeenCalledWith({ includeDeleted: true, includeAllDrafts: true })
+    expect(api.listIdrs).toHaveBeenCalledWith({ includeDeleted: false, includeAllDrafts: true })
   })
 
   it('shows a spinner while loading', async () => {
@@ -137,7 +157,7 @@ describe('AdminIdrsPage — the table', () => {
     renderPage()
     await ready()
     expect(dates()).toEqual(['Sep 30, 2026', 'Sep 23, 2026', 'Sep 20, 2026', 'Sep 18, 2026', 'Sep 16, 2026'])
-    expect(screen.getByLabelText('Show deleted')).not.toBeChecked()
+    expect(screen.getByLabelText('Include deleted')).not.toBeChecked()
     expect(screen.getByLabelText('Show all drafts')).not.toBeChecked()
   })
 
@@ -179,31 +199,61 @@ describe('AdminIdrsPage — the table', () => {
 // ---------------------------------------------------------------------------
 
 describe('AdminIdrsPage — toggles', () => {
-  it('"Show deleted" brings in deleted IDRs, with a Deleted badge in place of the actions', async () => {
+  it('"Include deleted" asks the backend for the list again, with the deleted IDRs in it', async () => {
     renderPage()
     await ready()
-    await userEvent.click(screen.getByLabelText('Show deleted'))
-    expect(dates()).toContain('Sep 10, 2026')
-    expect(cells('Sep 10, 2026')[7]).toBe('Deleted')
-    expect(actionsIn('Sep 10, 2026')).toEqual([])
-    await userEvent.click(screen.getByLabelText('Show deleted'))
     expect(dates()).not.toContain('Sep 10, 2026')
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    await waitFor(() => expect(api.listIdrs).toHaveBeenCalledTimes(2))
+    expect(api.listIdrs).toHaveBeenLastCalledWith({ includeDeleted: true, includeAllDrafts: true })
+    await waitFor(() => expect(dates()).toContain('Sep 10, 2026'))
+    expect(screen.getByLabelText('Include deleted')).toBeChecked()
   })
 
-  it('"Show all drafts" brings in everyone\'s drafts', async () => {
+  it('unticking it asks again without them', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    await waitFor(() => expect(dates()).not.toContain('Sep 10, 2026'))
+    expect(api.listIdrs).toHaveBeenCalledTimes(3)
+    expect(api.listIdrs).toHaveBeenLastCalledWith({ includeDeleted: false, includeAllDrafts: true })
+  })
+
+  it('keeps the table on screen while the list is read again', async () => {
+    renderPage()
+    await ready()
+    let finish
+    api.listIdrs.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(rows()).toHaveLength(5)
+    await act(async () => finish(structuredClone(server)))
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    expect(dates()).toContain('Sep 10, 2026')
+  })
+
+  it('shows a deleted IDR crossed out, reading Deleted, a deleted draft of someone else\'s included', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    expect(cells('Sep 10, 2026')[3]).toBe('Deleted')
+    expect(within(rowFor('Sep 10, 2026')).getByText('002').tagName).toBe('S')
+    expect(within(rowFor('Sep 10, 2026')).getByText('Sep 10, 2026')).toHaveClass('line-through')
+    expect(cells('Sep 8, 2026')[3]).toBe('Deleted')
+    expect(within(rowFor('Sep 8, 2026')).getByText('Sep 8, 2026')).toHaveClass('line-through')
+    // An IDR that isn't deleted is not
+    expect(within(rowFor('Sep 16, 2026')).getByText('004').tagName).not.toBe('S')
+    expect(within(rowFor('Sep 16, 2026')).getByText('Sep 16, 2026')).not.toHaveClass('line-through')
+  })
+
+  it('"Show all drafts" brings in everyone\'s drafts, without asking the backend again', async () => {
     renderPage()
     await ready()
     expect(dates()).not.toContain('Sep 29, 2026')
     await userEvent.click(screen.getByLabelText('Show all drafts'))
     expect(dates()).toContain('Sep 29, 2026')
     expect(cells('Sep 29, 2026')[3]).toBe('Draft')
-  })
-
-  it('does not ask the backend again', async () => {
-    renderPage()
-    await ready()
-    await userEvent.click(screen.getByLabelText('Show deleted'))
-    await userEvent.click(screen.getByLabelText('Show all drafts'))
     expect(api.listIdrs).toHaveBeenCalledTimes(1)
   })
 
@@ -212,8 +262,20 @@ describe('AdminIdrsPage — toggles', () => {
     renderPage()
     await ready()
     expect(screen.getByText('No IDRs to show.')).toBeInTheDocument()
-    await userEvent.click(screen.getByLabelText('Show deleted'))
-    expect(rows()).toHaveLength(1)
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    await waitFor(() => expect(rows()).toHaveLength(1))
+  })
+
+  it('shows a failed re-list as the load error, and Retry reads it', async () => {
+    renderPage()
+    await ready()
+    api.listIdrs.mockRejectedValueOnce(new Error('Failed to list IDRs'))
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    expect(await screen.findByText("Couldn't load the IDRs: Failed to list IDRs")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await ready()
+    expect(screen.getByLabelText('Include deleted')).toBeChecked()
+    expect(dates()).toContain('Sep 10, 2026')
   })
 })
 
@@ -251,10 +313,10 @@ describe('AdminIdrsPage — sorting', () => {
   it('sorts by status in the order an IDR moves through them', async () => {
     renderPage()
     await ready()
-    await userEvent.click(screen.getByLabelText('Show deleted'))
+    await includeDeleted()
     await userEvent.click(columnButton('Status'))
     expect(rows().map(row => within(row).getAllByRole('cell')[3].textContent)).toEqual(
-      ['Draft', 'Submitted', 'IDR Check', 'RE Review', 'Approved', 'Deleted'])
+      ['Draft', 'Submitted', 'IDR Check', 'RE Review', 'Approved', 'Deleted', 'Deleted'])
     await userEvent.click(columnButton('Status'))
     expect(header('Status')).toHaveAttribute('aria-sort', 'descending')
     expect(cells(dates()[0])[3]).toBe('Deleted')
@@ -277,6 +339,16 @@ describe('AdminIdrsPage — which actions a row gets', () => {
     await ready()
     expect(actionsIn(date)).toEqual(expected)
   })
+
+  it.each([
+    ['a deleted IDR', 'Sep 10, 2026'],
+    ['a deleted IDR with no number', 'Sep 8, 2026'],
+  ])('%s: Un-delete and Delete forever, and neither Unlock nor Soft-delete', async (_, date) => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    expect(actionsIn(date)).toEqual(['Un-delete', 'Delete forever'])
+  })
 })
 
 describe('AdminIdrsPage — soft-delete', () => {
@@ -294,7 +366,7 @@ describe('AdminIdrsPage — soft-delete', () => {
     expect(dates()).toContain('Sep 23, 2026')
   })
 
-  it('deletes, reads the list again, and the IDR is gone until "Show deleted" is on', async () => {
+  it('deletes, reads the list again, and the IDR is gone until "Include deleted" is on', async () => {
     renderPage()
     await ready()
     await clickDelete('Sep 23, 2026')
@@ -303,8 +375,20 @@ describe('AdminIdrsPage — soft-delete', () => {
     expect(api.listIdrs).toHaveBeenCalledTimes(2)
     expect(dialog()).not.toBeInTheDocument()
     expect(dates()).not.toContain('Sep 23, 2026')
-    await userEvent.click(screen.getByLabelText('Show deleted'))
-    expect(cells('Sep 23, 2026')[7]).toBe('Deleted')
+    await userEvent.click(screen.getByLabelText('Include deleted'))
+    await waitFor(() => expect(dates()).toContain('Sep 23, 2026'))
+    expect(cells('Sep 23, 2026')[3]).toBe('Deleted')
+    expect(actionsIn('Sep 23, 2026')).toEqual(['Un-delete', 'Delete forever'])
+  })
+
+  it('with "Include deleted" on, the row stays and turns into a deleted one', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickDelete('Sep 23, 2026')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Soft-delete' }))
+    expect(api.listIdrs).toHaveBeenLastCalledWith({ includeDeleted: true, includeAllDrafts: true })
+    expect(cells('Sep 23, 2026')[3]).toBe('Deleted')
   })
 
   it('shows what the backend wrote, not what the page expected', async () => {
@@ -341,6 +425,178 @@ describe('AdminIdrsPage — soft-delete', () => {
     await ready()
     expect(dates()).not.toContain('Sep 23, 2026')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('AdminIdrsPage — un-delete', () => {
+  const clickUndelete = (date) => userEvent.click(within(rowFor(date)).getByRole('button', { name: 'Un-delete' }))
+
+  it('asks first, naming the IDR, and does nothing on Cancel', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickUndelete('Sep 10, 2026')
+    expect(dialog()).toHaveAccessibleName('Un-delete IDR 002?')
+    expect(dialog()).toHaveTextContent('IDR: Sep 10, 2026 on HWS0023 (Genghis Khan)')
+    expect(api.undeleteIdr).not.toHaveBeenCalled()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.undeleteIdr).not.toHaveBeenCalled()
+    expect(cells('Sep 10, 2026')[3]).toBe('Deleted')
+  })
+
+  it('restores the IDR: its status is back, it is no longer crossed out, and a toast says so', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickUndelete('Sep 10, 2026')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
+    expect(api.undeleteIdr).toHaveBeenCalledTimes(1)
+    expect(api.undeleteIdr).toHaveBeenCalledWith('deleted')
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.listIdrs).toHaveBeenLastCalledWith({ includeDeleted: true, includeAllDrafts: true })
+    expect(cells('Sep 10, 2026')[3]).toBe('Approved')
+    expect(within(rowFor('Sep 10, 2026')).getByText('002').tagName).not.toBe('S')
+    expect(actionsIn('Sep 10, 2026')).toEqual(['Unlock', 'Soft-delete'])
+    expect(toastText('IDR 002 restored to Approved.')).toBeInTheDocument()
+    expect(refreshTaskCount).toHaveBeenCalledTimes(1)
+  })
+
+  it('names an IDR with no number by its day and project', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await userEvent.click(screen.getByLabelText('Show all drafts')) // it comes back as someone else's draft
+    await clickUndelete('Sep 8, 2026')
+    expect(dialog()).toHaveAccessibleName('Un-delete IDR of Sep 8, 2026 on HWS0023?')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
+    expect(toastText('IDR of Sep 8, 2026 on HWS0023 restored to Draft.')).toBeInTheDocument()
+    expect(cells('Sep 8, 2026')[3]).toBe('Draft')
+  })
+
+  it('shows a refusal in the dialog, as the backend worded it, and leaves the row deleted', async () => {
+    api.undeleteIdr.mockRejectedValue(Object.assign(
+      new Error("This IDR's number is now in use on this project"), { status: 409, body: { existing_idr_id: 'stage1' } }))
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickUndelete('Sep 10, 2026')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
+    expect(await within(dialog()).findByRole('alert'))
+      .toHaveTextContent("Couldn't un-delete the IDR: This IDR's number is now in use on this project")
+    expect(api.listIdrs).toHaveBeenCalledTimes(2)
+    expect(toastText(/restored/)).not.toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(cells('Sep 10, 2026')[3]).toBe('Deleted')
+  })
+})
+
+describe('AdminIdrsPage — delete forever', () => {
+  const clickForever = (date) => userEvent.click(within(rowFor(date)).getByRole('button', { name: 'Delete forever' }))
+  const confirmButton = () => within(dialog()).getByRole('button', { name: 'Delete forever' })
+  const phraseBox = () => within(dialog()).getByRole('textbox')
+
+  it('opens a dialog that warns what goes, with its button off', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    expect(dialog()).toHaveAccessibleName('Delete IDR forever?')
+    expect(dialog()).toHaveTextContent('This will permanently remove IDR 002 and all its data: pay-item quantities, '
+      + "reviewer redlines, attachments. This can't be undone.")
+    expect(dialog()).toHaveTextContent('IDR: Sep 10, 2026 on HWS0023 (Genghis Khan)')
+    expect(within(dialog()).getByLabelText('Type 002 to confirm.')).toHaveValue('')
+    expect(confirmButton()).toBeDisabled()
+    expect(confirmButton()).toHaveClass('btn-danger')
+    expect(api.permanentDeleteIdr).not.toHaveBeenCalled()
+  })
+
+  it('turns the button on once the IDR number is typed, then deletes, drops the row and says so', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    await userEvent.type(phraseBox(), '00')
+    expect(confirmButton()).toBeDisabled()
+    await userEvent.type(phraseBox(), '2')
+    expect(confirmButton()).toBeEnabled()
+    await userEvent.click(confirmButton())
+    expect(api.permanentDeleteIdr).toHaveBeenCalledTimes(1)
+    expect(api.permanentDeleteIdr).toHaveBeenCalledWith('deleted')
+    expect(dialog()).not.toBeInTheDocument()
+    expect(dates()).not.toContain('Sep 10, 2026')
+    expect(dates()).toContain('Sep 8, 2026') // the other deleted IDR is still listed
+    expect(toastText('IDR 002 permanently deleted.')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['another number', '004'],
+    ['the number with a space after it', '002 '],
+    ['the number without its zeros', '2'],
+  ])('keeps the button off for %s, and sends nothing', async (_, typed) => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    await userEvent.type(phraseBox(), `${typed}{Enter}`)
+    expect(confirmButton()).toBeDisabled()
+    expect(api.permanentDeleteIdr).not.toHaveBeenCalled()
+    expect(dialog()).toBeInTheDocument()
+  })
+
+  it('asks for the work date of an IDR that has no number', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 8, 2026')
+    expect(dialog()).toHaveTextContent('This will permanently remove IDR of Sep 8, 2026 on HWS0023 and all its data')
+    await userEvent.type(within(dialog()).getByLabelText('Type 2026-09-08 to confirm.'), '2026-09-08')
+    await userEvent.click(confirmButton())
+    expect(api.permanentDeleteIdr).toHaveBeenCalledWith('deleted-draft')
+    expect(toastText('IDR of Sep 8, 2026 on HWS0023 permanently deleted.')).toBeInTheDocument()
+  })
+
+  it('names an IDR and its confirm phrase by its number, or by its day when it has none', () => {
+    expect([LISTED[6], LISTED[7]].map(idrName)).toEqual(['IDR 002', 'IDR of Sep 8, 2026 on HWS0023'])
+    expect([LISTED[6], LISTED[7]].map(deleteForeverPhrase)).toEqual(['002', '2026-09-08'])
+  })
+
+  it('does nothing on Cancel, even with the number typed', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    await userEvent.type(phraseBox(), '002')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dialog()).not.toBeInTheDocument()
+    expect(api.permanentDeleteIdr).not.toHaveBeenCalled()
+    expect(dates()).toContain('Sep 10, 2026')
+  })
+
+  it('forgets what was typed when the dialog is opened again', async () => {
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    await userEvent.type(phraseBox(), '002')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    await clickForever('Sep 10, 2026')
+    expect(phraseBox()).toHaveValue('')
+    expect(confirmButton()).toBeDisabled()
+  })
+
+  it('shows a refusal in the dialog and keeps the row', async () => {
+    api.permanentDeleteIdr.mockRejectedValue(Object.assign(new Error('IDR must be soft-deleted first'), { status: 404 }))
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await clickForever('Sep 10, 2026')
+    await userEvent.type(phraseBox(), '002')
+    await userEvent.click(confirmButton())
+    expect(await within(dialog()).findByText("Couldn't delete the IDR: IDR must be soft-deleted first")).toBeInTheDocument()
+    expect(toastText(/permanently deleted/)).not.toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(dates()).toContain('Sep 10, 2026')
   })
 })
 

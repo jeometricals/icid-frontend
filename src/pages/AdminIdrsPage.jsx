@@ -1,10 +1,11 @@
 /**
  * Every IDR on every project, at /admin/idrs. Admins only: a sortable table (work date by default, submit date,
- * status) with a Soft-delete button on each IDR and Unlock on those the backend can unlock; a deleted IDR shows a
- * Deleted badge instead. "Show deleted" and "Show all drafts" (both off to start) bring in deleted IDRs and other
- * people's drafts. Each action is confirmed first, and the list is read again afterwards, so a row shows what the
- * backend wrote. Unlock on an IDR in RE Review that no RE has accepted has nothing to undo: it only says so, in a
- * toast. Anyone who isn't an admin is told so instead.
+ * status) with a Soft-delete button on each IDR and Unlock on those the backend can unlock. "Include deleted" (off
+ * to start) asks the backend for the list again with deleted IDRs in it; a deleted IDR is crossed out, reads
+ * Deleted, and has Un-delete and Delete forever instead. "Show all drafts" (off to start) brings in other people's
+ * drafts from what was fetched. Each action is confirmed first (Delete forever by typing the IDR's number), and
+ * the list is read again afterwards, so a row shows what the backend wrote. Unlock on an IDR in RE Review that no
+ * RE has accepted has nothing to undo: it only says so, in a toast. Anyone who isn't an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -12,21 +13,33 @@ import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
-import { adminDeleteIdr, adminUnlockIdr, listIdrs } from '../services/api'
+import { adminDeleteIdr, adminUnlockIdr, listIdrs, permanentDeleteIdr, undeleteIdr } from '../services/api'
 import { ADMIN_UNLOCKABLE_STATUSES, STATUS_LABELS, isAdmin } from '../lib/reviewRoles'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DeleteIdrForeverModal from '../components/DeleteIdrForeverModal'
 import IdrTable from '../components/IdrTable'
-import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 
 const STATUS_ORDER = Object.keys(STATUS_LABELS)
 const DEFAULT_SORT = { key: 'report_date', direction: 'desc' }
 
-// The two admin actions: the call, and the words of its confirm dialog
+// "IDR 004", or for an IDR that has no number yet, "IDR of Sep 16, 2025 on HWS0023"
+export function idrName(idr) {
+  if (idr.idr_number) return `IDR ${idr.idr_number}`
+  return `IDR of ${format(parseISO(idr.report_date), 'MMM d, yyyy')} on ${idr.project_id}`
+}
+
+// What an admin types to delete an IDR for good: its number, or its work date when it has none
+export function deleteForeverPhrase(idr) {
+  return idr.idr_number || idr.report_date
+}
+
+// The admin actions: the call, the words of its confirm dialog, and what the toast says once it went through
+// (given the IDR as it was and what the call returned)
 const ACTIONS = {
   unlock: {
     run: idrId => adminUnlockIdr(idrId),
-    title: 'Unlock IDR',
+    title: () => 'Unlock IDR',
     message: 'This returns the IDR to RE Review and clears the RE signature. The RE must re-approve to lock it again.',
     confirmLabel: 'Unlock',
     confirmClassName: 'btn-primary',
@@ -34,11 +47,29 @@ const ACTIONS = {
   },
   delete: {
     run: idrId => adminDeleteIdr(idrId),
-    title: 'Soft-delete IDR',
+    title: () => 'Soft-delete IDR',
     message: 'This removes the IDR from every list. The record is kept, and its day and IDR number become free again.',
     confirmLabel: 'Soft-delete',
     confirmClassName: 'btn-danger',
     failure: "Couldn't delete the IDR",
+  },
+  undelete: {
+    run: idrId => undeleteIdr(idrId),
+    title: idr => `Un-delete ${idrName(idr)}?`,
+    message: 'This brings the IDR back with the status it had when it was deleted, and into the lists again.',
+    confirmLabel: 'Un-delete',
+    confirmClassName: 'btn-primary',
+    failure: "Couldn't un-delete the IDR",
+    done: (idr, restored) => {
+      const status = STATUS_LABELS[restored?.status]
+      return status ? `${idrName(idr)} restored to ${status}.` : `${idrName(idr)} restored.`
+    },
+  },
+  // Confirmed in DeleteIdrForeverModal, not ConfirmDialog, so it has no dialog words here
+  purge: {
+    run: idrId => permanentDeleteIdr(idrId),
+    failure: "Couldn't delete the IDR",
+    done: idr => `${idrName(idr)} permanently deleted.`,
   },
 }
 
@@ -74,12 +105,13 @@ export default function AdminIdrsPage() {
   const { refresh: refreshTaskCount } = useTaskCount()
   const admin = isAdmin(user)
 
-  const [idrs, setIdrs] = useState([]) // every IDR, deleted ones and everyone's drafts included
+  const [idrs, setIdrs] = useState([]) // every IDR, everyone's drafts included; deleted ones only when asked for
   const [loading, setLoading] = useState(true)
+  const [loaded, setLoaded] = useState(false) // whether there is a list to keep on screen while it is read again
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
 
-  const [showDeleted, setShowDeleted] = useState(false)
+  const [includeDeleted, setIncludeDeleted] = useState(false)
   const [showAllDrafts, setShowAllDrafts] = useState(false)
   const [sort, setSort] = useState(DEFAULT_SORT)
 
@@ -95,12 +127,20 @@ export default function AdminIdrsPage() {
     setLoading(true)
     setLoadError(null)
     setRefreshError(null)
-    listIdrs({ includeDeleted: true, includeAllDrafts: true })
-      .then(data => { if (!ignore) setIdrs(data) })
-      .catch(err => { if (!ignore) setLoadError(err.message) })
+    listIdrs({ includeDeleted, includeAllDrafts: true })
+      .then(data => {
+        if (ignore) return
+        setIdrs(data)
+        setLoaded(true)
+      })
+      .catch(err => {
+        if (ignore) return
+        setLoadError(err.message)
+        setLoaded(false)
+      })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [admin, attempt])
+  }, [admin, includeDeleted, attempt])
 
   const ask = (idr, action) => {
     if (action === 'unlock' && isAlreadyUnlocked(idr)) {
@@ -117,20 +157,22 @@ export default function AdminIdrsPage() {
     const { idr, action } = pending
     setBusy(true)
     setActionError(null)
+    let result
     try {
-      await ACTIONS[action].run(idr.idr_id)
+      result = await ACTIONS[action].run(idr.idr_id)
     } catch (err) {
       setActionError(`${ACTIONS[action].failure}: ${err.message}`)
       setBusy(false)
       return
     }
     try {
-      setIdrs(await listIdrs({ includeDeleted: true, includeAllDrafts: true }))
+      setIdrs(await listIdrs({ includeDeleted, includeAllDrafts: true }))
       setRefreshError(null)
     } catch (err) {
       setRefreshError(`The change was saved, but the list couldn't be refreshed: ${err.message}`)
     }
-    refreshTaskCount() // an unlocked IDR is a task for its project's REs again
+    refreshTaskCount() // an unlocked or restored IDR can be a task for its project's reviewers again
+    setToast(ACTIONS[action].done?.(idr, result) ?? null)
     setPending(null)
     setBusy(false)
   }
@@ -164,27 +206,37 @@ export default function AdminIdrsPage() {
     )
   }
 
+  // A deleted IDR is in the list only because it was asked for, so it always shows
   const visible = sorted(
-    idrs.filter(idr => (isDeleted(idr)
-      ? showDeleted
-      : showAllDrafts || idr.status !== 'draft' || idr.reporter_uuid === user.uuid)),
+    idrs.filter(idr => isDeleted(idr) || showAllDrafts || idr.status !== 'draft' || idr.reporter_uuid === user.uuid),
     sort,
   )
 
-  const renderActions = (idr) => (isDeleted(idr) ? (
-    <StatusBadge status="deleted" />
-  ) : (
+  const renderActions = (idr) => (
     <div className="flex items-center space-x-2">
-      {ADMIN_UNLOCKABLE_STATUSES.includes(idr.status) && (
-        <button type="button" onClick={() => ask(idr, 'unlock')} disabled={busy} className="btn-secondary">
-          Unlock
-        </button>
+      {isDeleted(idr) ? (
+        <>
+          <button type="button" onClick={() => ask(idr, 'undelete')} disabled={busy} className="btn-secondary">
+            Un-delete
+          </button>
+          <button type="button" onClick={() => ask(idr, 'purge')} disabled={busy} className="btn-danger">
+            Delete forever
+          </button>
+        </>
+      ) : (
+        <>
+          {ADMIN_UNLOCKABLE_STATUSES.includes(idr.status) && (
+            <button type="button" onClick={() => ask(idr, 'unlock')} disabled={busy} className="btn-secondary">
+              Unlock
+            </button>
+          )}
+          <button type="button" onClick={() => ask(idr, 'delete')} disabled={busy} className="btn-danger">
+            Soft-delete
+          </button>
+        </>
       )}
-      <button type="button" onClick={() => ask(idr, 'delete')} disabled={busy} className="btn-danger">
-        Soft-delete
-      </button>
     </div>
-  ))
+  )
 
   return (
     <div className="flex-1 bg-gray-50">
@@ -193,7 +245,7 @@ export default function AdminIdrsPage() {
 
         <h2 className="text-2xl font-bold text-gray-900 mb-6">All IDRs (Admin)</h2>
 
-        {loading ? (
+        {loading && !loaded ? (
           <div className="flex justify-center py-12">
             <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
           </div>
@@ -206,13 +258,14 @@ export default function AdminIdrsPage() {
           <>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm text-gray-700">
               <label className="inline-flex items-center space-x-2">
-                <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
-                <span>Show deleted</span>
+                <input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />
+                <span>Include deleted</span>
               </label>
               <label className="inline-flex items-center space-x-2">
                 <input type="checkbox" checked={showAllDrafts} onChange={(e) => setShowAllDrafts(e.target.checked)} />
                 <span>Show all drafts</span>
               </label>
+              {loading && <span role="status" className="text-gray-500">Loading...</span>}
             </div>
 
             {refreshError && (
@@ -239,14 +292,26 @@ export default function AdminIdrsPage() {
           </>
         )}
 
-        {pending && (
+        {pending && pending.action !== 'purge' && (
           <ConfirmDialog
-            title={ACTIONS[pending.action].title}
+            title={ACTIONS[pending.action].title(pending.idr)}
             message={ACTIONS[pending.action].message}
             note={`IDR: ${describeIdr(pending.idr)}`}
             confirmLabel={ACTIONS[pending.action].confirmLabel}
             cancelLabel="Cancel"
             confirmClassName={ACTIONS[pending.action].confirmClassName}
+            onConfirm={confirm}
+            onCancel={() => setPending(null)}
+            busy={busy}
+            error={actionError}
+          />
+        )}
+
+        {pending?.action === 'purge' && (
+          <DeleteIdrForeverModal
+            name={idrName(pending.idr)}
+            phrase={deleteForeverPhrase(pending.idr)}
+            note={`IDR: ${describeIdr(pending.idr)}`}
             onConfirm={confirm}
             onCancel={() => setPending(null)}
             busy={busy}

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  acceptStage1, acceptStage2, adminDeleteIdr, adminUnlockIdr, approveStage1, approveStage2, getReviewQueue, returnIdr,
+  acceptStage1, acceptStage2, adminDeleteIdr, adminUnlockIdr, approveStage1, approveStage2, getReviewQueue,
+  permanentDeleteIdr, returnIdr, undeleteIdr,
 } from '../reviews'
-import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { mockFetch, mockFetchFailure, mockFetchNoContent, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -82,6 +83,7 @@ describe.each([
   ['approveStage2', approveStage2, 'approve-stage2'],
   ['adminUnlockIdr', adminUnlockIdr, 'admin/unlock'],
   ['adminDeleteIdr', adminDeleteIdr, 'admin/delete'],
+  ['undeleteIdr', undeleteIdr, 'admin/undelete'],
 ])('%s', (_, call, segment) => {
   it(`POSTs to /${segment} with no body and returns the updated IDR`, async () => {
     mockFetch(200, { status: 'success', data: MOCK_IDR })
@@ -133,5 +135,29 @@ describe('returnIdr', () => {
     await expect(returnIdr(IDR_ID, { to: 'inspector', comment: ' ' })).rejects.toMatchObject({
       message: 'A comment is required to return an IDR', status: 400,
     })
+  })
+})
+
+describe('undeleteIdr', () => {
+  it('throws the backend message for a day or number another IDR has taken, with that IDR', async () => {
+    mockFetch(409, { detail: "This IDR's number is now in use on this project", existing_idr_id: OTHER_IDR_ID })
+    await expect(undeleteIdr(IDR_ID)).rejects.toMatchObject({
+      message: "This IDR's number is now in use on this project", status: 409, body: { existing_idr_id: OTHER_IDR_ID },
+    })
+  })
+})
+
+describe('permanentDeleteIdr', () => {
+  it('DELETEs /admin/permanent with no body and returns nothing', async () => {
+    mockFetchNoContent()
+    expect(await permanentDeleteIdr(IDR_ID)).toBeUndefined()
+    expect(fetchUrl().pathname).toBe(`/v1/idrs/${IDR_ID}/admin/permanent`)
+    expect(fetchInit().method).toBe('DELETE')
+    expect(fetchInit().body).toBeUndefined()
+  })
+
+  it('throws the backend message for an IDR that was not soft-deleted first', async () => {
+    mockFetch(404, { detail: 'IDR must be soft-deleted first' })
+    await expect(permanentDeleteIdr(IDR_ID)).rejects.toMatchObject({ message: 'IDR must be soft-deleted first', status: 404 })
   })
 })

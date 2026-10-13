@@ -81,3 +81,23 @@ export async function adminDeleteIdr(idrId) {
   const json = await apiFetch(`/v1/idrs/${idrId}/admin/delete`, { method: 'POST' })
   return json.data
 }
+
+/**
+ * Admin only: brings a soft-deleted IDR back with the status it had when it was deleted (a draft when that isn't
+ * on record), and into the lists again. Fails with 404 for an IDR that isn't deleted and 409 when another IDR has
+ * since taken its day or its IDR number (the thrown error's body then carries existing_idr_id).
+ * Returns the restored IDR.
+ */
+export async function undeleteIdr(idrId) {
+  const json = await apiFetch(`/v1/idrs/${idrId}/admin/undelete`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only: deletes a soft-deleted IDR for good, with its reports, attachments, edits and quantities. It can't
+ * be undone. Fails with 404 for an IDR that isn't soft-deleted first.
+ * Returns nothing.
+ */
+export async function permanentDeleteIdr(idrId) {
+  await apiFetch(`/v1/idrs/${idrId}/admin/permanent`, { method: 'DELETE' })
+}
