@@ -7,7 +7,8 @@
  * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
  * A deleted property reads Deleted and takes no new PIR (the backend refuses one); only an admin can change it, or
- * its PIR, or un-delete it. Back returns to the project's properties. The backend refuses anyone not on the
+ * its PIR, or un-delete it. Under a live PIR's card, its flags (FlagsSection). Back returns to the project's
+ * properties. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  */
 import { useEffect, useState } from 'react'
@@ -23,6 +24,7 @@ import { PROPERTY_ACTIONS } from '../lib/properties'
 import { useUserNames } from '../lib/useUserNames'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import ConfirmDialog from '../components/ConfirmDialog'
+import FlagsSection from '../components/FlagsSection'
 import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PropertyFormModal from '../components/PropertyFormModal'
@@ -333,6 +335,17 @@ export default function PropertyPage() {
           </div>
         )}
       </section>
+
+      {livePir && (
+        <FlagsSection
+          key={livePir.id}
+          pir={livePir}
+          pirIsDeleted={false}
+          propertyIsDeleted={deleted}
+          writer={writer}
+          admin={admin}
+        />
+      )}
 
       {form?.kind === 'property' && (
         <PropertyFormModal

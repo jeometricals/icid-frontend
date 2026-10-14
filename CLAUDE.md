@@ -15,11 +15,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties and one property, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `flags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
-- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels).
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a flag's delete / un-delete wording and the next display order), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
@@ -528,6 +528,58 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
     (`pir`), or a status key (`status`), which the properties list reads off each row's `pir_status`
     (`pirStatusFromApi`: `none`, `dot_signed`, `as_built_signed`; anything else is none).
+- **Flags.** A PIR's flags: the sidewalk pieces its survey sheet marks, each a shape with dimensions in feet,
+  shown under the PIR card on the property page (`FlagsSection`, only while the property has a live PIR).
+  - **A flag** is `{id, pir_id, property_id, project_id, display_order, added_in_field, shape, dimensions,
+    sketch_x, sketch_y, rotation, surveyed_mark, surveyed_is_assessable, surveyed_non_assessable_reason,
+    surveyed_thickness, is_constructed, pay_item_id, computed_quantity, reported_quantity, quantity, is_overridden,
+    quantity_delta_reason, created_at, updated_at, created_by, deleted_at, deleted_by}`. The sketch fields,
+    rotation and `is_constructed` aren't shown or set yet.
+  - **Service:** `services/flags.js`: `listFlags(pirId, { includeDeleted })` (by display order), `getFlag`,
+    `createFlag(pirId, data)`, `updateFlag`, `softDeleteFlag` and `undeleteFlag`.
+  - **Shapes and dimensions** (`dimensions`, feet, every length above zero), and the area the backend stores as
+    `computed_quantity` (square feet, to the cent, halves up). `lib/flagArea.js` `computeArea` uses the same
+    formulas for the form's preview:
+    - rectangle `{L, W}`: L × W
+    - trapezoid `{a, b, w}` (the parallel edges and the width between them): (a + b) / 2 × w
+    - triangle `{a, b}` (a right triangle's legs): a × b / 2
+    - polygon `{vertices: [{x, y}, ...]}` (three or more, in order, enclosing an area): the shoelace formula
+    - arc `{r, theta}` (a circular segment; θ in radians, above 0 and at most 2π): r² / 2 × (θ − sin θ). The form
+      takes θ in degrees and converts.
+  - **Classifications** (`src/data/flagEnums.js`, the backend's values with the app's labels): shape; surveyed mark
+    (`number_only` "Number only", `cross` "Cross (X)", `cross_with_number` "Cross + number", `tick`, `none`);
+    non-assessable reason (`tree_damage`, `city_tree`, `transition`, `no_driveway`, `hydrant`, `fronting_city`
+    "Fronting city property", `utility`, `settlement`, `other`); thickness (`4in` '4"', `7in_as_4in` '7" as 4"',
+    `7in` '7"'). The reason labels are the app's own wording of the backend's keys.
+  - **The survey's rules** (the backend's 422s; the form keeps Save off instead): an assessable flag has no
+    non-assessable reason and any other has one; the mark is `none` exactly when the flag was added in the field
+    (both ways: the form says so under "Added in field"); a reported quantity is above zero.
+  - **The table:** # (display order), shape, thickness, area (`computed_quantity`, "42.50 SF", and under it the
+    reported quantity with "(reported)" when there is one that differs), pay item ("item no — description" from
+    the project's contract items, which the section reads with the flags; "—" for none), marks (pills: the mark,
+    then "assessable" or "non-assessable (<reason>)") and Actions. No flags reads "No flags yet. Click 'Add flag'
+    to start." ("No flags." for anyone who can't add).
+  - **`FlagFormModal`** (`mode`, `initial`, `nextDisplayOrder`, `contractItems`; "Add flag" / "Edit flag"): display
+    order (one past the highest, to start), shape, the shape's dimension inputs (each shape keeps what was typed
+    for it, so switching back loses nothing; a polygon starts with three vertex rows, Add vertex / remove, never
+    fewer than three), "Computed area: 42.50 SF" as they change, surveyed mark, thickness, "Added in field",
+    "Assessable" (on to start) and, when off, the reason; the pay item (`ContractItemPicker`, optional); reported
+    quantity (optional, placeholder "Same as computed") and, when it differs from the computed area, the quantity
+    delta reason (optional). Save is off until display order, shape, valid dimensions, mark, thickness and the rules
+    hold, and when editing until something changed. Adding sends the whole flag; editing only what changed (a new
+    shape with its dimensions; a cleared pay item, reason or reported quantity as `null`, the last reverting to
+    the computed area). A 422 naming a field sits under it; one about the whole flag (a rule) and anything else
+    (a 400: a deleted PIR or property, a pay item of another project) below the form.
+  - **`ContractItemPicker`** (`items`, `value`, `onChange`): the picked contract item as "item no — description"
+    with Change and Clear, or "No pay item" with Choose. Choose opens a panel with a search box (item no. or
+    description, any case) and one entry per contract item, its budget code beside it: `pay_item_id` is a
+    `contract_item_id`, and the same item no. under two budget codes is two contract items. (The report forms'
+    `PayItemPicker` groups by item no., so it can't pick one contract item.)
+  - **Who does what:** any member of the project reads, adds and edits; an admin alone deletes and un-deletes
+    (each confirmed in `ConfirmDialog`, toast "Flag #<n> deleted." / "restored.") and has "Show deleted", which
+    lists soft-deleted flags muted, # struck, with Un-delete. A demo user reads only: no Add flag, no Actions
+    column. While the PIR or its property is deleted, Add flag and Edit are hidden for everyone (the backend
+    refuses anyone but an admin with a 400); an admin keeps Delete. Every change reads the flags again.
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -640,6 +692,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
     `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the
     project, changes admin only; body `{inspector_initials, inspector_sign_date}`, both optional on a PATCH)
+  - Flags: `GET /v1/pirs/{id}/flags?include_deleted=` · `POST /v1/pirs/{id}/flags` · `GET /v1/flags/{id}` ·
+    `PATCH /v1/flags/{id}` · `POST /v1/flags/{id}/admin/soft-delete` · `POST /v1/flags/{id}/admin/undelete`
+    (reading, adding and editing for anyone on the project, a demo user only reads; soft-delete and un-delete
+    admin only)
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
