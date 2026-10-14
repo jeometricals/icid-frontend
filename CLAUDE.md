@@ -12,13 +12,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists, a project's pay items, properties and task orders, and one task order). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists, a project's pay items, properties and task orders, and one property and one task order). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, and `pirStatus`), `useUserNames.js` (names for the user ids an admin page shows), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -450,7 +450,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Load:** `listProperties` and `listAdminProjects` together; the second only gives the heading its project
     name ("Properties — <project_id> <project_name>"). A failure of either is the load error with Retry.
   - **The table** (`PropertiesTable`, shared with a task order's bundle) is in the backend's order (by address):
-    BBL, address (the notes as a tooltip), type (its label), added (`created_at` through `lib/shortDate.js`:
+    BBL (a link to `/admin/properties/<id>`), address (the notes as a tooltip), type (its label), added (`created_at` through `lib/shortDate.js`:
     "Sep 14", with the year when it isn't this one) and Edit / Delete. No properties reads
     "No properties yet. Click 'Add property' to start."
   - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add property" / "Edit property"): BBL, address
@@ -468,6 +468,42 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success the list
     is read again and a toast reads "Property <bbl> deleted." / "Property <bbl> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
+  - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
+- **PIRs (admin).** A property's PIR: the DOT survey sheet its inspector signed, digitized by an admin. One live
+  PIR per property; a soft-deleted one frees the property for a new one. A PIR is `{id, property_id, project_id,
+  source_image_url, source_image_scale, inspector_initials, inspector_sign_date ('YYYY-MM-DD'), digitized_by,
+  digitized_at, as_built_signed_by, as_built_signed_at, created_at, updated_at, deleted_at, deleted_by}`; the image
+  fields and the as-built signature are set by later slices, never by this page.
+  - **Service:** `services/pirs.js`: `getPirByProperty(propertyId)` (the live PIR, or `null` on a 404, which an
+    unknown property gives too), `listPirs(propertyId, { includeDeleted })` (newest first), `getPir`,
+    `createPir(propertyId, {inspector_initials, inspector_sign_date})`, `updatePir`, `softDeletePir` and
+    `undeletePir`. Reading is for anyone on the project; every change is admin only.
+  - **One property:** `/admin/properties/:propertyId` (`AdminPropertyPage`), from a BBL in `PropertiesTable` (the
+    properties list or a task order's bundle); Back ("Back to Properties — <project_id>") returns to its project's
+    properties. One `getProperty` and one `listPirs(…, { includeDeleted: true })`. The heading is "<project_id> ·
+    <address>". The Property card lists BBL, address, type, notes and added, with Edit (`PropertyFormModal`) and
+    Delete; a deleted property reads Deleted, has only Un-delete, and gets no Add PIR (the backend refuses a PIR
+    on it with a 400).
+  - **The PIR card** carries the status badge in its heading. With a live PIR: inspector initials, signed on, digitized
+    ("Sep 20 by <name>") and as-built ("Not yet confirmed", or "As-built signed by <name> on <date>"), with Edit PIR
+    and Delete PIR. Without one: "No PIR yet." and Add PIR. Names come from `useUserNames` (`GET /v1/admin/users`
+    with deleted users); when it fails or lacks the user, the date stands alone.
+  - **Deleted PIRs** are listed under the card, muted and struck ("JD, signed Sep 14 · deleted Oct 3"), each with
+    Un-delete. While the property has a live PIR, Un-delete is off with the tooltip "This property has a live PIR.
+    Delete it first to restore this one." (the backend's 409 otherwise).
+  - **`PirFormModal`** (`mode`, `initial`; "Add PIR" / "Edit PIR"): inspector initials (trimmed, at most 16) and
+    inspector sign date, both required. Save is off until both are in and, when editing, something changed;
+    editing sends only what changed. A 409 (the property got a live PIR since the page loaded) reads "This
+    property already has a PIR. Cancel to see it." below the form, and the page reads the PIRs again behind the
+    dialog; a 400 reads as the backend worded it; a 422 sits under its field (`lib/formErrors.js`, whose 409 can
+    now name no field). Creating after a delete is not a 409: the deleted PIR freed the property.
+  - Every delete and un-delete (the property's and the PIR's) is confirmed in `ConfirmDialog`; a refusal shows
+    there; the toasts read "Property <bbl> deleted." / "restored." and "PIR deleted." / "PIR restored.". After a
+    PIR change the page reads the PIRs again; after a property change it shows the property the call returned.
+  - **The status badge** (`PirStatusBadge`, from `pirStatus` in `lib/pirs.js`): a dash for no live PIR, "Signed by
+    DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is.
+  - **Not done yet: a PIR column on the properties list.** The backend can only give PIRs one property at a time,
+    so a column would cost a request per row; it waits for the property list to carry each property's PIR status.
   - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
 - **Task orders (admin).** A project's task orders, each a bundle of its properties (a property can be in several,
   once in each). A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -493,7 +529,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **One task order:** `/admin/task-orders/:taskOrderId` (`AdminTaskOrderPage`), from a number on the list; Back
     ("Back to Task orders — <project_id>") returns to its project's list. "Task order <number>" with Edit and
     Delete; a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by <name>"; the name
-    comes from `GET /v1/admin/users` with deleted users, and when that fails or doesn't have them the card gives
+    comes from `GET /v1/admin/users` with deleted users (`useUserNames`), and when that fails or doesn't have them the card gives
     the date alone). Then "Bundled properties": "N properties bundled", `PropertiesTable` with Unbundle on each
     row, and "Add properties". Nothing bundled reads "No properties bundled yet. Click 'Add properties' to pick
     from this project." Its Added column is when the property was added to the project: the response doesn't
@@ -563,6 +599,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `POST /v1/task-orders/{id}/admin/undelete` · `POST /v1/task-orders/{id}/properties/{property_id}` (bundle) ·
     `DELETE /v1/task-orders/{id}/properties/{property_id}` (unbundle) (reading for anyone on the project, changes
     admin only; body `{task_order_number, issued_date, estimate_notes}`, all optional on a PATCH)
+  - PIRs: `GET /v1/properties/{id}/pir` (the live one) · `GET /v1/properties/{id}/pirs?include_deleted=` ·
+    `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
+    `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the
+    project, changes admin only; body `{inspector_initials, inspector_sign_date}`, both optional on a PATCH)
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)

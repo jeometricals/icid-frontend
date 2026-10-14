@@ -1,11 +1,12 @@
+import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { shortDate } from '../lib/shortDate'
 import StatusBadge from './StatusBadge'
 
 /**
- * A table of properties: BBL, address (the notes as a tooltip), type (its label), added (when the property was
- * added to the project) and an Actions cell the caller fills. A soft-deleted property is muted, its BBL crossed
+ * A table of properties: BBL (a link to the property's page), address (the notes as a tooltip), type (its
+ * label), added (when the property was added to the project) and an Actions cell the caller fills. A soft-deleted property is muted, its BBL crossed
  * out beside a Deleted badge (the date as a tooltip). Rows are in the order given.
  * Props: properties, renderActions(property) (the Actions cell's content).
  */
@@ -34,12 +35,14 @@ export default function PropertiesTable({ properties, renderActions }) {
                 <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                   {deleted ? (
                     <span className="inline-flex items-center gap-2">
-                      <span className="line-through">{row.bbl}</span>
+                      <Link to={`/admin/properties/${row.id}`} className="line-through hover:underline">{row.bbl}</Link>
                       <span title={`Deleted ${format(parseISO(row.deleted_at), 'MMM d, yyyy')}`}>
                         <StatusBadge status="deleted" />
                       </span>
                     </span>
-                  ) : row.bbl}
+                  ) : (
+                    <Link to={`/admin/properties/${row.id}`} className="text-construction-700 hover:underline">{row.bbl}</Link>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <p title={row.notes || undefined}>{row.address}</p>

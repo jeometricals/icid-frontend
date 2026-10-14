@@ -121,6 +121,12 @@ describe('AdminPropertiesPage — the list', () => {
     expect(rowOf('4001230099')).toHaveTextContent('4+ family / commercial')
   })
 
+  it("links each BBL to the property's page", async () => {
+    await renderListed()
+    await userEvent.click(within(table()).getByRole('link', { name: '4001230045' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`/admin/properties/${LISTED[0].id}`)
+  })
+
   it('shows the empty state when the project has none', async () => {
     server = []
     renderPage()

@@ -13,11 +13,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getTaskOrder, listAdminUsers, unbundleProperty, updateTaskOrder } from '../services/api'
+import { getTaskOrder, unbundleProperty, updateTaskOrder } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
-import { personName } from '../lib/personName'
 import { shortDate } from '../lib/shortDate'
 import { TASK_ORDER_ACTIONS, propertyCount } from '../lib/taskOrders'
+import { useUserNames } from '../lib/useUserNames'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PropertiesTable from '../components/PropertiesTable'
 import PropertyPickerModal from '../components/PropertyPickerModal'
@@ -49,7 +49,6 @@ export default function AdminTaskOrderPage() {
   const admin = isAdmin(user)
 
   const [taskOrder, setTaskOrder] = useState(null)
-  const [creatorName, setCreatorName] = useState(null) // null until found; the card then reads the date alone
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
@@ -76,19 +75,8 @@ export default function AdminTaskOrderPage() {
     return () => { ignore = true }
   }, [admin, taskOrderId, attempt])
 
-  // The creator's name is a nicety: when the user list can't be read, or doesn't have them, the card gives the
-  // date alone, as the IDR page's signed banner does
-  const createdBy = taskOrder?.created_by
-  useEffect(() => {
-    if (!admin || !createdBy) return
-    let ignore = false
-    listAdminUsers({ include_deleted: true })
-      .then(users => {
-        if (!ignore) setCreatorName(personName(users.find(found => found.uuid === createdBy)) || null)
-      })
-      .catch(() => { if (!ignore) setCreatorName(null) })
-    return () => { ignore = true }
-  }, [admin, createdBy])
+  // The creator's name; until it is found, the card gives the date alone
+  const nameOf = useUserNames(admin)
 
   const open = (show) => {
     setActionError(null)
@@ -194,6 +182,7 @@ export default function AdminTaskOrderPage() {
   }
 
   const deleted = Boolean(taskOrder.deleted_at)
+  const creatorName = nameOf(taskOrder.created_by)
   const properties = taskOrder.properties
 
   return (

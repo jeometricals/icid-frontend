@@ -3,12 +3,17 @@
  * dialogs. A 409 is the conflict message on the field it names; a 422 names its fields in each entry's loc (the
  * first message for a field wins, and one for a field the form doesn't have goes below); anything else is said as
  * the backend worded it.
- * Takes the thrown error (or null), the form's field keys and {field, message} for a 409.
+ * Takes the thrown error (or null), the form's field keys and {field, message} for a 409 (with no field, the
+ * message goes below the form).
  * Returns {fields: {key: message}, general: message or null}.
  */
 export function formErrors(error, keys, conflict) {
   if (!error) return { fields: {}, general: null }
-  if (error.status === 409) return { fields: { [conflict.field]: conflict.message }, general: null }
+  if (error.status === 409) {
+    return conflict.field
+      ? { fields: { [conflict.field]: conflict.message }, general: null }
+      : { fields: {}, general: conflict.message }
+  }
   const entries = error.status === 422 && Array.isArray(error.body?.detail) ? error.body.detail : null
   if (!entries) return { fields: {}, general: error.message }
   const fields = {}

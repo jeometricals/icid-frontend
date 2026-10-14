@@ -1,6 +1,6 @@
 /**
  * One project's properties (route param :projectId), at /admin/projects/:projectId/properties. Admins only: a
- * table (BBL, address, type, added) in the backend's order, which is by address, with Edit and Delete on each
+ * table (BBL, a link to the property's page; address, type, added) in the backend's order, which is by address, with Edit and Delete on each
  * row and "Add property" beside the heading. Add and Edit share one dialog; Delete (a soft delete) is confirmed
  * first. "Show deleted" (off to start) asks the backend for the list again with soft-deleted properties in it;
  * a deleted one is muted, its BBL crossed out, and has "Un-delete" instead, also confirmed first. After every
@@ -11,9 +11,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import {
-  createProperty, listAdminProjects, listProperties, softDeleteProperty, undeleteProperty, updateProperty,
-} from '../services/api'
+import { createProperty, listAdminProjects, listProperties, updateProperty } from '../services/api'
+import { PROPERTY_ACTIONS } from '../lib/properties'
 import { isAdmin } from '../lib/reviewRoles'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PropertiesTable from '../components/PropertiesTable'
@@ -23,26 +22,6 @@ import Toast from '../components/Toast'
 export const EMPTY_TEXT = "No properties yet. Click 'Add property' to start."
 
 const isDeleted = (row) => Boolean(row.deleted_at)
-
-// The two confirmed actions: the call, the words of the dialog and of the toast once it went through
-const ACTIONS = {
-  delete: {
-    run: row => softDeleteProperty(row.id),
-    title: row => `Delete property ${row.bbl}?`,
-    message: row => `${row.address} leaves this project's list and its BBL is freed. Show deleted brings it back to un-delete.`,
-    confirmLabel: 'Delete',
-    confirmClassName: 'btn-danger',
-    done: row => `Property ${row.bbl} deleted.`,
-  },
-  undelete: {
-    run: row => undeleteProperty(row.id),
-    title: row => `Un-delete property ${row.bbl}?`,
-    message: row => `${row.address} returns to this project's list with BBL ${row.bbl}.`,
-    confirmLabel: 'Un-delete',
-    confirmClassName: 'btn-primary',
-    done: row => `Property ${row.bbl} restored.`,
-  },
-}
 
 export default function AdminPropertiesPage() {
   const { projectId } = useParams()
@@ -124,8 +103,8 @@ export default function AdminPropertiesPage() {
 
   const confirm = async () => {
     const { row, action } = pending
-    if (!(await run(() => ACTIONS[action].run(row)))) return
-    setToast(ACTIONS[action].done(row))
+    if (!(await run(() => PROPERTY_ACTIONS[action].run(row)))) return
+    setToast(PROPERTY_ACTIONS[action].done(row))
     setPending(null)
   }
 
@@ -247,11 +226,11 @@ export default function AdminPropertiesPage() {
 
         {pending && (
           <ConfirmDialog
-            title={ACTIONS[pending.action].title(pending.row)}
-            message={ACTIONS[pending.action].message(pending.row)}
-            confirmLabel={ACTIONS[pending.action].confirmLabel}
+            title={PROPERTY_ACTIONS[pending.action].title(pending.row)}
+            message={PROPERTY_ACTIONS[pending.action].message(pending.row)}
+            confirmLabel={PROPERTY_ACTIONS[pending.action].confirmLabel}
             cancelLabel="Cancel"
-            confirmClassName={ACTIONS[pending.action].confirmClassName}
+            confirmClassName={PROPERTY_ACTIONS[pending.action].confirmClassName}
             onConfirm={confirm}
             onCancel={() => setPending(null)}
             busy={busy}

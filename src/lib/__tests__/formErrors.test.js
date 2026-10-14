@@ -26,3 +26,10 @@ describe('formErrors', () => {
     expect(formErrors(failure(400, 'bbl is too long'), ['bbl'], CONFLICT)).toEqual({ fields: {}, general: 'bbl is too long' })
   })
 })
+
+describe('formErrors — a 409 with no field', () => {
+  it('says the conflict message below the form', () => {
+    expect(formErrors(failure(409, 'x'), ['bbl'], { field: null, message: 'Taken.' }))
+      .toEqual({ fields: {}, general: 'Taken.' })
+  })
+})
