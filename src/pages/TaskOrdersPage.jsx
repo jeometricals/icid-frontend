@@ -192,7 +192,7 @@ export default function TaskOrdersPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      {['Number', 'Issued', 'Properties', ...(writer ? ['Actions'] : [])].map(heading => (
+                      {['Number', 'Issued', 'Sites', ...(writer ? ['Actions'] : [])].map(heading => (
                         <th
                           key={heading}
                           scope="col"

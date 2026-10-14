@@ -94,7 +94,7 @@ async function renderLoaded(user) {
 }
 
 const details = () => screen.getByRole('region', { name: 'Task order details' })
-const bundled = () => screen.getByRole('region', { name: 'Bundled properties' })
+const bundled = () => screen.getByRole('region', { name: 'Bundled sites' })
 const rowOf = (bbl) => within(bundled()).getByText(bbl).closest('tr')
 const queryRowOf = (bbl) => within(bundled()).queryByText(bbl)?.closest('tr') ?? null
 const dialog = () => screen.getByRole('dialog')
@@ -117,9 +117,9 @@ describe('TaskOrderPage — who can do what', () => {
     await waitFor(() => expect(queryRowOf('4001230045')).toBeNull())
     expect(api.unbundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, MAIN.id)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add properties' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add sites' }))
     await userEvent.click(await screen.findByRole('checkbox', { name: /4001110001/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add 1 property' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 1 site' }))
     await waitFor(() => expect(queryRowOf('4001110001')).not.toBeNull())
     expect(api.bundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, ELM.id)
 
@@ -141,14 +141,14 @@ describe('TaskOrderPage — who can do what', () => {
     record = { ...record, deleted_at: `${YEAR}-10-02T09:00:00` }
     await renderLoaded(TEST_USER)
     expect(screen.getByRole('heading', { name: /Task order TO-001/ })).toHaveTextContent('Deleted')
-    for (const name of ['Edit', 'Delete', 'Un-delete', 'Add properties', 'Unbundle']) {
+    for (const name of ['Edit', 'Delete', 'Un-delete', 'Add sites', 'Unbundle']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
   })
 
   it('keeps a demo user to reading, with a note saying why, and reads no names', async () => {
     await renderLoaded(DEMO_USER)
-    for (const name of ['Edit', 'Delete', 'Add properties', 'Unbundle']) {
+    for (const name of ['Edit', 'Delete', 'Add sites', 'Unbundle']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
@@ -237,12 +237,12 @@ describe('TaskOrderPage — the task order', () => {
     expect(api.softDeleteTaskOrder).toHaveBeenCalledWith(TASK_ORDER_ID)
     expect(screen.getByRole('heading', { name: /Task order TO-001/ })).toHaveTextContent('Deleted')
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add properties' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add sites' })).not.toBeInTheDocument()
     expect(within(bundled()).queryByRole('button', { name: 'Unbundle' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
-    expect(await screen.findByRole('button', { name: 'Add properties' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Add sites' })).toBeInTheDocument()
     expect(api.undeleteTaskOrder).toHaveBeenCalledWith(TASK_ORDER_ID)
   })
 })
@@ -250,7 +250,7 @@ describe('TaskOrderPage — the task order', () => {
 describe('TaskOrderPage — bundled properties', () => {
   it('lists the bundled properties with a count, and hides a soft-deleted one', async () => {
     await renderLoaded()
-    expect(within(bundled()).getByText('2 properties bundled')).toBeInTheDocument()
+    expect(within(bundled()).getByText('2 sites bundled')).toBeInTheDocument()
     expect(within(bundled()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['BBL', 'Address', 'Type', 'Added', 'Actions'])
     expect(within(rowOf('4001230045')).getAllByRole('cell').map(td => td.textContent))
@@ -268,13 +268,13 @@ describe('TaskOrderPage — bundled properties', () => {
   it('unbundles a property once confirmed, and its row goes', async () => {
     await renderLoaded()
     await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Unbundle' }))
-    expect(dialog()).toHaveAccessibleName('Unbundle property 4001230045?')
+    expect(dialog()).toHaveAccessibleName('Unbundle site 4001230045?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
 
     await waitFor(() => expect(queryRowOf('4001230045')).toBeNull())
     expect(api.unbundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, MAIN.id)
-    expect(within(bundled()).getByText('1 property bundled')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Property 4001230045 unbundled.')
+    expect(within(bundled()).getByText('1 site bundled')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Site 4001230045 unbundled.')
   })
 
   it('shows a refused unbundle in its dialog', async () => {
@@ -285,29 +285,29 @@ describe('TaskOrderPage — bundled properties', () => {
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Property is not in this task order')
   })
 
-  it('opens the picker on Add properties, and what it adds shows in the table', async () => {
+  it('opens the picker on Add sites, and what it adds shows in the table', async () => {
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Add properties' }))
-    expect(dialog()).toHaveAccessibleName('Add properties')
+    await userEvent.click(screen.getByRole('button', { name: 'Add sites' }))
+    expect(dialog()).toHaveAccessibleName('Add sites')
     await userEvent.click(await screen.findByRole('checkbox', { name: /4001110001/ }))
     expect(screen.queryByRole('checkbox', { name: /4001230045/ })).not.toBeInTheDocument() // already bundled
-    await userEvent.click(screen.getByRole('button', { name: 'Add 1 property' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 1 site' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(rowOf('4001110001')).toHaveTextContent('Expedited')
-    expect(screen.getByRole('status')).toHaveTextContent('Added 1 property.')
+    expect(screen.getByRole('status')).toHaveTextContent('Added 1 site.')
   })
 })
 
 describe('addedMessage', () => {
   it('counts what went in', () => {
-    expect(addedMessage({ added: 3, failed: null })).toBe('Added 3 properties.')
+    expect(addedMessage({ added: 3, failed: null })).toBe('Added 3 sites.')
   })
 
   it('names the refusal that stopped the batch', () => {
     expect(addedMessage({ added: 1, failed: { property: MAIN, message: 'Cannot bundle a deleted property.' } }))
-      .toBe("Added 1 property. Couldn't add 4001230045: Cannot bundle a deleted property. The rest weren't tried.")
+      .toBe("Added 1 site. Couldn't add 4001230045: Cannot bundle a deleted property. The rest weren't tried.")
     expect(addedMessage({ added: 0, failed: { property: MAIN, message: 'Nope.' } }))
-      .toBe("No properties were added. Couldn't add 4001230045: Nope. The rest weren't tried.")
+      .toBe("No sites were added. Couldn't add 4001230045: Nope. The rest weren't tried.")
   })
 })

@@ -29,21 +29,21 @@ import StatusBadge from '../components/StatusBadge'
 import TaskOrderFormModal from '../components/TaskOrderFormModal'
 import Toast from '../components/Toast'
 
-export const EMPTY_TEXT = "No properties bundled yet. Click 'Add properties' to pick from this project."
+export const EMPTY_TEXT = "No sites bundled yet. Click 'Add sites' to pick from this project."
 
 // What the toast says after the picker's batch: how many went in and, when one was refused, which and why
 export function addedMessage({ added, failed }) {
-  const done = added > 0 ? `Added ${propertyCount(added)}.` : 'No properties were added.'
+  const done = added > 0 ? `Added ${propertyCount(added)}.` : 'No sites were added.'
   if (!failed) return done
   return `${done} Couldn't add ${failed.property.bbl}: ${failed.message} The rest weren't tried.`
 }
 
 const unbundleAction = {
-  title: row => `Unbundle property ${row.bbl}?`,
+  title: row => `Unbundle site ${row.bbl}?`,
   message: row => `${row.address} leaves this task order. It stays on the project and can be added again.`,
   confirmLabel: 'Unbundle',
   confirmClassName: 'btn-danger',
-  done: row => `Property ${row.bbl} unbundled.`,
+  done: row => `Site ${row.bbl} unbundled.`,
 }
 
 export const DEMO_NOTE = 'Demo mode: task orders are read-only.'
@@ -259,7 +259,7 @@ export default function TaskOrderPage() {
 
         <section aria-labelledby="bundled-properties-heading">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <h3 id="bundled-properties-heading" className="text-lg font-semibold text-gray-900">Bundled properties</h3>
+            <h3 id="bundled-properties-heading" className="text-lg font-semibold text-gray-900">Bundled sites</h3>
             {changeable && (
               <button
                 type="button"
@@ -267,7 +267,7 @@ export default function TaskOrderPage() {
                 className="btn-primary inline-flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
-                <span>Add properties</span>
+                <span>Add sites</span>
               </button>
             )}
           </div>

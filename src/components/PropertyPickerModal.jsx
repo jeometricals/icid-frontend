@@ -74,7 +74,7 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
 
   return (
     <Modal
-      title="Add properties"
+      title="Add sites"
       onClose={onClose}
       busy={busy}
       size="lg"
@@ -93,12 +93,12 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
         </div>
       ) : loadError ? (
         <div className="text-center py-4">
-          <p className="text-red-600 mb-4">Couldn't load the project's properties: {loadError}</p>
+          <p className="text-red-600 mb-4">Couldn't load the project's sites: {loadError}</p>
           <button type="button" onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
         </div>
       ) : available.length === 0 ? (
         <p className="text-gray-600 py-4 text-center">
-          Every property of this project is already in this task order, or the project has none yet.
+          Every site of this project is already in this task order, or the project has none yet.
         </p>
       ) : (
         <div className="space-y-3">
@@ -138,7 +138,7 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
           </div>
 
           {shown.length === 0 ? (
-            <p className="text-gray-600 py-4 text-center">No properties match "{search.trim()}".</p>
+            <p className="text-gray-600 py-4 text-center">No sites match "{search.trim()}".</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md">
               {shown.map(property => (

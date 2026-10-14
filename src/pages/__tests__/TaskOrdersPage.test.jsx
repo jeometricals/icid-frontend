@@ -119,7 +119,7 @@ describe('TaskOrdersPage — who can do what', () => {
   it('keeps a demo user to reading: no Add, no Actions column, and a note saying why', async () => {
     await renderListed(DEMO_USER)
     expect(screen.queryByRole('button', { name: 'Add task order' })).not.toBeInTheDocument()
-    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent)).toEqual(['Number', 'Issued', 'Properties'])
+    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent)).toEqual(['Number', 'Issued', 'Sites'])
     expect(within(table()).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
   })
@@ -157,11 +157,11 @@ describe('TaskOrdersPage — the list', () => {
     expect(screen.getByRole('heading', { name: 'Task Orders — HWS0023' })).toBeInTheDocument()
     expect(api.listTaskOrders).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
-      .toEqual(['Number', 'Issued', 'Properties', 'Actions'])
+      .toEqual(['Number', 'Issued', 'Sites', 'Actions'])
     expect(within(rowOf('TO-001')).getAllByRole('cell').map(td => td.textContent).slice(0, 3))
-      .toEqual(['TO-001', 'Sep 14', '24 properties'])
+      .toEqual(['TO-001', 'Sep 14', '24 sites'])
     expect(within(rowOf('TO-002')).getAllByRole('cell').map(td => td.textContent).slice(0, 3))
-      .toEqual(['TO-002', '—', '1 property'])
+      .toEqual(['TO-002', '—', '1 site'])
   })
 
   it('links each number to its task order\'s page', async () => {
@@ -198,7 +198,7 @@ describe('TaskOrdersPage — adding and editing', () => {
       task_order_number: 'TO-003', issued_date: `${YEAR}-10-02`, estimate_notes: null,
     })
     expect(within(rowOf('TO-003')).getAllByRole('cell').map(td => td.textContent).slice(0, 3))
-      .toEqual(['TO-003', 'Oct 2', '0 properties'])
+      .toEqual(['TO-003', 'Oct 2', '0 sites'])
   })
 
   it('shows a duplicate number on the Number field and adds no row', async () => {

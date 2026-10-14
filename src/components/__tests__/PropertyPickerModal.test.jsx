@@ -55,13 +55,13 @@ describe('PropertyPickerModal', () => {
     expect(shownBbls()).toEqual(['4009990003'])
     await userEvent.clear(search())
     await userEvent.type(search(), 'nowhere')
-    expect(screen.getByText('No properties match "nowhere".')).toBeInTheDocument()
+    expect(screen.getByText('No sites match "nowhere".')).toBeInTheDocument()
   })
 
   it('selects several, and "Select all shown" ticks only the rows the search shows', async () => {
     await renderPicker()
     await userEvent.click(box('4001110001'))
-    expect(screen.getByRole('button', { name: 'Add 1 property' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add 1 site' })).toBeEnabled()
     await userEvent.type(search(), 'Rd')
     await userEvent.click(screen.getByRole('button', { name: 'Select all shown' }))
     expect(screen.getByRole('button', { name: 'Select all shown' })).toBeDisabled()
@@ -69,7 +69,7 @@ describe('PropertyPickerModal', () => {
     expect(box('4001110001')).toBeChecked()
     expect(box('4009990003')).toBeChecked()
     expect(box('4001230045')).not.toBeChecked()
-    expect(screen.getByRole('button', { name: 'Add 2 properties' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add 2 sites' })).toBeEnabled()
     await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
   })
@@ -86,7 +86,7 @@ describe('PropertyPickerModal', () => {
       return { ...TASK_ORDER, last: propertyId }
     })
     await userEvent.click(screen.getByRole('button', { name: 'Select all shown' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add 3 properties' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 3 sites' }))
 
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(api.bundleProperty.mock.calls).toEqual([[TASK_ORDER.id, ELM.id], [TASK_ORDER.id, MAIN.id], [TASK_ORDER.id, MAPLE.id]])
@@ -100,7 +100,7 @@ describe('PropertyPickerModal', () => {
       .mockResolvedValueOnce({ ...TASK_ORDER, last: ELM.id })
       .mockRejectedValueOnce(new Error('Cannot bundle a deleted property'))
     await userEvent.click(screen.getByRole('button', { name: 'Select all shown' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add 3 properties' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 3 sites' }))
 
     await waitFor(() => expect(onDone).toHaveBeenCalled())
     expect(api.bundleProperty).toHaveBeenCalledTimes(2)
@@ -118,7 +118,7 @@ describe('PropertyPickerModal', () => {
   it('shows a failed read with Retry', async () => {
     api.listProperties.mockRejectedValueOnce(new Error('Failed to fetch properties'))
     render(<PropertyPickerModal taskOrder={TASK_ORDER} onClose={vi.fn()} onDone={vi.fn()} />)
-    expect(await screen.findByText("Couldn't load the project's properties: Failed to fetch properties")).toBeInTheDocument()
+    expect(await screen.findByText("Couldn't load the project's sites: Failed to fetch properties")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('searchbox')).toBeInTheDocument()
   })

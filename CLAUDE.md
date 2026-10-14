@@ -446,9 +446,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     keys and backend fields keep the word. What the user reads says "site": "Site Info" for the list and its
     links, "site" / "sites" in buttons, dialogs, confirms, toasts, empty states and notes ("Add site", "Edit
     site", "Site type", "Delete site <bbl>?", "Site <bbl> deleted."). The column headings (BBL, Address, Type,
-    PIR, Added) are unchanged. Messages the backend words itself ("Property not found", its 409 details) still
-    say "property". The task-order pages' own wording ("Bundled properties", "Add properties", "24 properties")
-    hasn't been renamed yet.
+    PIR, Added) are unchanged. The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle site <bbl>?",
+    the picker), and the task orders list's column is "Sites". Messages the backend words itself ("Property not
+    found", "Cannot bundle a deleted property", its 409 details) still say "property" and are shown as worded:
+    the backend's entity is still a property, and they appear only on errors. Backlog: if the backend entity is
+    ever renamed to sites, update those details then (or have the frontend translate known backend wordings).
   - **Who does what.** Since S2 (as for task orders since S1) any member of the project reads, adds and edits
     them; only the destructive controls (Delete, Un-delete, Show deleted) are an admin's. A demo user reads only:
     no Add, no Actions column, and the note "Demo mode: sites are read-only." (the backend answers 403). The
@@ -536,7 +538,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     - An admin only: Delete (a soft delete), Un-delete and "Show deleted". For anyone else these are hidden, not
       disabled, and their list never asks for deleted task orders. A non-admin who opens a deleted task order by
       URL sees it read-only (the backend answers 400 to their edits on it).
-    - A demo user: read only (the backend's 403). No Add, Edit, Add properties or Unbundle, the list drops its
+    - A demo user: read only (the backend's 403). No Add, Edit, Add sites or Unbundle, the list drops its
       Actions column, and both pages say "Demo mode: task orders are read-only."
     - Someone not on the project: the backend's 403, shown as the page's load error with Retry, as on Progress.
   - **Service:** `services/taskOrders.js`: `listTaskOrders(projectId, { includeDeleted })`, `getTaskOrder`,
@@ -548,7 +550,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     returns to the dashboard. "Task Orders — <project_id>" (no project name, as on Progress); on its right a
     plain "Site Info" link (small construction-coloured text, not a button) to `/project/<id>/properties`, for
     everyone, demo users included, then "Add task order". The table, in the backend's order (by number): Number (a link to the task order's page), Issued
-    (`shortDate`, or a dash), Properties ("24 properties", "1 property") and Edit (and Delete, for an admin).
+    (`shortDate`, or a dash), Sites (`propertyCount`: "24 sites", "1 site") and Edit (and Delete, for an admin).
     "Show deleted", the muted deleted rows with Un-delete, the confirm dialogs, the toasts ("Task order <number>
     deleted." / "restored."), reading the list again after every change and the load error are as on the
     properties page. No task orders reads "No task orders yet. Click 'Add task order' to start." ("No task orders
@@ -564,28 +566,28 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     project under this URL is refused as "Task order not found in project <id>". "Task order <number>" with Edit
     (and Delete, for an admin); a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by
     <name>"; the name comes from `useUserNames`, and when that fails or doesn't have them the card gives the date
-    alone). Then "Bundled properties": "N properties bundled", `PropertiesTable` with Unbundle on each row, and
-    "Add properties". A BBL links to the property's page (`/project/<project_id>/properties/<id>`), which is open
-    to anyone on the project. Nothing bundled reads "No properties bundled yet. Click 'Add properties' to pick from this
+    alone). Then "Bundled sites": "N sites bundled", `PropertiesTable` with Unbundle on each row, and
+    "Add sites". A BBL links to the property's page (`/project/<project_id>/properties/<id>`), which is open
+    to anyone on the project. Nothing bundled reads "No sites bundled yet. Click 'Add sites' to pick from this
     project." Its Added column is when the property was added to the project: the response doesn't carry when it
     was bundled.
     - Edit uses the same dialog; Delete, Un-delete and Unbundle are each confirmed in `ConfirmDialog`, a refusal
       shows in the dialog, and the page then shows the task order the call returned (Unbundle answers 204, so
-      the page reads it again). Toasts: "Task order <number> deleted." / "restored.", "Property <bbl>
+      the page reads it again). Toasts: "Task order <number> deleted." / "restored.", "Site <bbl>
       unbundled."
     - **A deleted task order** reads Deleted (the number crossed out) and can't be changed: an admin gets only
-      Un-delete, anyone else nothing. Add properties and Unbundle are hidden (the backend refuses bundling into
+      Un-delete, anyone else nothing. Add sites and Unbundle are hidden (the backend refuses bundling into
       it). Un-deleting brings its bundle back.
     - A property soft-deleted after it was bundled stays in the bundle but is left out of `properties` and
       `property_count` by the backend, so it disappears from the page until it is un-deleted.
-  - **`PropertyPickerModal`** (`taskOrder`, `onClose`, `onDone`), from Add properties: reads the project's live
+  - **`PropertyPickerModal`** (`taskOrder`, `onClose`, `onDone`), from Add sites (its title too): reads the project's live
     properties (`listProperties`, which any member may) and leaves out those already in this task order. One
     checkbox row each (BBL, address, type). The search box keeps the rows whose BBL or address holds the text, any
     case. "Select all shown" ticks every row shown; a ticked row stays ticked while the search hides it, and Clear
-    selection unticks all. "Add N properties" bundles the ticked ones **one at a time** (never in parallel), in
+    selection unticks all. "Add N sites" bundles the ticked ones **one at a time** (never in parallel), in
     list order, and stops at the first refusal, so nothing after it is tried. Then the picker closes and
     `onDone({added, failed, taskOrder})` hands the page the count, the refusal (`{property, message}`) and the last
-    task order the backend returned; the page shows that and a toast: "Added 3 properties." or "Added 1 property.
+    task order the backend returned; the page shows that and a toast: "Added 3 sites." or "Added 1 site.
     Couldn't add <bbl>: <message> The rest weren't tried."
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
