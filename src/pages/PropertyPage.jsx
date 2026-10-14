@@ -2,7 +2,8 @@
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
  * on the project: a card with its BBL, address, type, notes and when it was added; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
- * as-built is signed; without one it reads "No PIR yet.". A member who isn't a demo user also gets
+ * as-built is signed, under its image (PirImageSection: the scanned sheet, uploaded, replaced or removed by a
+ * member); without one it reads "No PIR yet.". A member who isn't a demo user also gets
  * Edit on the property, and Add PIR or Edit PIR. The destructive controls are an admin's alone: Delete and Delete
  * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
@@ -26,6 +27,7 @@ import { propertyTypeLabel } from '../data/propertyTypes'
 import ConfirmDialog from '../components/ConfirmDialog'
 import FlagsSection from '../components/FlagsSection'
 import PirFormModal from '../components/PirFormModal'
+import PirImageSection from '../components/PirImageSection'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PropertyFormModal from '../components/PropertyFormModal'
 import StatusBadge from '../components/StatusBadge'
@@ -282,16 +284,19 @@ export default function PropertyPage() {
         </div>
 
         {livePir ? (
-          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
-            <Detail term="Inspector initials">{livePir.inspector_initials}</Detail>
-            <Detail term="Signed on">{shortDate(livePir.inspector_sign_date)}</Detail>
-            <Detail term="Digitized">{dateBy(livePir.digitized_at, nameOf(livePir.digitized_by))}</Detail>
-            <Detail term="As-built" wide>
-              {livePir.as_built_signed_at
-                ? `As-built signed${nameOf(livePir.as_built_signed_by) ? ` by ${nameOf(livePir.as_built_signed_by)}` : ''} on ${shortDate(livePir.as_built_signed_at)}`
-                : NOT_CONFIRMED_TEXT}
-            </Detail>
-          </dl>
+          <>
+            <PirImageSection pir={livePir} writer={canChange} onChanged={rereadPirs} />
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+              <Detail term="Inspector initials">{livePir.inspector_initials}</Detail>
+              <Detail term="Signed on">{shortDate(livePir.inspector_sign_date)}</Detail>
+              <Detail term="Digitized">{dateBy(livePir.digitized_at, nameOf(livePir.digitized_by))}</Detail>
+              <Detail term="As-built" wide>
+                {livePir.as_built_signed_at
+                  ? `As-built signed${nameOf(livePir.as_built_signed_by) ? ` by ${nameOf(livePir.as_built_signed_by)}` : ''} on ${shortDate(livePir.as_built_signed_at)}`
+                  : NOT_CONFIRMED_TEXT}
+              </Detail>
+            </dl>
+          </>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-gray-600">

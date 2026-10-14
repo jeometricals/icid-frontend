@@ -23,7 +23,7 @@ vi.mock('../../services/api', () => ({
   listPirs: vi.fn(), createPir: vi.fn(), updatePir: vi.fn(), softDeletePir: vi.fn(), undeletePir: vi.fn(),
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlag: vi.fn(), updateFlag: vi.fn(), softDeleteFlag: vi.fn(),
-  undeleteFlag: vi.fn(),
+  undeleteFlag: vi.fn(), getPirImageSignedUrl: vi.fn(), removePirImage: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -63,6 +63,7 @@ beforeEach(() => {
   })
   api.listPirs.mockImplementation(async () => structuredClone(pirs))
   api.listFlags.mockResolvedValue([])
+  api.getPirImageSignedUrl.mockResolvedValue({ signed_url: 'https://storage.example/sign/pir.png', expires_at: `${YEAR}-10-14T13:00:00`, scale: 15 })
   api.getContractItems.mockResolvedValue([])
   api.createPir.mockImplementation(async (id, values) => {
     if (live()) throw conflict()
@@ -230,6 +231,39 @@ describe('PropertyPage — the property', () => {
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
     expect(await within(pirCard()).findByRole('button', { name: 'Add PIR' })).toBeInTheDocument()
+  })
+})
+
+describe('PropertyPage — the PIR image', () => {
+  it("opens the PIR card with the image, above the PIR's details", async () => {
+    pirs = [pir(1, { source_image_url: 'pirs/x/image.png', source_image_scale: 15 })]
+    await renderLoaded()
+    const image = await within(pirCard()).findByRole('img', { name: 'PIR survey sheet' })
+    expect(api.getPirImageSignedUrl).toHaveBeenCalledWith(pirs[0].id)
+    expect(within(pirCard()).getByText('15 px/ft')).toBeInTheDocument()
+    const details = within(pirCard()).getByText('Inspector initials')
+    expect(image.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(pirCard()).getByRole('button', { name: 'Replace' })).toBeInTheDocument()
+  })
+
+  it('offers a member the upload when the PIR has no image', async () => {
+    pirs = [pir(1)]
+    await renderLoaded(TEST_USER)
+    expect(within(pirCard()).getByText('No PIR image yet.')).toBeInTheDocument()
+    expect(within(pirCard()).getByRole('button', { name: 'Upload PIR image' })).toBeInTheDocument()
+  })
+
+  it('gives a demo user the image with no actions', async () => {
+    pirs = [pir(1, { source_image_url: 'pirs/x/image.png', source_image_scale: 15 })]
+    await renderLoaded(DEMO_USER)
+    await within(pirCard()).findByRole('img', { name: 'PIR survey sheet' })
+    expect(within(pirCard()).queryByRole('button', { name: 'Replace' })).not.toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+  })
+
+  it('has no image section without a live PIR', async () => {
+    await renderLoaded()
+    expect(within(pirCard()).queryByText('No PIR image yet.')).not.toBeInTheDocument()
   })
 })
 
