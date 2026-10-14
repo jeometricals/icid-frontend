@@ -20,6 +20,7 @@ import AdminIdrsPage from './pages/AdminIdrsPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminProjectsPage from './pages/AdminProjectsPage'
 import AdminPayItemsPage from './pages/AdminPayItemsPage'
+import AdminPropertiesPage from './pages/AdminPropertiesPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
@@ -48,6 +49,7 @@ function AppRoutes() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/projects" element={<AdminProjectsPage />} />
           <Route path="/admin/projects/:projectId/pay-items" element={<AdminPayItemsPage />} />
+          <Route path="/admin/projects/:projectId/properties" element={<AdminPropertiesPage />} />
           <Route path="/project/:projectId" element={<ProjectDashboard />} />
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />

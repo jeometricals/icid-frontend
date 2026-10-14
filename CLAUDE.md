@@ -12,14 +12,14 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items and properties). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
-- `src/data/` — static/mock data (report type definitions, and `disciplines.js`: the discipline names the archive filters by).
+- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
@@ -425,7 +425,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
   backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
   for whatever a project lacks. Nothing on a row is editable. Each row's Actions cell has "Pay items"
-  (`/admin/projects/<project_id>/pay-items`) and "Manage roles" (`/admin/projects/<project_id>/roles`).
+  (`/admin/projects/<project_id>/pay-items`), "Properties" (`/admin/projects/<project_id>/properties`) and
+  "Manage roles" (`/admin/projects/<project_id>/roles`).
   "Create project" (right of the heading) opens `CreateProjectModal`: project ID, project name, description,
   borough (free text: there is no borough list) and registration code (optional). Save is off until the first
   four are non-blank; `createAdminProject` (`POST /v1/admin/projects`) sends them trimmed, a blank registration
@@ -436,6 +437,37 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   project has no status and is on nobody's project list until someone is given a role on it
   (`/admin/projects/<project_id>/roles`). A non-admin who opens the URL is told it is for admins; the backend
   returns 403 to them anyway.
+- **Properties (admin).** `/admin/projects/:projectId/properties` (`AdminPropertiesPage`), reached from
+  "Properties" on an `/admin/projects` row; Back returns there. The project's properties (the lots its work is
+  done at), kept by hand. A property is `{id, project_id, bbl, address, property_type, notes, created_at,
+  updated_at, created_by, deleted_at, deleted_by}`; `property_type` is one of `1_3_family` ("1-3 family"),
+  `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), listed with their labels in
+  `src/data/propertyTypes.js` (the backend's CHECK holds the same three; a new type needs it first).
+  - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })`, `getProperty`,
+    `createProperty(projectId, data)`, `updateProperty(propertyId, data)`, `softDeleteProperty` and
+    `undeleteProperty`. Reading is for anyone on the project (or an admin), every change is admin only;
+    `include_deleted` from a non-admin is ignored by the backend. `getProperty` isn't used by a page yet.
+  - **Load:** `listProperties` and `listAdminProjects` together; the second only gives the heading its project
+    name ("Properties — <project_id> <project_name>"). A failure of either is the load error with Retry.
+  - **The table** is in the backend's order (by address): BBL, address (the notes as a tooltip), type (its label),
+    added (`created_at` as "Sep 14", with the year when it isn't this one) and Edit / Delete. No properties reads
+    "No properties yet. Click 'Add property' to start."
+  - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add property" / "Edit property"): BBL, address
+    and "Property type" (a select of the three labels) required, notes optional. Save is off until the three are
+    in, and when editing until something changed; adding sends all four, editing only what changed (the backend
+    answers 400 to an empty PATCH). Text is trimmed and blank notes are `null` (which clears them). The page
+    passes the thrown error to the modal: a 409 reads "A property with this BBL already exists in this project."
+    above the BBL field (its `existing_property_id` isn't used yet), a 422's messages sit under the fields their
+    `loc` names, anything else (a blank or over-long value is the backend's 400) shows below the form as worded.
+    The form keeps what was typed. After a save the list is read again.
+  - **Show deleted** (a checkbox above the table, off to start) asks the backend again with
+    `?include_deleted=true`; the table stays on screen meanwhile. A deleted row is muted (`text-gray-400`), its
+    BBL crossed out beside a Deleted badge (the date as a tooltip), and has "Un-delete" instead of Edit / Delete.
+  - **Delete** (a soft delete; it frees the BBL) and **Un-delete** are each confirmed in `ConfirmDialog`, a refusal
+    shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success the list
+    is read again and a toast reads "Property <bbl> deleted." / "Property <bbl> restored." The backend takes a
+    second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
+  - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with
@@ -474,6 +506,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/quantities?from=&to=&cumulative=` (the Progress page: quantities and their budget
     roll-ups; for a user on the project, or an admin)
   - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
+  - Properties: `GET /v1/projects/{id}/properties?include_deleted=` (anyone on the project; `include_deleted` is
+    admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
+    `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (changes admin only;
+    body `{bbl, address, property_type, notes}`, all optional on a PATCH)
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
