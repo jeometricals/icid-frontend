@@ -2,10 +2,12 @@
  * A site's PIR workspace (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId/pir,
  * for anyone on the project: the PIR's scanned pages, one at a time. Prev / Next and "Page n of N" (also the [ and ]
  * keys) move between them, and the page shown is in the URL (?page=, replaced rather than pushed). Each page shows
- * at its rotation, with its scale ("15 px/ft", or "not set"). A writer (a member who isn't a demo user; while the
- * site is deleted only an admin) also gets Rotate (a quarter turn clockwise, saved on that page), Set scale (that
- * page only), Replace PIR (a new upload replaces every page) and Remove pages. With no pages the card prompts an
- * upload. The backend refuses anyone not on the project (403), which shows as the load error.
+ * at its rotation, with its scale ("15 px/ft", or "not set"), in the sketch workspace (SketchWorkspace: the shape
+ * toolbar, the page's flags drawn over it, the selected flag's panel, Calibrate, and every flag listed below). A
+ * writer (a member who isn't a demo user; while the site is deleted only an admin) can use Rotate (a quarter turn
+ * clockwise, saved on that page), Set scale (that page only), Replace PIR (a new upload replaces every page) and
+ * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
+ * backend refuses anyone not on the project (403), which shows as the load error.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -21,7 +23,7 @@ import PirStatusBadge from '../components/PirStatusBadge'
 import PirUploadModal, { UPLOAD_PROMPT } from '../components/PirUploadModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
-import RotatedPage from '../components/sketch/RotatedPage'
+import SketchWorkspace from '../components/sketch/SketchWorkspace'
 
 export const NO_PIR_TEXT = 'This site has no PIR yet. Add one on the site page first.'
 export const NO_PAGES_READ_ONLY = 'No PIR pages uploaded yet.'
@@ -238,31 +240,29 @@ export default function PirPage() {
               </button>
               <span className="text-sm text-gray-500 ml-3">Scale: {scaleText(page.scale_px_per_ft)}</span>
             </div>
-            {writer && (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={rotate} disabled={busy} className="btn-secondary inline-flex items-center space-x-2">
-                  <RotateCw className="h-4 w-4" />
-                  <span>Rotate</span>
-                </button>
-                <button type="button" onClick={() => setDialog('scale')} disabled={busy} className="btn-secondary inline-flex items-center space-x-2">
-                  <Ruler className="h-4 w-4" />
-                  <span>Set scale</span>
-                </button>
-                <button type="button" onClick={() => setDialog('upload')} disabled={busy} className="btn-secondary inline-flex items-center space-x-2">
-                  <Upload className="h-4 w-4" />
-                  <span>Replace PIR</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActionError(null); setDialog('remove') }}
-                  disabled={busy}
-                  className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Remove pages</span>
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2" title={writer ? undefined : 'Read-only'}>
+              <button type="button" onClick={rotate} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
+                <RotateCw className="h-4 w-4" />
+                <span>Rotate</span>
+              </button>
+              <button type="button" onClick={() => setDialog('scale')} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
+                <Ruler className="h-4 w-4" />
+                <span>Set scale</span>
+              </button>
+              <button type="button" onClick={() => setDialog('upload')} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
+                <Upload className="h-4 w-4" />
+                <span>Replace PIR</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActionError(null); setDialog('remove') }}
+                disabled={busy || !writer}
+                className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Remove pages</span>
+              </button>
+            </div>
           </div>
 
           {actionError && !dialog && <p role="alert" className="text-sm text-red-600 mb-4">{actionError}</p>}
@@ -273,7 +273,19 @@ export default function PirPage() {
               <button type="button" onClick={() => setAttempt(a => a + 1)} className="btn-primary">Reload pages</button>
             </div>
           ) : (
-            <RotatedPage key={page.pir_page_id} page={page} onImageError={() => setImageFailed(true)} />
+            <SketchWorkspace
+              key={pages.map(found => found.pir_page_id).join()}
+              pir={pir}
+              page={page}
+              pages={pages}
+              writer={writer}
+              onPageSaved={(saved) => {
+                replacePage(saved)
+                setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)
+              }}
+              onJump={goTo}
+              onImageError={() => setImageFailed(true)}
+            />
           )}
         </section>
       )}

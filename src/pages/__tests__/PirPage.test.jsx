@@ -15,6 +15,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     nextRotation,
     getProperty: vi.fn(), getPirByProperty: vi.fn(), listPirPages: vi.fn(), deletePirPages: vi.fn(),
     setPirPageRotation: vi.fn(), setPirPageScale: vi.fn(),
+    listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   }
 })
 vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
@@ -50,6 +51,8 @@ beforeEach(() => {
   api.setPirPageRotation.mockImplementation(async (id, rotation) => ({ ...pages.find(p => p.pir_page_id === id), rotation_deg: rotation }))
   api.setPirPageScale.mockImplementation(async (id, scale) => ({ ...pages.find(p => p.pir_page_id === id), scale_px_per_ft: scale }))
   api.deletePirPages.mockResolvedValue(undefined)
+  api.listFlags.mockResolvedValue([])
+  api.getContractItems.mockResolvedValue([])
 })
 
 function CurrentUrl() {
@@ -255,12 +258,12 @@ describe('PirPage — upload, replace and remove', () => {
 })
 
 describe('PirPage — read-only', () => {
-  it('gives a demo user the pages and navigation, with the note and no changes', async () => {
+  it('gives a demo user the pages and navigation, with the note and every change disabled', async () => {
     await renderLoaded({ user: DEMO_USER })
     expect(screen.getByText(PIR_DEMO_NOTE)).toBeInTheDocument()
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
-    for (const name of ['Rotate', 'Set scale', 'Replace PIR', 'Remove pages']) {
-      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    for (const name of ['Rotate', 'Set scale', 'Replace PIR', 'Remove pages', 'Calibrate', 'Rectangle', 'Arc']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled()
     }
     await userEvent.keyboard(']')
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
@@ -276,12 +279,36 @@ describe('PirPage — read-only', () => {
   it("keeps a deleted site's pages from a member, but not from an admin", async () => {
     property.deleted_at = '2026-10-02T09:00:00'
     await renderLoaded()
-    expect(screen.queryByRole('button', { name: 'Rotate' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rotate' })).toBeDisabled()
   })
 
   it('lets an admin change a deleted site\'s pages', async () => {
     property.deleted_at = '2026-10-02T09:00:00'
     await renderLoaded({ user: ADMIN })
-    expect(screen.getByRole('button', { name: 'Rotate' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rotate' })).toBeEnabled()
+  })
+})
+
+describe('PirPage — the sketch workspace', () => {
+  it("jumps from the flags list to a flag's page, in the URL, and selects it there", async () => {
+    api.listFlags.mockResolvedValue([{
+      id: 'f9', pir_id: PIR.id, pir_page_id: 'page-3', display_order: 7, shape: 'rectangle', dimensions: { L: 5, W: 5 },
+      sketch_x: 100, sketch_y: 100, rotation: 0, surveyed_mark: 'number_only', surveyed_is_assessable: true,
+      surveyed_non_assessable_reason: null, surveyed_thickness: '4in', added_in_field: false, pay_item_id: null,
+      computed_quantity: 25, reported_quantity: null, quantity_delta_reason: null,
+    }])
+    await renderLoaded()
+    const list = await screen.findByRole('region', { name: 'All flags' })
+    await userEvent.click(within(list).getAllByRole('row')[1])
+    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument()
+    expect(screen.getByTestId('url')).toHaveTextContent('?page=3')
+    expect(screen.getByRole('button', { name: 'Flag #7' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('complementary', { name: 'Flag #7' })).toBeInTheDocument()
+  })
+
+  it('keeps the shape tools off on a page without a scale', async () => {
+    await renderLoaded({ search: '?page=2' })
+    expect(screen.getByText('Scale: not set')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rectangle' })).toBeDisabled()
   })
 })

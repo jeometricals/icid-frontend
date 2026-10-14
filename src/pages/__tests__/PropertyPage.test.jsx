@@ -22,8 +22,7 @@ vi.mock('../../services/api', () => ({
   getProperty: vi.fn(), updateProperty: vi.fn(), softDeleteProperty: vi.fn(), undeleteProperty: vi.fn(),
   listPirs: vi.fn(), createPir: vi.fn(), updatePir: vi.fn(), softDeletePir: vi.fn(), undeletePir: vi.fn(),
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
-  listFlags: vi.fn(), getContractItems: vi.fn(), createFlag: vi.fn(), updateFlag: vi.fn(), softDeleteFlag: vi.fn(),
-  undeleteFlag: vi.fn(), listPirPages: vi.fn(),
+  listPirPages: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -62,9 +61,7 @@ beforeEach(() => {
     return structuredClone(property)
   })
   api.listPirs.mockImplementation(async () => structuredClone(pirs))
-  api.listFlags.mockResolvedValue([])
   api.listPirPages.mockResolvedValue([{ pir_page_id: 'p1', page_number: 1 }, { pir_page_id: 'p2', page_number: 2 }, { pir_page_id: 'p3', page_number: 3 }])
-  api.getContractItems.mockResolvedValue([])
   api.createPir.mockImplementation(async (id, values) => {
     if (live()) throw conflict()
     created += 1
@@ -267,23 +264,6 @@ describe('PropertyPage — the way into the sketch workspace', () => {
     await renderLoaded()
     expect(within(pirCard()).queryByRole('button', { name: 'Open sketch workspace' })).not.toBeInTheDocument()
     expect(api.listPirPages).not.toHaveBeenCalled()
-  })
-})
-
-describe('PropertyPage — flags', () => {
-  it('shows the live PIR\'s flags under its card, and asks for them by its id', async () => {
-    pirs = [pir(1)]
-    await renderLoaded()
-    expect(await screen.findByRole('region', { name: 'Flags' })).toBeInTheDocument()
-    expect(api.listFlags).toHaveBeenCalledWith(pirs[0].id, { includeDeleted: false })
-    expect(api.getContractItems).toHaveBeenCalledWith('HWS0023')
-  })
-
-  it('has no flags section without a live PIR', async () => {
-    pirs = [pir(1, { deleted_at: `${YEAR}-10-03T09:00:00` })]
-    await renderLoaded()
-    expect(screen.queryByRole('region', { name: 'Flags' })).not.toBeInTheDocument()
-    expect(api.listFlags).not.toHaveBeenCalled()
   })
 })
 

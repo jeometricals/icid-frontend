@@ -1,21 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createFlag, getFlag, listFlags, softDeleteFlag, undeleteFlag, updateFlag } from '../flags'
-import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { createFlagOnPage, deleteFlag, getFlag, listFlags, updateFlag } from '../flags'
+import { mockFetch, mockFetchNoContent, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
   vi.restoreAllMocks()
 })
 
 const PIR_ID = 'e0000000-0000-4000-8000-000000000001'
+const PAGE_ID = 'f0000000-0000-4000-8000-000000000001'
 const FLAG_ID = 'f1000000-0000-4000-8000-000000000001'
-const FLAG = { id: FLAG_ID, pir_id: PIR_ID, display_order: 1, shape: 'rectangle', dimensions: { L: 5, W: 5 },
-  computed_quantity: 25, reported_quantity: null, quantity: 25, deleted_at: null }
-const VALUES = { display_order: 1, shape: 'rectangle', dimensions: { L: 5, W: 5 }, surveyed_mark: 'cross',
-  surveyed_is_assessable: true, surveyed_non_assessable_reason: null, surveyed_thickness: '4in', added_in_field: false,
-  pay_item_id: null, reported_quantity: null, quantity_delta_reason: null }
+const FLAG = { id: FLAG_ID, pir_id: PIR_ID, pir_page_id: PAGE_ID, display_order: 1, shape: 'rectangle',
+  dimensions: { L: 5, W: 5 }, sketch_x: 100, sketch_y: 50, computed_quantity: 25, reported_quantity: null, quantity: 25 }
+const VALUES = { display_order: 1, shape: 'rectangle', dimensions: { L: 5, W: 5 }, sketch_x: 100, sketch_y: 50,
+  rotation: 0, surveyed_mark: 'number_only', surveyed_is_assessable: true, surveyed_thickness: '4in' }
 
-describe('listFlags', () => {
-  it('GETs the PIR\'s flags without include_deleted by default', async () => {
+describe('listFlags and getFlag', () => {
+  it('GETs the PIR\'s live flags across its pages', async () => {
     mockFetch(200, { data: [FLAG] })
     expect(await listFlags(PIR_ID)).toEqual([FLAG])
     expect(fetchUrl().pathname).toBe(`/v1/pirs/${PIR_ID}/flags`)
@@ -23,14 +23,6 @@ describe('listFlags', () => {
     expect(fetchInit().method).toBe('GET')
   })
 
-  it('asks for deleted ones too when includeDeleted is true', async () => {
-    mockFetch(200, { data: [] })
-    await listFlags(PIR_ID, { includeDeleted: true })
-    expect(fetchUrl().searchParams.get('include_deleted')).toBe('true')
-  })
-})
-
-describe('getFlag', () => {
   it('GETs one flag', async () => {
     mockFetch(200, { data: FLAG })
     expect(await getFlag(FLAG_ID)).toEqual(FLAG)
@@ -38,20 +30,18 @@ describe('getFlag', () => {
   })
 })
 
-describe('createFlag and updateFlag', () => {
-  it('POSTs a flag to the PIR', async () => {
+describe('createFlagOnPage, updateFlag and deleteFlag', () => {
+  it('POSTs a flag to the page', async () => {
     mockFetch(201, { data: FLAG })
-    expect(await createFlag(PIR_ID, VALUES)).toEqual(FLAG)
-    expect(fetchUrl().pathname).toBe(`/v1/pirs/${PIR_ID}/flags`)
+    expect(await createFlagOnPage(PAGE_ID, VALUES)).toEqual(FLAG)
+    expect(fetchUrl().pathname).toBe(`/v1/pir-pages/${PAGE_ID}/flags`)
     expect(fetchInit().method).toBe('POST')
     expect(JSON.parse(fetchInit().body)).toEqual(VALUES)
   })
 
-  it('throws a 422\'s messages with its body', async () => {
-    mockFetch(422, { detail: [{ loc: ['body'], msg: "Value error, surveyed_mark 'none' is only for a flag added in the field" }] })
-    await expect(createFlag(PIR_ID, VALUES)).rejects.toMatchObject({
-      status: 422, message: "Value error, surveyed_mark 'none' is only for a flag added in the field",
-    })
+  it('throws a 422 with its status', async () => {
+    mockFetch(422, { detail: [{ loc: ['body', 'dimensions', 'L'], msg: 'Input should be greater than 0' }] })
+    await expect(createFlagOnPage(PAGE_ID, VALUES)).rejects.toMatchObject({ status: 422 })
   })
 
   it('PATCHes what changed', async () => {
@@ -61,16 +51,11 @@ describe('createFlag and updateFlag', () => {
     expect(fetchInit().method).toBe('PATCH')
     expect(JSON.parse(fetchInit().body)).toEqual({ reported_quantity: null })
   })
-})
 
-describe('softDeleteFlag and undeleteFlag', () => {
-  it.each([
-    [softDeleteFlag, 'soft-delete'],
-    [undeleteFlag, 'undelete'],
-  ])('POSTs to the admin route (%#)', async (call, action) => {
-    mockFetch(200, { data: FLAG })
-    expect(await call(FLAG_ID)).toEqual(FLAG)
-    expect(fetchUrl().pathname).toBe(`/v1/flags/${FLAG_ID}/admin/${action}`)
-    expect(fetchInit().method).toBe('POST')
+  it('DELETEs a flag', async () => {
+    mockFetchNoContent()
+    expect(await deleteFlag(FLAG_ID)).toBeUndefined()
+    expect(fetchUrl().pathname).toBe(`/v1/flags/${FLAG_ID}`)
+    expect(fetchInit().method).toBe('DELETE')
   })
 })

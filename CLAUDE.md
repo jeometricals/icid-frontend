@@ -18,10 +18,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a flag's delete / un-delete wording and the next display order), `pageGeometry.js` (a PIR page's size on screen at its rotation; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/sketch/` holds the PIR workspace's pieces (`RotatedPage`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`; see PIR pages); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -529,7 +529,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
     (`pir`), or a status key (`status`), which the properties list reads off each row's `pir_status`
     (`pirStatusFromApi`: `none`, `dot_signed`, `as_built_signed`; anything else is none).
-- **PIR pages (the PIR workspace).** A PIR's scanned survey sheet, as pages: a PDF (any number of pages, up to the
+- **PIR pages (the PIR sketch workspace).** `PirPage` is a multi-page sketch workspace: a PIR's scanned survey
+  sheet, as pages, with its flags drawn over them. The pages: a PDF (any number of pages, up to the
   backend's cap, 15) or a PNG / JPEG (one page), each page rendered to PNG by the backend and stored in Supabase
   Storage (private bucket `pir-images`, 10 MB per upload). A page is `{pir_page_id, pir_id, page_number, image_url (a
   signed URL, an hour), image_url_expires_at, image_mime, width_px, height_px, scale_px_per_ft (or null),
@@ -553,77 +554,104 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     one on the site page first."
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
       the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
-      Each page shows at its rotation (`RotatedPage`) with "Scale: 15 px/ft" ("not set" without one). If its image
-      fails to load (an expired link), "Reload pages" reads them again.
+      Each page shows at its rotation in the sketch workspace (`SketchWorkspace`; see Flags) with "Scale: 15 px/ft"
+      ("not set" without one). If its image fails to load (an expired link), "Reload pages" reads them again.
     - **A writer** (a member who isn't a demo user; while the site is deleted only an admin) also gets Rotate (a
       quarter turn clockwise, PATCHed on that page; a refusal shows above the page), Set scale (`PageScaleModal`:
       a number above 0, "Applies to page {n}."), Replace PIR (the upload dialog, warning that the pages and their
       flags go) and Remove pages (confirmed). With no pages the card reads "Upload PIR (image or PDF, any number of
       pages)." with Upload PIR. After an upload the page lands on page 1 and toasts "PIR uploaded: 2 pages." /
-      "PIR replaced: ...". A demo user reads only, with "Demo mode: sites and PIRs are read-only."
+      "PIR replaced: ...". For a reader (a demo user, or anyone but an admin on a deleted site) these controls are
+      there but disabled; a demo user reads "Demo mode: sites and PIRs are read-only."
   - **`PirUploadModal`** (`pirId`, `replacing`, `onUploaded`, `onClose`; "Upload PIR" / "Replace PIR"): a file input
     (`.pdf,.png,.jpg,.jpeg`), the file's name and size, a size or type refusal at once, and an optional scale for
     every page (15 to start, at least 1; blank leaves it to each page). A picked image is previewed from the file.
     The spinner names the step: "Preparing upload...", "Uploading file...", then "Rendering..." (the page count only
     comes back with the response). A 413 reads "The file is too large: a PIR file is 10 MB at most.", anything else
     (a cap: too many pages, a page too large) as the backend worded it, and the dialog keeps the file and scale.
-  - **Rotation and coordinates.** Everything stored about a page's contents is in its native, unrotated pixel space
-    (x right and y down from the PNG's top-left corner, 0..`width_px` and 0..`height_px`). `RotatedPage` draws the
-    image in a box of the page's native proportions and turns that box with `transform: rotate(<deg>deg)` inside an
-    outer box of the rotated proportions (width and height swapped at 90 / 270; `lib/pageGeometry.js`
-    `rotatedSize`), so whatever is drawn in the box in native pixels turns with the image.
-- **Flags.** A PIR's flags: the sidewalk pieces its survey sheet marks, each a shape with dimensions in feet,
-  shown under the PIR card on the property page (`FlagsSection`, only while the property has a live PIR).
-  - **A flag** is `{id, pir_id, property_id, project_id, display_order, added_in_field, shape, dimensions,
-    sketch_x, sketch_y, rotation, surveyed_mark, surveyed_is_assessable, surveyed_non_assessable_reason,
+  - **Rotation and coordinates (the convention).** A flag's `sketch_x`, `sketch_y` and `rotation` are in the page's
+    native, unrotated pixel space: x right and y down from the PNG's top-left corner as uploaded, 0..`width_px` and
+    0..`height_px`, whatever the page's `rotation_deg`. `sketch_x` / `sketch_y` is the centre of the shape's bounding
+    box; `rotation` is the shape's own turn about it, in degrees clockwise. `RotatedPage` draws the image in a box of
+    the page's native proportions and turns that box with `transform: rotate(<deg>deg)` inside an outer box of the
+    rotated proportions (width and height swapped at 90 / 270; `lib/pageGeometry.js` `rotatedSize`). The SVG overlay
+    (`viewBox="0 0 width_px height_px"`) sits in the same box, so it gets the same transform as the image and stored
+    positions stay valid at every rotation. A pointer's position goes the other way through `toNativeCoords`
+    (relative to the outer box's centre, scaled back, turned back). Checked in a browser: overlay and image agree
+    to within 2 px at all four rotations.
+- **Flags.** A PIR's flags: the sidewalk pieces its survey sheet marks, each a shape with dimensions in feet, drawn
+  on one of its pages in the sketch workspace (`SketchWorkspace`, on `PirPage` under the page controls).
+  - **A flag** is `{id, pir_id, pir_page_id, property_id, project_id, display_order, added_in_field, shape,
+    dimensions, sketch_x, sketch_y, rotation, surveyed_mark, surveyed_is_assessable, surveyed_non_assessable_reason,
     surveyed_thickness, is_constructed, pay_item_id, computed_quantity, reported_quantity, quantity, is_overridden,
-    quantity_delta_reason, created_at, updated_at, created_by, deleted_at, deleted_by}`. The sketch fields,
-    rotation and `is_constructed` aren't shown or set yet.
-  - **Service:** `services/flags.js`: `listFlags(pirId, { includeDeleted })` (by display order), `getFlag`,
-    `createFlag(pirId, data)`, `updateFlag`, `softDeleteFlag` and `undeleteFlag`.
+    quantity_delta_reason, created_at, updated_at, created_by, deleted_at, deleted_by}`. `is_constructed` isn't
+    shown or set yet. Flags made before pages (R1b's form) were soft-deleted by migration 033 and can't come back.
+  - **Service:** `services/flags.js`: `listFlags(pirId)` (the live flags across the live pages, by display order),
+    `getFlag`, `createFlagOnPage(pirPageId, data)`, `updateFlag` and `deleteFlag` (a soft delete, for any member).
+    The admin's soft-delete / un-delete routes and the deprecated `POST /v1/pirs/{id}/flags` aren't called.
   - **Shapes and dimensions** (`dimensions`, feet, every length above zero), and the area the backend stores as
-    `computed_quantity` (square feet, to the cent, halves up). `lib/flagArea.js` `computeArea` uses the same
-    formulas for the form's preview:
+    `computed_quantity` (square feet, to the cent, halves up; the panel shows the backend's). `lib/flagArea.js`
+    `computeArea` has the same formulas:
     - rectangle `{L, W}`: L × W
     - trapezoid `{a, b, w}` (the parallel edges and the width between them): (a + b) / 2 × w
     - triangle `{a, b}` (a right triangle's legs): a × b / 2
     - polygon `{vertices: [{x, y}, ...]}` (three or more, in order, enclosing an area): the shoelace formula
-    - arc `{r, theta}` (a circular segment; θ in radians, above 0 and at most 2π): r² / 2 × (θ − sin θ). The form
+    - arc `{r, theta}` (a circular segment; θ in radians, above 0 and at most 2π): r² / 2 × (θ − sin θ). The panel
       takes θ in degrees and converts.
+    `lib/flagGeometry.js` draws them (`shapeOutline`, in feet: a trapezoid's a on top, a triangle's right angle at
+    the bottom left, an arc's chord at the bottom); `flagOutline` centres that on (sketch_x, sketch_y), scales it by
+    the page's px/ft and turns it by `rotation`. A page without a scale draws no flags and takes none.
   - **Classifications** (`src/data/flagEnums.js`, the backend's values with the app's labels): shape; surveyed mark
     (`number_only` "Number only", `cross` "Cross (X)", `cross_with_number` "Cross + number", `tick`, `none`);
     non-assessable reason (`tree_damage`, `city_tree`, `transition`, `no_driveway`, `hydrant`, `fronting_city`
     "Fronting city property", `utility`, `settlement`, `other`); thickness (`4in` '4"', `7in_as_4in` '7" as 4"',
     `7in` '7"'). The reason labels are the app's own wording of the backend's keys.
-  - **The survey's rules** (the backend's 422s; the form keeps Save off instead): an assessable flag has no
-    non-assessable reason and any other has one; the mark is `none` exactly when the flag was added in the field
-    (both ways: the form says so under "Added in field"); a reported quantity is above zero.
-  - **The table:** # (display order), shape, thickness, area (`computed_quantity`, "42.50 SF", and under it the
-    reported quantity with "(reported)" when there is one that differs), pay item ("item no — description" from
-    the project's contract items, which the section reads with the flags; "—" for none), marks (pills: the mark,
-    then "assessable" or "non-assessable (<reason>)") and Actions. No flags reads "No flags yet. Click 'Add flag'
-    to start." ("No flags." for anyone who can't add).
-  - **`FlagFormModal`** (`mode`, `initial`, `nextDisplayOrder`, `contractItems`; "Add flag" / "Edit flag"): display
-    order (one past the highest, to start), shape, the shape's dimension inputs (each shape keeps what was typed
-    for it, so switching back loses nothing; a polygon starts with three vertex rows, Add vertex / remove, never
-    fewer than three), "Computed area: 42.50 SF" as they change, surveyed mark, thickness, "Added in field",
-    "Assessable" (on to start) and, when off, the reason; the pay item (`ContractItemPicker`, optional); reported
-    quantity (optional, placeholder "Same as computed") and, when it differs from the computed area, the quantity
-    delta reason (optional). Save is off until display order, shape, valid dimensions, mark, thickness and the rules
-    hold, and when editing until something changed. Adding sends the whole flag; editing only what changed (a new
-    shape with its dimensions; a cleared pay item, reason or reported quantity as `null`, the last reverting to
-    the computed area). A 422 naming a field sits under it; one about the whole flag (a rule) and anything else
-    (a 400: a deleted PIR or property, a pay item of another project) below the form.
+  - **The survey's rules** (the backend's 422s; the panel only sends what keeps them): an assessable flag has no
+    non-assessable reason and any other has one; the mark is `none` exactly when the flag was added in the field;
+    a reported quantity is above zero.
+  - **`SketchWorkspace`** (`pir`, `page`, `pages`, `writer`, `onPageSaved`, `onJump`, `onImageError`; keyed by the
+    page ids, so a new upload reads afresh): reads `listFlags` and `getContractItems` once. Above the page,
+    `ShapeToolbar` and `CalibrateControl`; then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
+    shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`.
+    - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc) and the thickness
+      legend. Picking one arms it (the cursor is a crosshair over the page) until it is picked again or Esc. Off
+      without a scale ("Set this page's scale (or calibrate) to draw flags.") or while calibrating.
+    - **Placing:** a click on empty page with a shape armed POSTs `createFlagOnPage` with `newFlagValues`: the next
+      display order, the shape's default dimensions (`DEFAULT_DIMENSIONS`: a 5 × 5 ft rectangle, a 4 / 6 × 5 ft
+      trapezoid, 5 × 5 ft legs, a 5 ft square polygon, a half circle of 5 ft radius), centred on the click, rotation
+      0, `number_only`, assessable, `4in`, not added in field. The new flag is selected; the shape stays armed.
+    - **`SketchCanvas`**: the page (`RotatedPage`) and the SVG overlay. Each flag on the page is its outline in its
+      thickness's colour (`THICKNESS_COLORS`: 4" blue, 7" as 4" amber, 7" red) with its display order; the
+      selected one is heavier and dashed. Clicking a flag selects it; clicking empty page clears the selection.
+      Dragging a flag that is already selected moves only the overlay; letting go PATCHes `sketch_x` / `sketch_y`
+      (a refusal puts it back and says so above the page); Esc mid-drag puts it back. The Delete key (or the panel's
+      "Delete flag") deletes the selected flag at once, toast "Flag #<n> deleted.". `showCorners` marks (0, 0) and
+      (width, height), for checking alignment by eye.
+    - **`FlagPanel`** (`flag`, `contractItems`, `writer`, `onSaved`, `onDelete`; keyed by the flag): display order;
+      shape (a new one starts from its default dimensions, sent with them) and its dimensions (a polygon's vertex
+      rows, Add vertex / remove, never fewer than three; an arc's angle in degrees); rotation (degrees); surveyed
+      mark (radios: the four marks that aren't `none`); "Added in field" (sends `none` with it, and "Number only"
+      back when unticked); "Assessable" (unticked, the reason select must be picked before anything is sent);
+      surveyed thickness (radios); pay item (`ContractItemPicker`); the computed area; reported quantity (blank or
+      "Clear override" reverts to the computed area) and quantity delta reason. Each change waits 300 ms
+      (`SAVE_DELAY_MS`) for the next and they go in one PATCH; a pending one is sent when another flag is selected.
+      Nothing out of range is sent (a hint says why); a refusal reads "Couldn't save the flag: ..." at the top.
+    - **`CalibrateControl`**: "Calibrate" toggles the mode. The canvas takes two clicks (a click on a flag counts),
+      marks them and joins them with a thin line; then "Calibrate scale" asks for the distance in feet and sets the
+      page's scale to pixel distance / feet (`setPirPageScale`; the points are native pixels, so the rotation doesn't
+      matter). Esc or Cancel leaves it; a refusal stays in the dialog.
+    - **`FlagsFallbackList`** (R1b's `FlagsSection`, repurposed): every flag across the pages, read-only, by page
+      then display order: Page, #, Shape, Thickness, Pay item ("item no — description", "—" for none, "Not in the
+      catalog"), Area (computed), Reported. Clicking a row (or Enter) goes to its page (`?page=`) and selects it.
+      No flags reads "No flags yet."
   - **`ContractItemPicker`** (`items`, `value`, `onChange`): the picked contract item as "item no — description"
     with Change and Clear, or "No pay item" with Choose. Choose opens a panel with a search box (item no. or
     description, any case) and one entry per contract item, its budget code beside it: `pay_item_id` is a
     `contract_item_id`, and the same item no. under two budget codes is two contract items. (The report forms'
     `PayItemPicker` groups by item no., so it can't pick one contract item.)
-  - **Who does what:** any member of the project reads, adds and edits; an admin alone deletes and un-deletes
-    (each confirmed in `ConfirmDialog`, toast "Flag #<n> deleted." / "restored.") and has "Show deleted", which
-    lists soft-deleted flags muted, # struck, with Un-delete. A demo user reads only: no Add flag, no Actions
-    column. While the PIR or its property is deleted, Add flag and Edit are hidden for everyone (the backend
-    refuses anyone but an admin with a 400); an admin keeps Delete. Every change reads the flags again.
+  - **Who does what:** any member of the project reads, adds, edits, moves and deletes flags. A reader (a demo
+    user, or anyone but an admin while the site is deleted) sees the same workspace with the toolbar, Calibrate and
+    the panel disabled, no Delete flag, and neither drags nor deletes. There is no un-delete in the UI.
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -741,10 +769,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `DELETE /v1/pirs/{id}/pages` · `PATCH /v1/pir-pages/{id}/scale` · `PATCH /v1/pir-pages/{id}/rotation` (reading
     for anyone on the project, writes for anyone on it but a demo user; R1d's `GET` / `PATCH` / `DELETE
     /v1/pirs/{id}/image` are deprecated and not called)
-  - Flags: `GET /v1/pirs/{id}/flags?include_deleted=` · `POST /v1/pirs/{id}/flags` · `GET /v1/flags/{id}` ·
-    `PATCH /v1/flags/{id}` · `POST /v1/flags/{id}/admin/soft-delete` · `POST /v1/flags/{id}/admin/undelete`
-    (reading, adding and editing for anyone on the project, a demo user only reads; soft-delete and un-delete
-    admin only)
+  - Flags: `GET /v1/pirs/{id}/flags` (across the PIR's pages) · `POST /v1/pir-pages/{id}/flags` ·
+    `GET /v1/flags/{id}` · `PATCH /v1/flags/{id}` · `DELETE /v1/flags/{id}` (a soft delete) (reading for anyone on
+    the project; adding, editing and deleting for anyone on it but a demo user). Not called: the deprecated `POST
+    /v1/pirs/{id}/flags` and the admin's `/admin/soft-delete` and `/admin/undelete`.
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)
