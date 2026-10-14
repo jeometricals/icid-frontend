@@ -19,11 +19,11 @@ const YEAR = new Date().getFullYear()
 const property = (number, bbl, address, property_type, extra = {}) => ({
   id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', bbl, address, property_type,
   notes: null, created_at: `${YEAR}-09-14T12:00:00`, updated_at: `${YEAR}-09-14T12:00:00`, created_by: ADMIN.uuid,
-  deleted_at: null, deleted_by: null, ...extra,
+  deleted_at: null, deleted_by: null, pir_status: 'none', ...extra,
 })
 const LISTED = [
   property(1, '4001230045', '12 Main St', '1_3_family'),
-  property(2, '4001230099', '40 Oak Ave', '4_plus_family'),
+  property(2, '4001230099', '40 Oak Ave', '4_plus_family', { pir_status: 'dot_signed' }),
 ]
 const byAddress = (a, b) => a.address.localeCompare(b.address)
 
@@ -110,15 +110,27 @@ describe('AdminPropertiesPage — who sees it', () => {
 })
 
 describe('AdminPropertiesPage — the list', () => {
-  it('heads the page with the project and lists BBL, address, type label and added date', async () => {
+  it('heads the page with the project and lists BBL, address, type label, PIR status and added date', async () => {
     await renderListed()
     expect(screen.getByRole('heading', { name: 'Properties — HWS0023 S/W Queens 2025' })).toBeInTheDocument()
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
-      .toEqual(['BBL', 'Address', 'Type', 'Added', 'Actions'])
+      .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added', 'Actions'])
     const cells = within(rowOf('4001230045')).getAllByRole('cell').map(td => td.textContent)
-    expect(cells.slice(0, 4)).toEqual(['4001230045', '12 Main St', '1-3 family', 'Sep 14'])
+    expect(cells.slice(0, 5)).toEqual(['4001230045', '12 Main St', '1-3 family', '—', 'Sep 14'])
     expect(rowOf('4001230099')).toHaveTextContent('4+ family / commercial')
+  })
+
+  it.each([
+    ['no live PIR', 'none', '—'],
+    ['a PIR signed by DOT', 'dot_signed', 'Signed by DOT'],
+    ['a PIR with the as-built signed', 'as_built_signed', 'As-built signed'],
+  ])("shows a row with %s by its list's pir_status", async (_, status, label) => {
+    const bbl = server[1].bbl
+    server[1].pir_status = status
+    await renderListed()
+    const pirCell = within(rowOf(bbl)).getAllByRole('cell')[3]
+    expect(pirCell).toHaveTextContent(label)
   })
 
   it("links each BBL to the property's page", async () => {

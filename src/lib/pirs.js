@@ -14,6 +14,14 @@ export function pirStatus(pir) {
   return pir.as_built_signed_at ? 'asBuiltSigned' : 'dotSigned'
 }
 
+// The property list's pir_status, as the backend spells it, against the keys above
+const API_PIR_STATUS = { none: 'none', dot_signed: 'dotSigned', as_built_signed: 'asBuiltSigned' }
+
+/** The status key for a property list row's pir_status; a missing or unknown one reads as none. */
+export function pirStatusFromApi(value) {
+  return API_PIR_STATUS[value] ?? 'none'
+}
+
 // A PIR's two confirmed actions: the call, the words of the dialog and of the toast once it went through
 export const PIR_ACTIONS = {
   delete: {

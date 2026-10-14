@@ -2,21 +2,26 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { shortDate } from '../lib/shortDate'
+import { pirStatusFromApi } from '../lib/pirs'
 import StatusBadge from './StatusBadge'
+import PirStatusBadge from './PirStatusBadge'
 
 /**
  * A table of properties: BBL (a link to the property's page), address (the notes as a tooltip), type (its
- * label), added (when the property was added to the project) and an Actions cell the caller fills. A soft-deleted property is muted, its BBL crossed
- * out beside a Deleted badge (the date as a tooltip). Rows are in the order given.
- * Props: properties, renderActions(property) (the Actions cell's content).
+ * label), PIR (when asked for: the row's pir_status as a PirStatusBadge), added (when the property was added to the
+ * project) and an Actions cell the caller fills. A soft-deleted property is muted, its BBL crossed out beside a
+ * Deleted badge (the date as a tooltip). Rows are in the order given.
+ * Props: properties, renderActions(property) (the Actions cell's content), showPirStatus (off by default: only the
+ * project's property list carries pir_status).
  */
-export default function PropertiesTable({ properties, renderActions }) {
+export default function PropertiesTable({ properties, renderActions, showPirStatus = false }) {
+  const headings = ['BBL', 'Address', 'Type', ...(showPirStatus ? ['PIR'] : []), 'Added', 'Actions']
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            {['BBL', 'Address', 'Type', 'Added', 'Actions'].map(heading => (
+            {headings.map(heading => (
               <th
                 key={heading}
                 scope="col"
@@ -50,6 +55,11 @@ export default function PropertiesTable({ properties, renderActions }) {
                 <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
                   {propertyTypeLabel(row.property_type)}
                 </td>
+                {showPirStatus && (
+                  <td className="px-6 py-4 text-sm whitespace-nowrap">
+                    <PirStatusBadge status={pirStatusFromApi(row.pir_status)} />
+                  </td>
+                )}
                 <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
                   {shortDate(row.created_at)}
                 </td>

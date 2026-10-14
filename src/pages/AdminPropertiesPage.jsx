@@ -182,6 +182,7 @@ export default function AdminPropertiesPage() {
             ) : (
               <PropertiesTable
                 properties={properties}
+                showPirStatus
                 renderActions={row => (isDeleted(row) ? (
                   <button
                     type="button"
