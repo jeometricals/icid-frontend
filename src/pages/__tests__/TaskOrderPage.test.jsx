@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminTaskOrderPage, { EMPTY_TEXT, addedMessage } from '../AdminTaskOrderPage'
+import TaskOrderPage, { DEMO_NOTE, EMPTY_TEXT, addedMessage } from '../TaskOrderPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
@@ -26,7 +26,7 @@ const ELM = property(3, '4001110001', '7 Elm Pl', 'expedited')
 const GONE = property(4, '4007770007', '1 Gone Ct', '1_3_family', { deleted_at: `${YEAR}-10-01T09:00:00` })
 
 vi.mock('../../services/api', () => ({
-  getTaskOrder: vi.fn(), listAdminUsers: vi.fn(), updateTaskOrder: vi.fn(), softDeleteTaskOrder: vi.fn(),
+  getTaskOrder: vi.fn(), listAdminUsers: vi.fn(), listUsers: vi.fn(), updateTaskOrder: vi.fn(), softDeleteTaskOrder: vi.fn(),
   undeleteTaskOrder: vi.fn(), unbundleProperty: vi.fn(), bundleProperty: vi.fn(), listProperties: vi.fn(),
 }))
 
@@ -49,6 +49,7 @@ beforeEach(() => {
   properties = [MAIN, OAK, ELM, GONE]
   api.getTaskOrder.mockImplementation(async () => detail())
   api.listAdminUsers.mockResolvedValue([ADMIN])
+  api.listUsers.mockResolvedValue([{ user_id: ADMIN.uuid, email: ADMIN.email, first_name: 'Ada', last_name: 'Admin' }])
   api.listProperties.mockImplementation(async () => structuredClone(properties.filter(row => !row.deleted_at)))
   api.updateTaskOrder.mockImplementation(async (id, values) => {
     record = { ...record, ...values }
@@ -78,9 +79,9 @@ function CurrentUrl() {
 function renderPage(user = ADMIN) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={[`/admin/task-orders/${TASK_ORDER_ID}`]}>
+    <MemoryRouter initialEntries={[`/project/HWS0023/task-orders/${TASK_ORDER_ID}`]}>
       <Routes>
-        <Route path="/admin/task-orders/:taskOrderId" element={<AdminTaskOrderPage />} />
+        <Route path="/project/:projectId/task-orders/:taskOrderId" element={<TaskOrderPage />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>
@@ -98,15 +99,77 @@ const rowOf = (bbl) => within(bundled()).getByText(bbl).closest('tr')
 const queryRowOf = (bbl) => within(bundled()).queryByText(bbl)?.closest('tr') ?? null
 const dialog = () => screen.getByRole('dialog')
 
-describe('AdminTaskOrderPage — who sees it', () => {
-  it.each([['a regular user', TEST_USER], ['a demo user', DEMO_USER]])('tells %s it is for admins and asks nothing', (_, user) => {
-    renderPage(user)
-    expect(screen.getByText('Only an admin can manage task orders.')).toBeInTheDocument()
-    expect(api.getTaskOrder).not.toHaveBeenCalled()
+describe('TaskOrderPage — who can do what', () => {
+  it("lets a project member who isn't an admin edit, bundle and unbundle, but not delete", async () => {
+    await renderLoaded(TEST_USER)
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    // The member's name list is GET /v1/users/, not the admin's
+    await waitFor(() => expect(within(details()).getByText('Created').nextSibling).toHaveTextContent('by Ada Admin'))
+    expect(api.listUsers).toHaveBeenCalled()
+    expect(api.listAdminUsers).not.toHaveBeenCalled()
+    // The property page is the admin's, so a member's BBLs aren't links
+    expect(within(bundled()).queryByRole('link')).not.toBeInTheDocument()
+
+    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Unbundle' }))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
+    await waitFor(() => expect(queryRowOf('4001230045')).toBeNull())
+    expect(api.unbundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, MAIN.id)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add properties' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: /4001110001/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 1 property' }))
+    await waitFor(() => expect(queryRowOf('4001110001')).not.toBeNull())
+    expect(api.bundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, ELM.id)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await userEvent.clear(screen.getByLabelText('Number'))
+    await userEvent.type(screen.getByLabelText('Number'), 'TO-001B')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('heading', { name: 'Task order TO-001B' })).toBeInTheDocument()
+  })
+
+  it('gives an admin Delete, and BBLs that link to the property page', async () => {
+    await renderLoaded()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(within(rowOf('4001230045')).getByRole('link', { name: '4001230045' }))
+      .toHaveAttribute('href', `/admin/properties/${MAIN.id}`)
+  })
+
+  it('shows a member a deleted task order with nothing to change and no Un-delete', async () => {
+    record = { ...record, deleted_at: `${YEAR}-10-02T09:00:00` }
+    await renderLoaded(TEST_USER)
+    expect(screen.getByRole('heading', { name: /Task order TO-001/ })).toHaveTextContent('Deleted')
+    for (const name of ['Edit', 'Delete', 'Un-delete', 'Add properties', 'Unbundle']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+  })
+
+  it('keeps a demo user to reading, with a note saying why, and reads no names', async () => {
+    await renderLoaded(DEMO_USER)
+    for (const name of ['Edit', 'Delete', 'Add properties', 'Unbundle']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
+    expect(rowOf('4001230045')).toBeInTheDocument()
+    expect(api.listUsers).not.toHaveBeenCalled()
+    expect(api.listAdminUsers).not.toHaveBeenCalled()
+  })
+
+  it("shows the backend's refusal of someone not on the project as the load error", async () => {
+    api.getTaskOrder.mockRejectedValueOnce(Object.assign(new Error('Not a member of this project'), { status: 403 }))
+    renderPage(TEST_USER)
+    expect(await screen.findByText("Couldn't load the task order: Not a member of this project")).toBeInTheDocument()
+  })
+
+  it("won't show a task order of another project under this one's URL", async () => {
+    record = { ...record, project_id: 'SE384' }
+    renderPage()
+    expect(await screen.findByText("Couldn't load the task order: Task order not found in project HWS0023")).toBeInTheDocument()
   })
 })
 
-describe('AdminTaskOrderPage — the task order', () => {
+describe('TaskOrderPage — the task order', () => {
   it('shows the number, the issued date, the estimate notes and who created it when', async () => {
     await renderLoaded()
     expect(api.getTaskOrder).toHaveBeenCalledWith(TASK_ORDER_ID)
@@ -131,10 +194,16 @@ describe('AdminTaskOrderPage — the task order', () => {
     expect(within(details()).getByText('Estimate notes').nextSibling).toHaveTextContent('—')
   })
 
-  it('goes back to the project\'s task orders', async () => {
+  it("goes back to the project's task orders", async () => {
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Task orders — HWS0023' }))
-    expect(screen.getByTestId('url')).toHaveTextContent('/admin/projects/HWS0023/task-orders')
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Task Orders' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/task-orders')
+  })
+
+  it('has Go to Project Page beside Back', async () => {
+    await renderLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Go to Project Page' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(/^\/project\/HWS0023$/)
   })
 
   it('shows a load failure with Retry', async () => {
@@ -177,7 +246,7 @@ describe('AdminTaskOrderPage — the task order', () => {
   })
 })
 
-describe('AdminTaskOrderPage — bundled properties', () => {
+describe('TaskOrderPage — bundled properties', () => {
   it('lists the bundled properties with a count, and hides a soft-deleted one', async () => {
     await renderLoaded()
     expect(within(bundled()).getByText('2 properties bundled')).toBeInTheDocument()

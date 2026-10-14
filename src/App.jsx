@@ -13,6 +13,8 @@ import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
 import ProgressPage from './pages/ProgressPage'
+import TaskOrderPage from './pages/TaskOrderPage'
+import TaskOrdersPage from './pages/TaskOrdersPage'
 import IDRPage from './pages/IDRPage'
 import ReviewQueuePage from './pages/ReviewQueuePage'
 import ProjectRolesPage from './pages/ProjectRolesPage'
@@ -22,8 +24,6 @@ import AdminProjectsPage from './pages/AdminProjectsPage'
 import AdminPayItemsPage from './pages/AdminPayItemsPage'
 import AdminPropertiesPage from './pages/AdminPropertiesPage'
 import AdminPropertyPage from './pages/AdminPropertyPage'
-import AdminTaskOrderPage from './pages/AdminTaskOrderPage'
-import AdminTaskOrdersPage from './pages/AdminTaskOrdersPage'
 import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
@@ -54,12 +54,12 @@ function AppRoutes() {
           <Route path="/admin/projects/:projectId/pay-items" element={<AdminPayItemsPage />} />
           <Route path="/admin/projects/:projectId/properties" element={<AdminPropertiesPage />} />
           <Route path="/admin/properties/:propertyId" element={<AdminPropertyPage />} />
-          <Route path="/admin/projects/:projectId/task-orders" element={<AdminTaskOrdersPage />} />
-          <Route path="/admin/task-orders/:taskOrderId" element={<AdminTaskOrderPage />} />
           <Route path="/project/:projectId" element={<ProjectDashboard />} />
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
           <Route path="/project/:projectId/progress" element={<ProgressPage />} />
+          <Route path="/project/:projectId/task-orders" element={<TaskOrdersPage />} />
+          <Route path="/project/:projectId/task-orders/:taskOrderId" element={<TaskOrderPage />} />
           <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />
           <Route path="/project/:projectId/idr/:idrId/general/:reportId" element={<GeneralReportPage />} />
           <Route path="/project/:projectId/idr/:idrId/swcb/:reportId" element={<SWCBReportPage />} />

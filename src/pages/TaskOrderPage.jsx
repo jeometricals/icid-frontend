@@ -1,12 +1,15 @@
 /**
- * One task order (route param :taskOrderId), at /admin/task-orders/:taskOrderId. Admins only: its number with
- * Edit and Delete, a card with its issued date, estimate notes and who created it when, and its bundled
- * properties (those not deleted, by address) with Unbundle on each and "Add properties", which opens a picker of
- * the project's other properties. Edit shares the list page's dialog; Delete (a soft delete) and Unbundle are
- * confirmed first. A deleted task order reads Deleted, has only "Un-delete", and its bundle can't be changed (the
- * backend refuses bundling into it). After each change the page shows the task order the backend returned, and a
- * delete, un-delete, unbundle or batch of additions is announced in a toast. Back returns to the project's task
- * orders. Anyone who isn't an admin is told so instead.
+ * One task order of a project (route params :projectId and :taskOrderId), at
+ * /project/:projectId/task-orders/:taskOrderId. For anyone on the project: its number, a card with its issued date,
+ * estimate notes and who created it when, and its bundled properties (those not deleted, by address). A member
+ * who isn't a demo user also gets Edit, Unbundle on each property and "Add properties", which opens a picker of
+ * the project's other properties; Delete (a soft delete) is an admin's alone. Edit shares the list page's dialog;
+ * Delete and Unbundle are confirmed first. A deleted task order reads Deleted and can't be changed: an admin gets
+ * only "Un-delete", anyone else nothing (the backend refuses them). After each change the page shows the task
+ * order the backend returned, and a delete, un-delete, unbundle or batch of additions is announced in a toast. A
+ * BBL links to the property's page for an admin only, since that page is theirs. Back returns to the project's
+ * task orders; "Go to Project Page" sits beside it. The backend refuses anyone not on the project (403), which
+ * shows as the load error.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -19,6 +22,7 @@ import { shortDate } from '../lib/shortDate'
 import { TASK_ORDER_ACTIONS, propertyCount } from '../lib/taskOrders'
 import { useUserNames } from '../lib/useUserNames'
 import ConfirmDialog from '../components/ConfirmDialog'
+import GoToProjectButton from '../components/GoToProjectButton'
 import PropertiesTable from '../components/PropertiesTable'
 import PropertyPickerModal from '../components/PropertyPickerModal'
 import StatusBadge from '../components/StatusBadge'
@@ -42,11 +46,14 @@ const unbundleAction = {
   done: row => `Property ${row.bbl} unbundled.`,
 }
 
-export default function AdminTaskOrderPage() {
-  const { taskOrderId } = useParams()
+export const DEMO_NOTE = 'Demo mode: task orders are read-only.'
+
+export default function TaskOrderPage() {
+  const { projectId, taskOrderId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const admin = isAdmin(user)
+  const writer = !user?.is_demo // the backend keeps demo users read-only on task orders
 
   const [taskOrder, setTaskOrder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -63,20 +70,24 @@ export default function AdminTaskOrderPage() {
   const [refreshError, setRefreshError] = useState(null) // a change worked but the task order couldn't be read again
 
   useEffect(() => {
-    if (!admin) return
     let ignore = false
     setLoading(true)
     setLoadError(null)
     setRefreshError(null)
     getTaskOrder(taskOrderId)
-      .then(found => { if (!ignore) setTaskOrder(found) })
+      .then(found => {
+        if (ignore) return
+        // A task order of another project, reached by an edited URL, isn't this project's to show
+        if (found.project_id !== projectId) setLoadError(`Task order not found in project ${projectId}`)
+        else setTaskOrder(found)
+      })
       .catch(err => { if (!ignore) setLoadError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [admin, taskOrderId, attempt])
+  }, [projectId, taskOrderId, attempt])
 
   // The creator's name; until it is found, the card gives the date alone
-  const nameOf = useUserNames(admin)
+  const nameOf = useUserNames(user)
 
   const open = (show) => {
     setActionError(null)
@@ -135,29 +146,18 @@ export default function AdminTaskOrderPage() {
     if (outcome.taskOrder) setTaskOrder(outcome.taskOrder)
   }
 
-  const backTo = taskOrder ? `/admin/projects/${taskOrder.project_id}/task-orders` : '/admin/projects'
   const back = (
-    <button
-      onClick={() => navigate(backTo)}
-      className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 mb-6"
-    >
-      <ArrowLeft className="h-5 w-5" />
-      <span className="font-medium">{taskOrder ? `Back to Task orders — ${taskOrder.project_id}` : 'Back to All Projects (Admin)'}</span>
-    </button>
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6">
+      <button
+        onClick={() => navigate(`/project/${projectId}/task-orders`)}
+        className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span className="font-medium">Back to Task Orders</span>
+      </button>
+      <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />
+    </div>
   )
-
-  if (!admin) {
-    return (
-      <div className="flex-1 bg-gray-50">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {back}
-          <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-            Only an admin can manage task orders.
-          </div>
-        </main>
-      </div>
-    )
-  }
 
   if (loading && !taskOrder) {
     return (
@@ -182,6 +182,7 @@ export default function AdminTaskOrderPage() {
   }
 
   const deleted = Boolean(taskOrder.deleted_at)
+  const changeable = writer && !deleted // a deleted task order is the admin's to un-delete, and nobody's to change
   const creatorName = nameOf(taskOrder.created_by)
   const properties = taskOrder.properties
 
@@ -200,32 +201,35 @@ export default function AdminTaskOrderPage() {
             )}
           </h2>
           <div className="flex flex-wrap gap-3">
-            {deleted ? (
+            {deleted && admin && (
               <button type="button" onClick={() => open(() => setPending({ kind: 'undelete' }))} className="btn-primary">
                 Un-delete
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => open(() => setEditing(true))}
-                  className="btn-secondary inline-flex items-center space-x-2"
-                >
-                  <Pencil className="h-4 w-4" />
-                  <span>Edit</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => open(() => setPending({ kind: 'delete' }))}
-                  className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete</span>
-                </button>
-              </>
+            )}
+            {changeable && (
+              <button
+                type="button"
+                onClick={() => open(() => setEditing(true))}
+                className="btn-secondary inline-flex items-center space-x-2"
+              >
+                <Pencil className="h-4 w-4" />
+                <span>Edit</span>
+              </button>
+            )}
+            {!deleted && admin && (
+              <button
+                type="button"
+                onClick={() => open(() => setPending({ kind: 'delete' }))}
+                className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete</span>
+              </button>
             )}
           </div>
         </div>
+
+        {!writer && <p className="text-sm text-gray-600 mb-4">{DEMO_NOTE}</p>}
 
         {refreshError && (
           <p role="alert" className="text-sm text-red-600 mb-4">
@@ -256,7 +260,7 @@ export default function AdminTaskOrderPage() {
         <section aria-labelledby="bundled-properties-heading">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
             <h3 id="bundled-properties-heading" className="text-lg font-semibold text-gray-900">Bundled properties</h3>
-            {!deleted && (
+            {changeable && (
               <button
                 type="button"
                 onClick={() => open(() => setPicking(true))}
@@ -275,7 +279,8 @@ export default function AdminTaskOrderPage() {
               <p className="text-sm text-gray-600 mb-3">{propertyCount(properties.length)} bundled</p>
               <PropertiesTable
                 properties={properties}
-                renderActions={property => (deleted ? <span className="text-gray-400">—</span> : (
+                linkToProperty={admin}
+                renderActions={property => (!changeable ? <span className="text-gray-400">—</span> : (
                   <button
                     type="button"
                     onClick={() => open(() => setPending({ kind: 'unbundle', property }))}

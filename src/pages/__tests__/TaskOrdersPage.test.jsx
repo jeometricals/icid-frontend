@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminTaskOrdersPage, { EMPTY_TEXT } from '../AdminTaskOrdersPage'
+import TaskOrdersPage, { DEMO_NOTE, EMPTY_TEXT, EMPTY_TEXT_READ_ONLY } from '../TaskOrdersPage'
 import { NUMBER_TAKEN } from '../../components/TaskOrderFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
@@ -13,7 +13,6 @@ import { DEMO_USER, TEST_USER } from '../../test/users'
 // ---------------------------------------------------------------------------
 
 const ADMIN = { ...TEST_USER, role: 'admin' }
-const PROJECTS = [{ project_id: 'HWS0023', project_name: 'S/W Queens 2025' }]
 const YEAR = new Date().getFullYear()
 
 const taskOrder = (number, task_order_number, issued_date, property_count, extra = {}) => ({
@@ -28,7 +27,7 @@ const LISTED = [
 const byNumber = (a, b) => a.task_order_number.localeCompare(b.task_order_number)
 
 vi.mock('../../services/api', () => ({
-  listTaskOrders: vi.fn(), listAdminProjects: vi.fn(), createTaskOrder: vi.fn(), updateTaskOrder: vi.fn(),
+  listTaskOrders: vi.fn(), createTaskOrder: vi.fn(), updateTaskOrder: vi.fn(),
   softDeleteTaskOrder: vi.fn(), undeleteTaskOrder: vi.fn(),
 }))
 
@@ -42,7 +41,6 @@ let server
 beforeEach(() => {
   vi.clearAllMocks()
   server = structuredClone(LISTED)
-  api.listAdminProjects.mockResolvedValue(PROJECTS)
   api.listTaskOrders.mockImplementation(async (projectId, { includeDeleted = false } = {}) => (
     structuredClone(server.filter(row => includeDeleted || live(row)))
   ))
@@ -73,9 +71,9 @@ function CurrentUrl() {
 function renderPage(user = ADMIN) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={['/admin/projects/HWS0023/task-orders']}>
+    <MemoryRouter initialEntries={['/project/HWS0023/task-orders']}>
       <Routes>
-        <Route path="/admin/projects/:projectId/task-orders" element={<AdminTaskOrdersPage />} />
+        <Route path="/project/:projectId/task-orders" element={<TaskOrdersPage />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>
@@ -92,18 +90,63 @@ async function renderListed(user) {
   await screen.findByRole('table')
 }
 
-describe('AdminTaskOrdersPage — who sees it', () => {
-  it.each([['a regular user', TEST_USER], ['a demo user', DEMO_USER]])('tells %s it is for admins and asks nothing', (_, user) => {
-    renderPage(user)
-    expect(screen.getByText('Only an admin can manage task orders.')).toBeInTheDocument()
-    expect(api.listTaskOrders).not.toHaveBeenCalled()
+describe('TaskOrdersPage — who can do what', () => {
+  it("lets a project member who isn't an admin list, add and edit, but not delete or see deleted ones", async () => {
+    await renderListed(TEST_USER)
+    expect(api.listTaskOrders).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
+    expect(screen.getByRole('button', { name: 'Add task order' })).toBeInTheDocument()
+    expect(within(rowOf('TO-001')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(table()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Show deleted' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add task order' }))
+    await userEvent.type(screen.getByLabelText('Number'), 'TO-003')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(queryRowOf('TO-003')).not.toBeNull())
+
+    await userEvent.click(within(rowOf('TO-002')).getByRole('button', { name: 'Edit' }))
+    await userEvent.type(screen.getByLabelText(/Issued date/), `${YEAR}-09-20`)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(rowOf('TO-002')).toHaveTextContent('Sep 20'))
+  })
+
+  it('gives an admin Delete and Show deleted too', async () => {
+    await renderListed()
+    expect(within(rowOf('TO-001')).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Show deleted' })).toBeInTheDocument()
+  })
+
+  it('keeps a demo user to reading: no Add, no Actions column, and a note saying why', async () => {
+    await renderListed(DEMO_USER)
+    expect(screen.queryByRole('button', { name: 'Add task order' })).not.toBeInTheDocument()
+    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent)).toEqual(['Number', 'Issued', 'Properties'])
+    expect(within(table()).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
+  })
+
+  it("reads a demo user's empty list without pointing at Add", async () => {
+    server = []
+    renderPage(DEMO_USER)
+    expect(await screen.findByText(EMPTY_TEXT_READ_ONLY)).toBeInTheDocument()
+  })
+
+  it("shows the backend's refusal of someone not on the project as the load error", async () => {
+    api.listTaskOrders.mockRejectedValueOnce(Object.assign(new Error('Not a member of this project'), { status: 403 }))
+    renderPage(TEST_USER)
+    expect(await screen.findByText("Couldn't load the task orders: Not a member of this project")).toBeInTheDocument()
+  })
+
+  it('goes back to the project page', async () => {
+    await renderListed()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Project Page' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023')
   })
 })
 
-describe('AdminTaskOrdersPage — the list', () => {
+describe('TaskOrdersPage — the list', () => {
   it('heads the page with the project and lists number, issued date and property count', async () => {
     await renderListed()
-    expect(screen.getByRole('heading', { name: 'Task orders — HWS0023 S/W Queens 2025' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Task Orders — HWS0023' })).toBeInTheDocument()
     expect(api.listTaskOrders).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['Number', 'Issued', 'Properties', 'Actions'])
@@ -116,7 +159,7 @@ describe('AdminTaskOrdersPage — the list', () => {
   it('links each number to its task order\'s page', async () => {
     await renderListed()
     await userEvent.click(within(table()).getByRole('link', { name: 'TO-001' }))
-    expect(screen.getByTestId('url')).toHaveTextContent(`/admin/task-orders/${LISTED[0].id}`)
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/task-orders/${LISTED[0].id}`)
   })
 
   it('shows the empty state when the project has none', async () => {
@@ -134,7 +177,7 @@ describe('AdminTaskOrdersPage — the list', () => {
   })
 })
 
-describe('AdminTaskOrdersPage — adding and editing', () => {
+describe('TaskOrdersPage — adding and editing', () => {
   it('adds a task order, and the list read again shows it', async () => {
     await renderListed()
     await userEvent.click(screen.getByRole('button', { name: 'Add task order' }))
@@ -176,7 +219,7 @@ describe('AdminTaskOrdersPage — adding and editing', () => {
   })
 })
 
-describe('AdminTaskOrdersPage — deleting and un-deleting', () => {
+describe('TaskOrdersPage — deleting and un-deleting', () => {
   it('soft-deletes a row once confirmed, and it leaves the list', async () => {
     await renderListed()
     await userEvent.click(within(rowOf('TO-001')).getByRole('button', { name: 'Delete' }))

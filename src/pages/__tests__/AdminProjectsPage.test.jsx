@@ -106,7 +106,7 @@ describe('AdminProjectsPage — the table', () => {
   it.each([
     ['Pay items', '/admin/projects/SE384/pay-items'],
     ['Properties', '/admin/projects/SE384/properties'],
-    ['Task orders', '/admin/projects/SE384/task-orders'],
+    ['Task orders', '/project/SE384/task-orders'],
     ['Manage roles', '/admin/projects/SE384/roles'],
   ])('%s opens that project\'s page', async (name, path) => {
     renderPage()

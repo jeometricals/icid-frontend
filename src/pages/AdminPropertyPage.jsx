@@ -47,7 +47,7 @@ export default function AdminPropertyPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const admin = isAdmin(user)
-  const nameOf = useUserNames(admin)
+  const nameOf = useUserNames(admin ? user : null)
 
   const [property, setProperty] = useState(null)
   const [pirs, setPirs] = useState([]) // every PIR of the property, deleted ones included, newest first

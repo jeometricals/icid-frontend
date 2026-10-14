@@ -315,13 +315,27 @@ describe('ProjectDashboard progress button', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/progress')
   })
 
-  it('sits with the other three entry points, after the archive', async () => {
+  it('sits with the other entry points, after the archive', async () => {
     mockAuth()
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
     const progress = await screen.findByRole('button', { name: 'Progress' })
     const tiles = within(progress.parentElement).getAllByRole('button').map(button => button.textContent)
-    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress'])
+    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress', 'Task Orders'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task Orders entry point
+// ---------------------------------------------------------------------------
+
+describe('ProjectDashboard task orders button', () => {
+  it("navigates to this project's task orders, for a member who isn't an admin", async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await userEvent.click(await screen.findByRole('button', { name: 'Task Orders' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/task-orders')
   })
 })
 
