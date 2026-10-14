@@ -3,8 +3,8 @@
  * code, status) in the backend's order, which is by project ID, and a "Create project" button that opens a dialog
  * for a new one. After a save the list is read again, so the new row shows what the backend wrote. A created
  * project is announced once, in a banner that goes when dismissed or when the dialog is opened again. Each row
- * has "Pay items", "Properties" and "Manage roles", which open that project's pay items, properties and roles
- * pages. Anyone who isn't an
+ * has "Pay items", "Properties", "Task orders" and "Manage roles", which open that project's pay items,
+ * properties, task orders and roles pages. Anyone who isn't an
  * admin is told so instead.
  */
 import { useEffect, useState } from 'react'
@@ -179,6 +179,13 @@ export default function AdminProjectsPage() {
                               className="btn-secondary whitespace-nowrap"
                             >
                               Properties
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/admin/projects/${row.project_id}/task-orders`)}
+                              className="btn-secondary whitespace-nowrap"
+                            >
+                              Task orders
                             </button>
                             <button
                               type="button"

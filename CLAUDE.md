@@ -12,13 +12,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items and properties). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists, a project's pay items, properties and task orders, and one task order). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
@@ -425,8 +425,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
   backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
   for whatever a project lacks. Nothing on a row is editable. Each row's Actions cell has "Pay items"
-  (`/admin/projects/<project_id>/pay-items`), "Properties" (`/admin/projects/<project_id>/properties`) and
-  "Manage roles" (`/admin/projects/<project_id>/roles`).
+  (`/admin/projects/<project_id>/pay-items`), "Properties" (`/admin/projects/<project_id>/properties`), "Task
+  orders" (`/admin/projects/<project_id>/task-orders`) and "Manage roles" (`/admin/projects/<project_id>/roles`).
   "Create project" (right of the heading) opens `CreateProjectModal`: project ID, project name, description,
   borough (free text: there is no borough list) and registration code (optional). Save is off until the first
   four are non-blank; `createAdminProject` (`POST /v1/admin/projects`) sends them trimmed, a blank registration
@@ -449,14 +449,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `include_deleted` from a non-admin is ignored by the backend. `getProperty` isn't used by a page yet.
   - **Load:** `listProperties` and `listAdminProjects` together; the second only gives the heading its project
     name ("Properties — <project_id> <project_name>"). A failure of either is the load error with Retry.
-  - **The table** is in the backend's order (by address): BBL, address (the notes as a tooltip), type (its label),
-    added (`created_at` as "Sep 14", with the year when it isn't this one) and Edit / Delete. No properties reads
+  - **The table** (`PropertiesTable`, shared with a task order's bundle) is in the backend's order (by address):
+    BBL, address (the notes as a tooltip), type (its label), added (`created_at` through `lib/shortDate.js`:
+    "Sep 14", with the year when it isn't this one) and Edit / Delete. No properties reads
     "No properties yet. Click 'Add property' to start."
   - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add property" / "Edit property"): BBL, address
     and "Property type" (a select of the three labels) required, notes optional. Save is off until the three are
     in, and when editing until something changed; adding sends all four, editing only what changed (the backend
     answers 400 to an empty PATCH). Text is trimmed and blank notes are `null` (which clears them). The page
-    passes the thrown error to the modal: a 409 reads "A property with this BBL already exists in this project."
+    passes the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A property with this BBL already exists in this project."
     above the BBL field (its `existing_property_id` isn't used yet), a 422's messages sit under the fields their
     `loc` names, anything else (a blank or over-long value is the backend's 400) shows below the form as worded.
     The form keeps what was typed. After a save the list is read again.
@@ -468,6 +469,53 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     is read again and a toast reads "Property <bbl> deleted." / "Property <bbl> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
   - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
+- **Task orders (admin).** A project's task orders, each a bundle of its properties (a property can be in several,
+  once in each). A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
+  estimate_notes, created_at, updated_at, created_by, deleted_at, deleted_by}`; a list row adds `property_count`,
+  and one read on its own adds `properties` (its bundled properties that aren't deleted, by address).
+  - **Service:** `services/taskOrders.js`: `listTaskOrders(projectId, { includeDeleted })`, `getTaskOrder`,
+    `createTaskOrder`, `updateTaskOrder`, `softDeleteTaskOrder`, `undeleteTaskOrder`, `bundleProperty(taskOrderId,
+    propertyId)` and `unbundleProperty`. As for properties, reading is for anyone on the project and every change
+    is admin only.
+  - **The list:** `/admin/projects/:projectId/task-orders` (`AdminTaskOrdersPage`), reached from "Task orders" on
+    an `/admin/projects` row; Back returns there. "Task orders — <project_id> <project_name>" and "Add task
+    order". The table, in the backend's order (by number): Number (a link to the task order's page), Issued
+    (`shortDate`, or a dash), Properties ("24 properties", "1 property") and Edit / Delete. "Show deleted",
+    the muted deleted rows with Un-delete, the confirm dialogs, the toasts ("Task order <number> deleted." /
+    "restored."), reading the list again after every change and the load error are as on the properties page.
+    No task orders reads "No task orders yet. Click 'Add task order' to start."
+  - **`TaskOrderFormModal`** (`mode`, `initial`; "Add task order" / "Edit task order"): Number (required), Issued
+    date (a date input) and Estimate notes (placeholder "Rough bid estimate — 4" SF, 7" SF, curb LF"), both
+    optional. Save is off until the number is in and, when editing, something changed; adding sends all three,
+    editing only what changed, a blank date or blank notes as `null` (which clears them). A 409 reads "A task
+    order with this number already exists in this project." under Number (its `existing_task_order_id` isn't
+    used yet); a 422 (a malformed date) under its field; anything else below the form.
+  - **One task order:** `/admin/task-orders/:taskOrderId` (`AdminTaskOrderPage`), from a number on the list; Back
+    ("Back to Task orders — <project_id>") returns to its project's list. "Task order <number>" with Edit and
+    Delete; a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by <name>"; the name
+    comes from `GET /v1/admin/users` with deleted users, and when that fails or doesn't have them the card gives
+    the date alone). Then "Bundled properties": "N properties bundled", `PropertiesTable` with Unbundle on each
+    row, and "Add properties". Nothing bundled reads "No properties bundled yet. Click 'Add properties' to pick
+    from this project." Its Added column is when the property was added to the project: the response doesn't
+    carry when it was bundled.
+    - Edit uses the same dialog; Delete, Un-delete and Unbundle are each confirmed in `ConfirmDialog`, a refusal
+      shows in the dialog, and the page then shows the task order the call returned (Unbundle answers 204, so
+      the page reads it again). Toasts: "Task order <number> deleted." / "restored.", "Property <bbl>
+      unbundled."
+    - **A deleted task order** reads Deleted (the number crossed out), offers only Un-delete, and hides Add
+      properties and Unbundle (the backend refuses bundling into it). Un-deleting brings its bundle back.
+    - A property soft-deleted after it was bundled stays in the bundle but is left out of `properties` and
+      `property_count` by the backend, so it disappears from the page until it is un-deleted.
+  - **`PropertyPickerModal`** (`taskOrder`, `onClose`, `onDone`), from Add properties: reads the project's live
+    properties (`listProperties`) and leaves out those already in this task order. One checkbox row each (BBL,
+    address, type). The search box keeps the rows whose BBL or address holds the text, any case. "Select all
+    shown" ticks every row shown; a ticked row stays ticked while the search hides it, and Clear selection
+    unticks all. "Add N properties" bundles the ticked ones **one at a time** (never in parallel), in list order,
+    and stops at the first refusal, so nothing after it is tried. Then the picker closes and `onDone({added,
+    failed, taskOrder})` hands the page the count, the refusal (`{property, message}`) and the last task order
+    the backend returned; the page shows that and a toast: "Added 3 properties." or "Added 1 property. Couldn't
+    add <bbl>: <message> The rest weren't tried."
+  - A non-admin who opens either URL is told it is for admins; the backend returns 403 to their changes anyway.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with
@@ -510,6 +558,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
     `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (changes admin only;
     body `{bbl, address, property_type, notes}`, all optional on a PATCH)
+  - Task orders: `GET /v1/projects/{id}/task-orders?include_deleted=` · `POST /v1/projects/{id}/task-orders` ·
+    `GET /v1/task-orders/{id}` · `PATCH /v1/task-orders/{id}` · `POST /v1/task-orders/{id}/admin/soft-delete` ·
+    `POST /v1/task-orders/{id}/admin/undelete` · `POST /v1/task-orders/{id}/properties/{property_id}` (bundle) ·
+    `DELETE /v1/task-orders/{id}/properties/{property_id}` (unbundle) (reading for anyone on the project, changes
+    admin only; body `{task_order_number, issued_date, estimate_notes}`, all optional on a PATCH)
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)

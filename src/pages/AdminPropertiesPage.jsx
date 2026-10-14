@@ -9,28 +9,20 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { format, isSameYear, parseISO } from 'date-fns'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
   createProperty, listAdminProjects, listProperties, softDeleteProperty, undeleteProperty, updateProperty,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
-import { propertyTypeLabel } from '../data/propertyTypes'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PropertiesTable from '../components/PropertiesTable'
 import PropertyFormModal from '../components/PropertyFormModal'
-import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 
 export const EMPTY_TEXT = "No properties yet. Click 'Add property' to start."
 
 const isDeleted = (row) => Boolean(row.deleted_at)
-
-// "Sep 14", with the year when it isn't this one
-export function addedDate(timestamp, today = new Date()) {
-  const date = parseISO(timestamp)
-  return format(date, isSameYear(date, today) ? 'MMM d' : 'MMM d, yyyy')
-}
 
 // The two confirmed actions: the call, the words of the dialog and of the toast once it went through
 const ACTIONS = {
@@ -209,79 +201,35 @@ export default function AdminPropertiesPage() {
             {properties.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">{EMPTY_TEXT}</div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['BBL', 'Address', 'Type', 'Added', 'Actions'].map(heading => (
-                        <th
-                          key={heading}
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          {heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {properties.map(row => {
-                      const deleted = isDeleted(row)
-                      return (
-                        <tr key={row.id} data-deleted={deleted || undefined} className={deleted ? 'bg-gray-50 text-gray-400' : 'text-gray-900'}>
-                          <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
-                            {deleted ? (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="line-through">{row.bbl}</span>
-                                <span title={`Deleted ${format(parseISO(row.deleted_at), 'MMM d, yyyy')}`}>
-                                  <StatusBadge status="deleted" />
-                                </span>
-                              </span>
-                            ) : row.bbl}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <p title={row.notes || undefined}>{row.address}</p>
-                          </td>
-                          <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
-                            {propertyTypeLabel(row.property_type)}
-                          </td>
-                          <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
-                            {addedDate(row.created_at)}
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            {deleted ? (
-                              <button
-                                type="button"
-                                onClick={() => open(() => setPending({ row, action: 'undelete' }))}
-                                className="btn-secondary"
-                              >
-                                Un-delete
-                              </button>
-                            ) : (
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => open(() => setForm({ mode: 'edit', property: row }))}
-                                  className="btn-secondary"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => open(() => setPending({ row, action: 'delete' }))}
-                                  className="btn-secondary text-red-600 hover:text-red-700"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <PropertiesTable
+                properties={properties}
+                renderActions={row => (isDeleted(row) ? (
+                  <button
+                    type="button"
+                    onClick={() => open(() => setPending({ row, action: 'undelete' }))}
+                    className="btn-secondary"
+                  >
+                    Un-delete
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => open(() => setForm({ mode: 'edit', property: row }))}
+                      className="btn-secondary"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => open(() => setPending({ row, action: 'delete' }))}
+                      className="btn-secondary text-red-600 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              />
             )}
           </>
         )}

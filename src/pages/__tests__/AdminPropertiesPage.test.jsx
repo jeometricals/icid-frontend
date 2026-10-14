@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminPropertiesPage, { EMPTY_TEXT, addedDate } from '../AdminPropertiesPage'
+import AdminPropertiesPage, { EMPTY_TEXT } from '../AdminPropertiesPage'
 import { BBL_TAKEN } from '../../components/PropertyFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
@@ -133,11 +133,6 @@ describe('AdminPropertiesPage — the list', () => {
     expect(await screen.findByText("Couldn't load the properties: Project not found")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('table')).toBeInTheDocument()
-  })
-
-  it('carries the year on a date of another year', () => {
-    expect(addedDate('2024-09-14T12:00:00', new Date(2026, 0, 1))).toBe('Sep 14, 2024')
-    expect(addedDate('2026-09-14T12:00:00', new Date(2026, 0, 1))).toBe('Sep 14')
   })
 })
 

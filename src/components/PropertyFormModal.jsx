@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { PROPERTY_TYPES } from '../data/propertyTypes'
+import { formErrors } from '../lib/formErrors'
 
 // The longest value the backend takes for each text field
 export const MAX_BBL_LENGTH = 32
@@ -23,24 +24,6 @@ const cleaned = (values) => ({
   notes: values.notes.trim() || null,
 })
 
-// Splits a failed save into what shows under each field and what shows below the form. A 409 is the BBL another
-// property of the project has; a 422 names its fields in each entry's loc; anything else is said as the backend
-// worded it.
-function errorsFrom(error) {
-  if (!error) return { fields: {}, general: null }
-  if (error.status === 409) return { fields: { bbl: BBL_TAKEN }, general: null }
-  const entries = error.status === 422 && Array.isArray(error.body?.detail) ? error.body.detail : null
-  if (!entries) return { fields: {}, general: error.message }
-  const fields = {}
-  const rest = []
-  for (const entry of entries) {
-    const key = entry.loc?.[entry.loc.length - 1]
-    if (KEYS.includes(key) && !fields[key]) fields[key] = entry.msg
-    else rest.push(entry.msg)
-  }
-  return { fields, general: rest.length > 0 ? rest.join('; ') : null }
-}
-
 /**
  * Lets an admin add a property to a project, or edit one: BBL, address and property type (required) and notes
  * (optional). Save is off until the three required fields are in and, when editing, until something has changed.
@@ -59,7 +42,7 @@ export default function PropertyFormModal({ mode = 'add', initial, onSave, onCan
   const before = cleaned(startingValues(initial))
   const changes = Object.fromEntries(KEYS.filter(key => sending[key] !== before[key]).map(key => [key, sending[key]]))
   const ready = REQUIRED.every(key => Boolean(sending[key])) && (adding || Object.keys(changes).length > 0)
-  const { fields, general } = errorsFrom(error)
+  const { fields, general } = formErrors(error, KEYS, { field: 'bbl', message: BBL_TAKEN })
 
   const handleSubmit = (e) => {
     e.preventDefault()
