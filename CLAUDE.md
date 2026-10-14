@@ -622,8 +622,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       0, `number_only`, assessable, `4in`, not added in field. The new flag is selected; the shape stays armed.
     - **`SketchCanvas`**: the page (`RotatedPage`) and the SVG overlay. Each flag on the page is its outline in its
       thickness's colour (`THICKNESS_COLORS`: 4" blue, 7" as 4" amber, 7" red) with its display order; the
-      selected one is heavier and dashed. Clicking a flag selects it; clicking empty page clears the selection.
-      Dragging a flag that is already selected moves only the overlay; letting go PATCHes `sketch_x` / `sketch_y`
+      selected one is heavier and dashed. Clicking a flag selects it; clicking empty page clears the selection
+      (or, with a shape armed, places one there). A press on a flag never places a shape, so a just-placed flag can
+      be nudged without Esc. Dragging a flag that is already selected, shape armed or not, moves only the overlay; letting go PATCHes `sketch_x` / `sketch_y`
       (a refusal puts it back and says so above the page); Esc mid-drag puts it back. The Delete key (or the panel's
       "Delete flag") deletes the selected flag at once, toast "Flag #<n> deleted.". `showCorners` marks (0, 0) and
       (width, height), for checking alignment by eye.
