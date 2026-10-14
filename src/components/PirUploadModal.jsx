@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
 import Modal from './Modal'
-import {
-  DEFAULT_PIR_IMAGE_SCALE, PIR_IMAGE_ACCEPT, pirImageTypeOf, uploadPirImage, validatePirImageFile,
-} from '../services/pirImages'
+import { DEFAULT_PIR_SCALE, PIR_FILE_ACCEPT, pirFileTypeOf, uploadPir, validatePirFile } from '../services/pirPages'
 
-// What the spinner says during each upload step
+// What the spinner says during each upload step; the page count only comes back with the rendered pages
 export const STEP_LABELS = {
   requesting: 'Preparing upload...',
   uploading: 'Uploading file...',
-  completing: 'Converting and saving...',
+  rendering: 'Rendering...',
 }
 
-export const PDF_NOTE = 'PDF will be converted to PNG on upload.'
-export const TOO_LARGE = 'The file is too large: a PIR image is 10 MB at most.'
+export const UPLOAD_PROMPT = 'Upload PIR (image or PDF, any number of pages).'
+export const REPLACE_WARNING = 'Uploading replaces every page of this PIR, and the flags drawn on them are deleted.'
+export const TOO_LARGE = 'The file is too large: a PIR file is 10 MB at most.'
 
 // "1.2 MB", "340 KB": a file's size as the dialog shows it
 export function fileSize(bytes) {
@@ -20,30 +19,34 @@ export function fileSize(bytes) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-// A scale as typed is usable when it is a finite number of at least 1 px/ft
-const scaleOf = (typed) => (typed.trim() !== '' && Number.isFinite(Number(typed)) && Number(typed) >= 1 ? Number(typed) : null)
+// A scale as typed: blank is none (set per page later); otherwise a finite number of at least 1 px/ft, or invalid
+const scaleOf = (typed) => {
+  if (typed.trim() === '') return { value: null, valid: true }
+  const value = Number(typed)
+  return Number.isFinite(value) && value >= 1 ? { value, valid: true } : { value: null, valid: false }
+}
 
 /**
- * Uploads a PIR's image, or replaces it: a file (PDF, PNG or JPG, 10 MB at most), shown by name and size, and the
- * scale in pixels per foot (15 to start, at least 1). A picked image is previewed from the file itself; a PDF
- * gets a note that it is converted to PNG on upload. Upload is off until there is a file that fits and a scale.
- * Runs the upload itself (upload-request, the PUT to Storage, complete), with a spinner naming the step; a refusal
- * shows inline (a 413 as the size limit, anything else as the backend or Storage worded it) and the form keeps the
- * file and scale.
- * Props: pirId, replacing (the PIR has an image already: the title says Replace), initialScale, onUploaded(pir)
- * (the PIR as complete returned it), onClose.
+ * Uploads a PIR's file, or replaces it: a PDF (any number of pages) or a PNG / JPG (one page), 10 MB at most, shown
+ * by name and size, and an optional scale in pixels per foot for every page (15 to start, at least 1; blank leaves
+ * the pages without one, to be set per page). A picked image is previewed from the file itself. Replacing warns that
+ * every page and the flags drawn on them go. Runs the upload itself (upload-request, the PUT to Storage, complete),
+ * with a spinner naming the step ("Rendering..." while the backend renders the pages); a refusal shows inline (a 413
+ * as the size limit, anything else as the backend or Storage worded it) and the form keeps the file and scale.
+ * Props: pirId, replacing (the PIR has pages already), onUploaded(pir) (the PIR with its new `pages`), onClose.
  */
-export default function PirImageUploadModal({ pirId, replacing = false, initialScale, onUploaded, onClose }) {
+export default function PirUploadModal({ pirId, replacing = false, onUploaded, onClose }) {
   const [file, setFile] = useState(null)
   const [fileError, setFileError] = useState(null)
-  const [scale, setScale] = useState(String(initialScale ?? DEFAULT_PIR_IMAGE_SCALE))
+  const [scale, setScale] = useState(String(DEFAULT_PIR_SCALE))
   const [preview, setPreview] = useState(null) // an object URL for a picked image
   const [step, setStep] = useState(null) // the running upload step, null when idle
   const [error, setError] = useState(null)
 
   const busy = step !== null
-  const isPdf = file && pirImageTypeOf(file) === 'application/pdf'
-  const ready = Boolean(file) && !fileError && scaleOf(scale) !== null
+  const isPdf = file && pirFileTypeOf(file) === 'application/pdf'
+  const typedScale = scaleOf(scale)
+  const ready = Boolean(file) && !fileError && typedScale.valid
 
   // A picked image is previewed from the file; the URL is let go when the file changes or the dialog closes
   useEffect(() => {
@@ -59,7 +62,7 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
   const pick = (e) => {
     const picked = e.target.files?.[0] ?? null
     setFile(picked)
-    setFileError(picked ? validatePirImageFile(picked) : null)
+    setFileError(picked ? validatePirFile(picked) : null)
     setError(null)
   }
 
@@ -67,7 +70,7 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
     if (busy || !ready) return
     setError(null)
     try {
-      const pir = await uploadPirImage(pirId, file, scaleOf(scale), { onProgress: ({ step: current }) => setStep(current) })
+      const pir = await uploadPir(pirId, file, { scale: typedScale.value, onProgress: ({ step: current }) => setStep(current) })
       setStep(null)
       onUploaded(pir)
     } catch (err) {
@@ -78,7 +81,7 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
 
   return (
     <Modal
-      title={replacing ? 'Replace PIR image' : 'Upload PIR image'}
+      title={replacing ? 'Replace PIR' : 'Upload PIR'}
       onClose={onClose}
       busy={busy}
       footer={
@@ -91,12 +94,15 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
       }
     >
       <div className="space-y-4">
+        <p className="text-sm text-gray-700">{UPLOAD_PROMPT}</p>
+        {replacing && <p className="text-sm text-amber-700 bg-amber-50 rounded p-2">{REPLACE_WARNING}</p>}
+
         <div>
-          <label htmlFor="pir-image-file" className="input-label">PIR image (PDF, PNG or JPG)</label>
+          <label htmlFor="pir-file" className="input-label">PIR file (PDF, PNG or JPG)</label>
           <input
-            id="pir-image-file"
+            id="pir-file"
             type="file"
-            accept={PIR_IMAGE_ACCEPT}
+            accept={PIR_FILE_ACCEPT}
             disabled={busy}
             onChange={pick}
             className="block w-full text-sm text-gray-700"
@@ -110,9 +116,9 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
         </div>
 
         <div>
-          <label htmlFor="pir-image-scale" className="input-label">Scale (px/ft)</label>
+          <label htmlFor="pir-scale" className="input-label">Scale (px/ft, every page)</label>
           <input
-            id="pir-image-scale"
+            id="pir-scale"
             type="number"
             min="1"
             step="any"
@@ -122,17 +128,14 @@ export default function PirImageUploadModal({ pirId, replacing = false, initialS
             disabled={busy}
             onChange={(e) => setScale(e.target.value)}
           />
-          {scale.trim() !== '' && scaleOf(scale) === null && (
+          <p className="text-xs text-gray-500 mt-1">Leave blank to set each page's scale later.</p>
+          {!typedScale.valid && (
             <p role="alert" className="text-sm text-red-600 mt-1">The scale is a number of at least 1 px/ft.</p>
           )}
         </div>
 
-        {file && !fileError && (
-          isPdf ? (
-            <p className="text-sm text-gray-600">{PDF_NOTE}</p>
-          ) : preview && (
-            <img src={preview} alt="Preview of the picked PIR image" className="max-w-full h-auto max-h-64 border border-gray-200 rounded" />
-          )
+        {file && !fileError && !isPdf && preview && (
+          <img src={preview} alt="Preview of the picked PIR image" className="max-w-full h-auto max-h-64 border border-gray-200 rounded" />
         )}
 
         {busy && (

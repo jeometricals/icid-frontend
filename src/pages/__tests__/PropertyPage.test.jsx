@@ -23,7 +23,7 @@ vi.mock('../../services/api', () => ({
   listPirs: vi.fn(), createPir: vi.fn(), updatePir: vi.fn(), softDeletePir: vi.fn(), undeletePir: vi.fn(),
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlag: vi.fn(), updateFlag: vi.fn(), softDeleteFlag: vi.fn(),
-  undeleteFlag: vi.fn(), getPirImageSignedUrl: vi.fn(), removePirImage: vi.fn(),
+  undeleteFlag: vi.fn(), listPirPages: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -63,7 +63,7 @@ beforeEach(() => {
   })
   api.listPirs.mockImplementation(async () => structuredClone(pirs))
   api.listFlags.mockResolvedValue([])
-  api.getPirImageSignedUrl.mockResolvedValue({ signed_url: 'https://storage.example/sign/pir.png', expires_at: `${YEAR}-10-14T13:00:00`, scale: 15 })
+  api.listPirPages.mockResolvedValue([{ pir_page_id: 'p1', page_number: 1 }, { pir_page_id: 'p2', page_number: 2 }, { pir_page_id: 'p3', page_number: 3 }])
   api.getContractItems.mockResolvedValue([])
   api.createPir.mockImplementation(async (id, values) => {
     if (live()) throw conflict()
@@ -148,7 +148,7 @@ describe('PropertyPage — who can do what', () => {
     pirs = [pir(1)]
     await renderLoaded(TEST_USER)
     expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(pirCard()).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(pirCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Open sketch workspace'])
   })
 
   it("lets an admin edit a deleted property's live PIR, to clean up", async () => {
@@ -164,7 +164,7 @@ describe('PropertyPage — who can do what', () => {
     await renderLoaded(DEMO_USER)
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
     expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(pirCard()).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(pirCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Open sketch workspace'])
   })
 
   it('gives a demo user no Add PIR either', async () => {
@@ -234,36 +234,39 @@ describe('PropertyPage — the property', () => {
   })
 })
 
-describe('PropertyPage — the PIR image', () => {
-  it("opens the PIR card with the image, above the PIR's details", async () => {
-    pirs = [pir(1, { source_image_url: 'pirs/x/image.png', source_image_scale: 15 })]
-    await renderLoaded()
-    const image = await within(pirCard()).findByRole('img', { name: 'PIR survey sheet' })
-    expect(api.getPirImageSignedUrl).toHaveBeenCalledWith(pirs[0].id)
-    expect(within(pirCard()).getByText('15 px/ft')).toBeInTheDocument()
-    const details = within(pirCard()).getByText('Inspector initials')
-    expect(image.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(pirCard()).getByRole('button', { name: 'Replace' })).toBeInTheDocument()
-  })
-
-  it('offers a member the upload when the PIR has no image', async () => {
+describe('PropertyPage — the way into the sketch workspace', () => {
+  it("opens the PIR card with the page count and \"Open sketch workspace\", above the PIR's details", async () => {
     pirs = [pir(1)]
-    await renderLoaded(TEST_USER)
-    expect(within(pirCard()).getByText('No PIR image yet.')).toBeInTheDocument()
-    expect(within(pirCard()).getByRole('button', { name: 'Upload PIR image' })).toBeInTheDocument()
-  })
-
-  it('gives a demo user the image with no actions', async () => {
-    pirs = [pir(1, { source_image_url: 'pirs/x/image.png', source_image_scale: 15 })]
-    await renderLoaded(DEMO_USER)
-    await within(pirCard()).findByRole('img', { name: 'PIR survey sheet' })
-    expect(within(pirCard()).queryByRole('button', { name: 'Replace' })).not.toBeInTheDocument()
-    expect(within(pirCard()).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
-  })
-
-  it('has no image section without a live PIR', async () => {
     await renderLoaded()
-    expect(within(pirCard()).queryByText('No PIR image yet.')).not.toBeInTheDocument()
+    expect(await within(pirCard()).findByText('3 pages')).toBeInTheDocument()
+    expect(api.listPirPages).toHaveBeenCalledWith(pirs[0].id)
+    const open = within(pirCard()).getByRole('button', { name: 'Open sketch workspace' })
+    const details = within(pirCard()).getByText('Inspector initials')
+    expect(open.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await userEvent.click(open)
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${PROPERTY_ID}/pir`)
+  })
+
+  it('says when no pages are uploaded yet, and gives a demo user the way in too', async () => {
+    pirs = [pir(1)]
+    api.listPirPages.mockResolvedValue([])
+    await renderLoaded(DEMO_USER)
+    expect(await within(pirCard()).findByText('No pages uploaded yet')).toBeInTheDocument()
+    expect(within(pirCard()).getByRole('button', { name: 'Open sketch workspace' })).toBeInTheDocument()
+  })
+
+  it("says so when the pages can't be read, the button still there", async () => {
+    pirs = [pir(1)]
+    api.listPirPages.mockRejectedValue(new Error('Storage is down'))
+    await renderLoaded()
+    expect(await within(pirCard()).findByText("Couldn't read the pages: Storage is down")).toBeInTheDocument()
+    expect(within(pirCard()).getByRole('button', { name: 'Open sketch workspace' })).toBeInTheDocument()
+  })
+
+  it('has no way in without a live PIR', async () => {
+    await renderLoaded()
+    expect(within(pirCard()).queryByRole('button', { name: 'Open sketch workspace' })).not.toBeInTheDocument()
+    expect(api.listPirPages).not.toHaveBeenCalled()
   })
 })
 

@@ -15,6 +15,7 @@ import ReportArchivePage from './pages/ReportArchivePage'
 import ProgressPage from './pages/ProgressPage'
 import PropertiesPage from './pages/PropertiesPage'
 import PropertyPage from './pages/PropertyPage'
+import PirPage from './pages/PirPage'
 import TaskOrderPage from './pages/TaskOrderPage'
 import TaskOrdersPage from './pages/TaskOrdersPage'
 import IDRPage from './pages/IDRPage'
@@ -58,6 +59,7 @@ function AppRoutes() {
           <Route path="/project/:projectId/progress" element={<ProgressPage />} />
           <Route path="/project/:projectId/properties" element={<PropertiesPage />} />
           <Route path="/project/:projectId/properties/:propertyId" element={<PropertyPage />} />
+          <Route path="/project/:projectId/properties/:propertyId/pir" element={<PirPage />} />
           <Route path="/project/:projectId/task-orders" element={<TaskOrdersPage />} />
           <Route path="/project/:projectId/task-orders/:taskOrderId" element={<TaskOrderPage />} />
           <Route path="/project/:projectId/idr/:idrId" element={<IDRPage />} />

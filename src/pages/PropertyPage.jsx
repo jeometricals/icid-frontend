@@ -2,8 +2,8 @@
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
  * on the project: a card with its BBL, address, type, notes and when it was added; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
- * as-built is signed, under its image (PirImageSection: the scanned sheet, uploaded, replaced or removed by a
- * member); without one it reads "No PIR yet.". A member who isn't a demo user also gets
+ * as-built is signed, under the way into its sketch workspace (PirWorkspaceLink: its page count and "Open sketch
+ * workspace", PirPage); without one it reads "No PIR yet.". A member who isn't a demo user also gets
  * Edit on the property, and Add PIR or Edit PIR. The destructive controls are an admin's alone: Delete and Delete
  * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
@@ -20,15 +20,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { createPir, getProperty, listPirs, updatePir, updateProperty } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
-import { PIR_ACTIONS } from '../lib/pirs'
+import { PIR_ACTIONS, PIR_DEMO_NOTE } from '../lib/pirs'
 import { PROPERTY_ACTIONS } from '../lib/properties'
 import { useUserNames } from '../lib/useUserNames'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import ConfirmDialog from '../components/ConfirmDialog'
 import FlagsSection from '../components/FlagsSection'
 import PirFormModal from '../components/PirFormModal'
-import PirImageSection from '../components/PirImageSection'
 import PirStatusBadge from '../components/PirStatusBadge'
+import PirWorkspaceLink from '../components/PirWorkspaceLink'
 import PropertyFormModal from '../components/PropertyFormModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
@@ -36,7 +36,7 @@ import Toast from '../components/Toast'
 export const NO_PIR_TEXT = 'No PIR yet.'
 export const NOT_CONFIRMED_TEXT = 'Not yet confirmed'
 export const LIVE_PIR_TOOLTIP = 'This site has a live PIR. Delete it first to restore this one.'
-export const DEMO_NOTE = 'Demo mode: sites and PIRs are read-only.'
+export const DEMO_NOTE = PIR_DEMO_NOTE
 
 // "Sep 14 by Ada Admin", or the date alone when the name isn't known
 const dateBy = (timestamp, name) => `${shortDate(timestamp)}${name ? ` by ${name}` : ''}`
@@ -285,7 +285,7 @@ export default function PropertyPage() {
 
         {livePir ? (
           <>
-            <PirImageSection pir={livePir} writer={canChange} onChanged={rereadPirs} />
+            <PirWorkspaceLink pir={livePir} projectId={projectId} propertyId={property.id} />
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
               <Detail term="Inspector initials">{livePir.inspector_initials}</Detail>
               <Detail term="Signed on">{shortDate(livePir.inspector_sign_date)}</Detail>

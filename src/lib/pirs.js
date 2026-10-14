@@ -1,5 +1,8 @@
 import { softDeletePir, undeletePir } from '../services/api'
 
+// What a demo user reads on a site's page and its PIR's: the backend keeps them read-only on both
+export const PIR_DEMO_NOTE = 'Demo mode: sites and PIRs are read-only.'
+
 // How far a property's PIR has got: none at all, signed by the DOT inspector (every PIR is), or with the
 // as-built signed too
 export const PIR_STATUS = {

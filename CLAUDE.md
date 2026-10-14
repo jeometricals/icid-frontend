@@ -12,16 +12,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties and one property, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties, one property and its PIR workspace, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirImages.js`, `flags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a flag's delete / un-delete wording and the next display order), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a flag's delete / un-delete wording and the next display order), `pageGeometry.js` (a PIR page's size on screen at its rotation; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/sketch/` holds the PIR workspace's pieces (`RotatedPage`); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -507,7 +507,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
     PIR), anyone else no controls (the backend answers them 400). A demo user gets no controls and the note "Demo
     mode: sites and PIRs are read-only."
-  - **The PIR card** carries the status badge in its heading. With a live PIR: inspector initials, signed on, digitized
+  - **The PIR card** carries the status badge in its heading. With a live PIR: the way into its workspace
+    (`PirWorkspaceLink`: the page count and "Open sketch workspace"; see PIR pages), then inspector initials, signed on, digitized
     ("Sep 20 by <name>") and as-built ("Not yet confirmed", or "As-built signed by <name> on <date>"), with Edit PIR
     for a member and Delete PIR for an admin. Without one: "No PIR yet." and, for a member, Add PIR. Names come
     from `useUserNames` (an admin's list with deleted users, or the members' list); when it fails or lacks the
@@ -528,40 +529,49 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
     (`pir`), or a status key (`status`), which the properties list reads off each row's `pir_status`
     (`pirStatusFromApi`: `none`, `dot_signed`, `as_built_signed`; anything else is none).
-- **PIR image.** A PIR's scanned survey sheet, shown first on its PIR card (`PirImageSection`, above the PIR's
-  details), stored in Supabase Storage (private bucket `pir-images`, 10 MB at most) with its scale in pixels per
-  foot. The PIR carries the storage path (`source_image_url`) and the scale (`source_image_scale`); the image is
-  read through a short-lived signed URL, asked for separately.
-  - **Service:** `services/pirImages.js`. `uploadPirImage(pirId, file, scale, { onProgress })` runs the house
-    two-step upload (the API can't take a body over 4.5 MB on Vercel): `requestPirImageUpload` (`POST
-    /image/upload-request` with the file's type) → `putPirImageFile` (a PUT straight to the signed Storage URL,
-    not through `apiFetch`) → `completePirImageUpload` (`POST /image/complete` with the upload path and scale),
-    which returns the PIR with `signed_url` and `expires_at`. `onProgress` gets `requesting`, `uploading`,
-    `completing`. `removePirImage(pirId)` (`DELETE`, 204). `getPirImageSignedUrl(pirId)` gives `{signed_url,
-    expires_at, scale}`, or `null` on the backend's 404 (no image). `validatePirImageFile` / `pirImageTypeOf`:
-    a PDF, PNG or JPEG by declared type or, failing that, extension; not empty; 10 MB at most. The backend's
-    `PATCH /image` (a new scale alone) has no caller yet.
-  - **The backend** tells the file apart by its first bytes, renders a PDF's first page to PNG, and on a
-    replacement removes the old file. A refusal: 400 (an unsupported or unreadable file, a scale not above 0, a
-    deleted PIR or property for a non-admin), 413 (too large), 502 (Storage).
-  - **`PirImageSection`** (`pir`, `writer`, `onChanged`): without an image, "No PIR image yet." and, for a writer,
-    "Upload PIR image". With one, it asks for a signed URL when it mounts and again when the PIR or its image
-    changes; meanwhile a spinner, on failure "Couldn't load the PIR image: <message>" with Retry. The image is
-    shown at its natural size but never wider than the card (`max-w-full h-auto`), captioned with its scale ("15
-    px/ft"). If the image itself fails to load (an expired link) it offers "Reload image", which asks for a fresh
-    link. A writer gets Replace (the upload dialog again) and Remove (confirmed: "Remove the PIR image?"). After a
-    change the page reads the PIRs again (`onChanged`) and a toast says "PIR image uploaded." / "replaced." /
-    "removed.".
-  - **`PirImageUploadModal`** (`pirId`, `replacing`, `initialScale`, `onUploaded`, `onClose`; "Upload PIR image"
-    / "Replace PIR image"): a file input (`.pdf,.png,.jpg,.jpeg`), the file's name and size once picked, a size
-    or type refusal at once; the scale (px/ft, at least 1, 15 to start or the image's own when replacing,
-    placeholder "e.g. 15"). A picked image is previewed from the file (an object URL); a PDF reads "PDF will be
-    converted to PNG on upload." Upload is off until a file that fits and a scale are in. It runs the upload
-    itself, with a spinner naming the step; a 413 reads "The file is too large: a PIR image is 10 MB at most.",
-    anything else as the backend or Storage worded it, and the dialog keeps the file and scale.
-  - **Who:** `writer` is the PIR card's own rule (`canChange`): a member who isn't a demo user, and while the
-    property is deleted only an admin. Everyone on the project sees the image; a demo user gets no Upload,
-    Replace or Remove.
+- **PIR pages (the PIR workspace).** A PIR's scanned survey sheet, as pages: a PDF (any number of pages, up to the
+  backend's cap, 15) or a PNG / JPEG (one page), each page rendered to PNG by the backend and stored in Supabase
+  Storage (private bucket `pir-images`, 10 MB per upload). A page is `{pir_page_id, pir_id, page_number, image_url (a
+  signed URL, an hour), image_url_expires_at, image_mime, width_px, height_px, scale_px_per_ft (or null),
+  rotation_deg (0, 90, 180, 270), created_at, updated_at, deleted_at, deleted_by}`.
+  - **Service:** `services/pirPages.js`. `uploadPir(pirId, file, { scale, onProgress })` runs the house two-step
+    upload (the API can't take a body over 4.5 MB on Vercel): `requestPirUpload` (`POST /image/upload-request` with
+    `{mime, filename, size_bytes}`) → `putPirFile` (a PUT straight to the signed Storage URL, not through
+    `apiFetch`) → `completePirUpload` (`POST /image/complete` with `{staging_path, scale_px_per_ft?}`), which
+    returns the PIR with its `pages`. `onProgress` gets `requesting`, `uploading`, `rendering`. A new upload
+    replaces every page, and the flags drawn on the old ones are deleted. `listPirPages(pirId)`,
+    `deletePirPages(pirId)` (204; the flags go too), `setPirPageScale(pageId, scale)`, `setPirPageRotation(pageId,
+    degrees)` (`PATCH /v1/pir-pages/{id}/scale` and `/rotation`, each returning the page), `nextRotation` (0 → 90 →
+    180 → 270 → 0), `validatePirFile` / `pirFileTypeOf` (a PDF, PNG or JPEG by declared type or, failing that,
+    extension; not empty; 10 MB at most). The R1d routes (`GET` / `PATCH` / `DELETE /image`, the `content_type`,
+    `upload_path` and `scale` names) are deprecated and the frontend doesn't call them.
+  - **`PirPage`**, `/project/:projectId/properties/:propertyId/pir`, from "Open sketch workspace" on the property
+    page's PIR card (`PirWorkspaceLink`, which shows the page count: "3 pages", "No pages uploaded yet"). Back
+    ("Back to Site <bbl>") returns to the property, with `GoToProjectButton` beside it. One `getProperty` and one
+    `getPirByProperty`, then `listPirPages`; a failure (a non-member's 403 included) is the load error with Retry.
+    The heading is "PIR · <address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
+    one on the site page first."
+    - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
+      the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
+      Each page shows at its rotation (`RotatedPage`) with "Scale: 15 px/ft" ("not set" without one). If its image
+      fails to load (an expired link), "Reload pages" reads them again.
+    - **A writer** (a member who isn't a demo user; while the site is deleted only an admin) also gets Rotate (a
+      quarter turn clockwise, PATCHed on that page; a refusal shows above the page), Set scale (`PageScaleModal`:
+      a number above 0, "Applies to page {n}."), Replace PIR (the upload dialog, warning that the pages and their
+      flags go) and Remove pages (confirmed). With no pages the card reads "Upload PIR (image or PDF, any number of
+      pages)." with Upload PIR. After an upload the page lands on page 1 and toasts "PIR uploaded: 2 pages." /
+      "PIR replaced: ...". A demo user reads only, with "Demo mode: sites and PIRs are read-only."
+  - **`PirUploadModal`** (`pirId`, `replacing`, `onUploaded`, `onClose`; "Upload PIR" / "Replace PIR"): a file input
+    (`.pdf,.png,.jpg,.jpeg`), the file's name and size, a size or type refusal at once, and an optional scale for
+    every page (15 to start, at least 1; blank leaves it to each page). A picked image is previewed from the file.
+    The spinner names the step: "Preparing upload...", "Uploading file...", then "Rendering..." (the page count only
+    comes back with the response). A 413 reads "The file is too large: a PIR file is 10 MB at most.", anything else
+    (a cap: too many pages, a page too large) as the backend worded it, and the dialog keeps the file and scale.
+  - **Rotation and coordinates.** Everything stored about a page's contents is in its native, unrotated pixel space
+    (x right and y down from the PNG's top-left corner, 0..`width_px` and 0..`height_px`). `RotatedPage` draws the
+    image in a box of the page's native proportions and turns that box with `transform: rotate(<deg>deg)` inside an
+    outer box of the rotated proportions (width and height swapped at 90 / 270; `lib/pageGeometry.js`
+    `rotatedSize`), so whatever is drawn in the box in native pixels turns with the image.
 - **Flags.** A PIR's flags: the sidewalk pieces its survey sheet marks, each a shape with dimensions in feet,
   shown under the PIR card on the property page (`FlagsSection`, only while the property has a live PIR).
   - **A flag** is `{id, pir_id, property_id, project_id, display_order, added_in_field, shape, dimensions,
@@ -726,9 +736,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
     `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the
     project, changes admin only; body `{inspector_initials, inspector_sign_date}`, both optional on a PATCH)
-  - PIR image, under `/v1/pirs/{id}/image`: `POST /upload-request` · `POST /complete` · `GET` (a signed URL) ·
-    `DELETE` (the file itself is PUT straight to the Storage signed URL from upload-request, not to the API;
-    `PATCH` (scale alone) exists but isn't used yet; writes for anyone on the project but a demo user)
+  - PIR pages: `POST /v1/pirs/{id}/image/upload-request` · `POST /v1/pirs/{id}/image/complete` (the file itself is
+    PUT straight to the Storage signed URL from upload-request, not to the API) · `GET /v1/pirs/{id}/pages` ·
+    `DELETE /v1/pirs/{id}/pages` · `PATCH /v1/pir-pages/{id}/scale` · `PATCH /v1/pir-pages/{id}/rotation` (reading
+    for anyone on the project, writes for anyone on it but a demo user; R1d's `GET` / `PATCH` / `DELETE
+    /v1/pirs/{id}/image` are deprecated and not called)
   - Flags: `GET /v1/pirs/{id}/flags?include_deleted=` · `POST /v1/pirs/{id}/flags` · `GET /v1/flags/{id}` ·
     `PATCH /v1/flags/{id}` · `POST /v1/flags/{id}/admin/soft-delete` · `POST /v1/flags/{id}/admin/undelete`
     (reading, adding and editing for anyone on the project, a demo user only reads; soft-delete and un-delete
