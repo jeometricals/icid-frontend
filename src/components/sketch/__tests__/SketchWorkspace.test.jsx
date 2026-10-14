@@ -221,6 +221,28 @@ describe('SketchWorkspace — dragging', () => {
     expect(await screen.findByText("Couldn't move flag #1: Flag is deleted")).toBeInTheDocument()
     expect(flagShape(1).querySelector('polygon')).toHaveAttribute('points', '275.00,175.00 325.00,175.00 325.00,225.00 275.00,225.00')
   })
+
+  it('drags a just-placed flag while its shape is still armed', async () => {
+    api.updateFlag.mockImplementation(async (id, body) => ({ ...flag(id, { display_order: 4, sketch_x: 640, sketch_y: 410 }), ...body }))
+    await renderLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Rectangle' }))
+    click(overlay(), 640, 410)
+    expect(await screen.findByRole('button', { name: 'Flag #4' })).toHaveAttribute('aria-pressed', 'true')
+
+    // A press on the new flag drags it rather than placing another
+    press(flagShape(4), 640, 410)
+    moveTo(700, 450)
+    release(700, 450)
+    await waitFor(() => expect(api.updateFlag).toHaveBeenCalledWith('new', { sketch_x: 700, sketch_y: 450 }))
+    expect(api.createFlagOnPage).toHaveBeenCalledTimes(1)
+    // Its anchor is the new place: a 5 ft square at 10 px/ft, centred on (700, 450)
+    await waitFor(() => expect(flagShape(4).querySelector('polygon'))
+      .toHaveAttribute('points', '675.00,425.00 725.00,425.00 725.00,475.00 675.00,475.00'))
+    // The shape stays armed, and the empty page still places
+    expect(screen.getByRole('button', { name: 'Rectangle' })).toHaveAttribute('aria-pressed', 'true')
+    click(overlay(), 100, 100)
+    await waitFor(() => expect(api.createFlagOnPage).toHaveBeenCalledTimes(2))
+  })
 })
 
 describe('SketchWorkspace — calibrating', () => {

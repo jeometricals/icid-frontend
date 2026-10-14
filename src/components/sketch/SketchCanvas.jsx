@@ -14,9 +14,9 @@ const DRAG_THRESHOLD = 1
  * display order; the selected one is drawn heavier.
  * - A click on empty page: places the armed shape there (onPlace), else a calibration point while calibrating
  *   (onCalibratePoint), else clears the selection (onSelect(null)).
- * - A click on a flag selects it (while calibrating it is a calibration point instead). For a writer, dragging an
- *   already selected flag moves it: the overlay alone follows the pointer, and letting go hands the new place to
- *   onMove; Esc while dragging puts it back.
+ * - A click on a flag selects it (while calibrating it is a calibration point instead), armed shape or not. For a
+ *   writer, dragging an already selected flag moves it, even with a shape armed: the overlay alone follows the
+ *   pointer, and letting go hands the new place to onMove; Esc while dragging puts it back.
  * - While calibrating, the points picked so far are marked and joined by a thin line.
  * Pointer positions are turned into page pixels with toNativeCoords against the page's on-screen box.
  * Props: page, flags (this page's), selectedId, activeShape, calibrating, calibratePoints ([{x, y}]), writer,
@@ -59,7 +59,7 @@ export default function SketchCanvas({
     if (e.button !== undefined && e.button !== 0) return
     const wasSelected = flag.id === selectedId
     onSelect?.(flag.id)
-    if (!writer || !wasSelected || activeShape) return
+    if (!writer || !wasSelected) return
     const start = native(e)
     const origin = { x: flag.sketch_x, y: flag.sketch_y }
     setDrag({ id: flag.id, start, origin, at: origin })
@@ -113,7 +113,7 @@ export default function SketchCanvas({
               aria-label={`Flag #${flag.display_order}`}
               aria-pressed={selected}
               data-flag-id={flag.id}
-              className={writer && selected && !crosshair ? 'cursor-move' : 'cursor-pointer'}
+              className={writer && selected && !calibrating ? 'cursor-move' : 'cursor-pointer'}
               onPointerDown={(e) => pressFlag(e, flag)}
             >
               <polygon
