@@ -12,7 +12,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists, a project's pay items and properties, and one property). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties and one property, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
@@ -438,24 +438,28 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   project has no status and is on nobody's project list until someone is given a role on it
   (`/admin/projects/<project_id>/roles`). A non-admin who opens the URL is told it is for admins; the backend
   returns 403 to them anyway.
-- **Properties (admin).** `/admin/projects/:projectId/properties` (`AdminPropertiesPage`), reached from
-  "Properties" on an `/admin/projects` row; Back returns there. The project's properties (the lots its work is
-  done at), kept by hand. A property is `{id, project_id, bbl, address, property_type, notes, created_at,
+- **Properties.** `/project/:projectId/properties` (`PropertiesPage`), reached from "Properties" on the project
+  page (and on an `/admin/projects` row); Back returns to the project page. The project's properties (the lots its
+  work is done at), kept by hand. A project-level feature since S2, as task orders are since S1: any member of the
+  project reads, adds and edits them; only the destructive controls (Delete, Un-delete, Show deleted) are an
+  admin's. A demo user reads only: no Add, no Actions column, and the note "Demo mode: properties are read-only."
+  (the backend answers 403). The backend refuses anyone not on the project (403), which shows as the load error. A property is `{id, project_id, bbl, address, property_type, notes, created_at,
   updated_at, created_by, deleted_at, deleted_by}`; `property_type` is one of `1_3_family` ("1-3 family"),
   `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), listed with their labels in
   `src/data/propertyTypes.js` (the backend's CHECK holds the same three; a new type needs it first).
   - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })`, `getProperty`,
     `createProperty(projectId, data)`, `updateProperty(propertyId, data)`, `softDeleteProperty` and
-    `undeleteProperty`. Reading is for anyone on the project (or an admin), every change is admin only;
-    `include_deleted` from a non-admin is ignored by the backend. `getProperty` isn't used by a page yet.
-  - **Load:** `listProperties` and `listAdminProjects` together; the second only gives the heading its project
-    name ("Properties — <project_id> <project_name>"). A failure of either is the load error with Retry.
+    `undeleteProperty`. Reading, adding and editing are for anyone on the project (or an admin), deleting and
+    un-deleting for an admin; `include_deleted` from a non-admin is ignored by the backend.
+  - **Load:** one `listProperties`; the heading is "Properties — <project_id>". A failure is the load error with
+    Retry.
   - **The table** (`PropertiesTable`, shared with a task order's bundle) is in the backend's order (by address):
-    BBL (a link to `/admin/properties/<id>`), address (the notes as a tooltip), type (its label), PIR (the row's
+    BBL (a link to `/project/<project_id>/properties/<id>`, `propertyPath`), address (the notes as a tooltip), type (its label), PIR (the row's
     `pir_status` as a `PirStatusBadge`; this page turns the column on with `showPirStatus`, a task order's bundle
     leaves it off, its properties carrying no `pir_status`), added (`created_at` through `lib/shortDate.js`:
-    "Sep 14", with the year when it isn't this one) and Edit / Delete. No properties reads
-    "No properties yet. Click 'Add property' to start."
+    "Sep 14", with the year when it isn't this one) and, when the page passes `renderActions`, Actions: Edit for a
+    member, Delete too for an admin (none for a demo user, whose table has no Actions column). No properties reads
+    "No properties yet. Click 'Add property' to start." ("No properties yet." for a demo user)
   - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add property" / "Edit property"): BBL, address
     and "Property type" (a select of the three labels) required, notes optional. Save is off until the three are
     in, and when editing until something changed; adding sends all four, editing only what changed (the backend
@@ -464,15 +468,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     above the BBL field (its `existing_property_id` isn't used yet), a 422's messages sit under the fields their
     `loc` names, anything else (a blank or over-long value is the backend's 400) shows below the form as worded.
     The form keeps what was typed. After a save the list is read again.
-  - **Show deleted** (a checkbox above the table, off to start) asks the backend again with
+  - **Show deleted** (an admin's checkbox above the table, off to start) asks the backend again with
     `?include_deleted=true`; the table stays on screen meanwhile. A deleted row is muted (`text-gray-400`), its
     BBL crossed out beside a Deleted badge (the date as a tooltip), and has "Un-delete" instead of Edit / Delete.
   - **Delete** (a soft delete; it frees the BBL) and **Un-delete** are each confirmed in `ConfirmDialog`, a refusal
     shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success the list
     is read again and a toast reads "Property <bbl> deleted." / "Property <bbl> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
-  - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
-- **PIRs (admin).** A property's PIR: the DOT survey sheet its inspector signed, digitized by an admin. One live
+- **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
+  admin. One live
   PIR per property; a soft-deleted one frees the property for a new one. A PIR is `{id, property_id, project_id,
   source_image_url, source_image_scale, inspector_initials, inspector_sign_date ('YYYY-MM-DD'), digitized_by,
   digitized_at, as_built_signed_by, as_built_signed_at, created_at, updated_at, deleted_at, deleted_by}`; the image
@@ -480,18 +484,23 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Service:** `services/pirs.js`: `getPirByProperty(propertyId)` (the live PIR, or `null` on a 404, which an
     unknown property gives too), `listPirs(propertyId, { includeDeleted })` (newest first), `getPir`,
     `createPir(propertyId, {inspector_initials, inspector_sign_date})`, `updatePir`, `softDeletePir` and
-    `undeletePir`. Reading is for anyone on the project; every change is admin only.
-  - **One property:** `/admin/properties/:propertyId` (`AdminPropertyPage`), from a BBL in `PropertiesTable` (the
-    properties list or a task order's bundle); Back ("Back to Properties — <project_id>") returns to its project's
-    properties. One `getProperty` and one `listPirs(…, { includeDeleted: true })`. The heading is "<project_id> ·
-    <address>". The Property card lists BBL, address, type, notes and added, with Edit (`PropertyFormModal`) and
-    Delete; a deleted property reads Deleted, has only Un-delete, and gets no Add PIR (the backend refuses a PIR
-    on it with a 400).
+    `undeletePir`. Reading, creating and editing are for anyone on the project; deleting and un-deleting for an
+    admin.
+  - **One property:** `/project/:projectId/properties/:propertyId` (`PropertyPage`), from a BBL in
+    `PropertiesTable` (the properties list or a task order's bundle), for anyone on the project; Back ("Back to
+    Properties — <project_id>") returns to the project's properties. One `getProperty` and one
+    `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
+    "<project_id> · <address>". The Property card lists BBL, address, type, notes and added, with Edit
+    (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
+    (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
+    PIR), anyone else no controls (the backend answers them 400). A demo user gets no controls and the note "Demo
+    mode: properties and PIRs are read-only."
   - **The PIR card** carries the status badge in its heading. With a live PIR: inspector initials, signed on, digitized
     ("Sep 20 by <name>") and as-built ("Not yet confirmed", or "As-built signed by <name> on <date>"), with Edit PIR
-    and Delete PIR. Without one: "No PIR yet." and Add PIR. Names come from `useUserNames` (`GET /v1/admin/users`
-    with deleted users); when it fails or lacks the user, the date stands alone.
-  - **Deleted PIRs** are listed under the card, muted and struck ("JD, signed Sep 14 · deleted Oct 3"), each with
+    for a member and Delete PIR for an admin. Without one: "No PIR yet." and, for a member, Add PIR. Names come
+    from `useUserNames` (an admin's list with deleted users, or the members' list); when it fails or lacks the
+    user, the date stands alone.
+  - **Deleted PIRs** (an admin's) are listed under the card, muted and struck ("JD, signed Sep 14 · deleted Oct 3"), each with
     Un-delete. While the property has a live PIR, Un-delete is off with the tooltip "This property has a live PIR.
     Delete it first to restore this one." (the backend's 409 otherwise).
   - **`PirFormModal`** (`mode`, `initial`; "Add PIR" / "Edit PIR"): inspector initials (trimmed, at most 16) and
@@ -507,7 +516,6 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
     (`pir`), or a status key (`status`), which the properties list reads off each row's `pir_status`
     (`pirStatusFromApi`: `none`, `dot_signed`, `as_built_signed`; anything else is none).
-  - A non-admin who opens the URL is told it is for admins; the backend returns 403 to their changes anyway.
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -545,8 +553,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     (and Delete, for an admin); a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by
     <name>"; the name comes from `useUserNames`, and when that fails or doesn't have them the card gives the date
     alone). Then "Bundled properties": "N properties bundled", `PropertiesTable` with Unbundle on each row, and
-    "Add properties". A BBL links to the property's page for an admin only (`linkToProperty`), since that page is
-    the admin's. Nothing bundled reads "No properties bundled yet. Click 'Add properties' to pick from this
+    "Add properties". A BBL links to the property's page (`/project/<project_id>/properties/<id>`), which is open
+    to anyone on the project. Nothing bundled reads "No properties bundled yet. Click 'Add properties' to pick from this
     project." Its Added column is when the property was added to the project: the response doesn't carry when it
     was bundled.
     - Edit uses the same dialog; Delete, Un-delete and Unbundle are each confirmed in `ConfirmDialog`, a refusal

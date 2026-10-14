@@ -123,7 +123,7 @@ export default function ProjectDashboard() {
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
           <button
             onClick={() => setPickingIdrDate(true)}
             className="bg-construction-600 text-white p-6 rounded-lg hover:bg-construction-700 transition-colors text-center"
@@ -147,6 +147,12 @@ export default function ProjectDashboard() {
             className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
           >
             <h3 className="font-bold text-lg">Progress</h3>
+          </button>
+          <button
+            onClick={() => navigate(`/project/${projectId}/properties`)}
+            className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
+          >
+            <h3 className="font-bold text-lg">Properties</h3>
           </button>
           <button
             onClick={() => navigate(`/project/${projectId}/task-orders`)}

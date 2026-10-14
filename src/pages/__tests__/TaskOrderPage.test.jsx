@@ -108,8 +108,9 @@ describe('TaskOrderPage — who can do what', () => {
     await waitFor(() => expect(within(details()).getByText('Created').nextSibling).toHaveTextContent('by Ada Admin'))
     expect(api.listUsers).toHaveBeenCalled()
     expect(api.listAdminUsers).not.toHaveBeenCalled()
-    // The property page is the admin's, so a member's BBLs aren't links
-    expect(within(bundled()).queryByRole('link')).not.toBeInTheDocument()
+    // The property page is open to anyone on the project, so a member's BBLs link to it too
+    expect(within(rowOf('4001230045')).getByRole('link', { name: '4001230045' }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/${MAIN.id}`)
 
     await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Unbundle' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
@@ -133,7 +134,7 @@ describe('TaskOrderPage — who can do what', () => {
     await renderLoaded()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     expect(within(rowOf('4001230045')).getByRole('link', { name: '4001230045' }))
-      .toHaveAttribute('href', `/admin/properties/${MAIN.id}`)
+      .toHaveAttribute('href', `/project/HWS0023/properties/${MAIN.id}`)
   })
 
   it('shows a member a deleted task order with nothing to change and no Un-delete', async () => {

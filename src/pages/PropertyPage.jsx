@@ -1,12 +1,14 @@
 /**
- * One property (route param :propertyId), at /admin/properties/:propertyId. Admins only: a card with its BBL,
- * address, type, notes and when it was added, with Edit and Delete; then its PIR card. With a live PIR the card
- * gives the inspector's initials, the date they signed, who digitized it when and whether the as-built is signed,
- * with Edit PIR and Delete PIR; without one it reads "No PIR yet." with Add PIR. The property's soft-deleted PIRs
- * are listed under it, muted, each with Un-delete (off while a live PIR exists). Every delete and un-delete is
- * confirmed first and announced in a toast; a refusal stays in its dialog. A deleted property reads Deleted, has
- * only Un-delete, and takes no new PIR (the backend refuses one). Back returns to the project's properties.
- * Anyone who isn't an admin is told so instead.
+ * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
+ * on the project: a card with its BBL, address, type, notes and when it was added; then its PIR card. With a live
+ * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
+ * as-built is signed; without one it reads "No PIR yet.". A member who isn't a demo user also gets
+ * Edit on the property, and Add PIR or Edit PIR. The destructive controls are an admin's alone: Delete and Delete
+ * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
+ * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
+ * A deleted property reads Deleted and takes no new PIR (the backend refuses one); only an admin can change it, or
+ * its PIR, or un-delete it. Back returns to the project's properties. The backend refuses anyone not on the
+ * project (403), which shows as the load error.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -30,6 +32,7 @@ import Toast from '../components/Toast'
 export const NO_PIR_TEXT = 'No PIR yet.'
 export const NOT_CONFIRMED_TEXT = 'Not yet confirmed'
 export const LIVE_PIR_TOOLTIP = 'This property has a live PIR. Delete it first to restore this one.'
+export const DEMO_NOTE = 'Demo mode: properties and PIRs are read-only.'
 
 // "Sep 14 by Ada Admin", or the date alone when the name isn't known
 const dateBy = (timestamp, name) => `${shortDate(timestamp)}${name ? ` by ${name}` : ''}`
@@ -42,12 +45,13 @@ const ACTIONS = {
   'pir-undelete': PIR_ACTIONS.undelete,
 }
 
-export default function AdminPropertyPage() {
-  const { propertyId } = useParams()
+export default function PropertyPage() {
+  const { projectId, propertyId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const admin = isAdmin(user)
-  const nameOf = useUserNames(admin ? user : null)
+  const writer = !user?.is_demo // the backend keeps demo users read-only on properties and PIRs
+  const nameOf = useUserNames(user)
 
   const [property, setProperty] = useState(null)
   const [pirs, setPirs] = useState([]) // every PIR of the property, deleted ones included, newest first
@@ -64,7 +68,6 @@ export default function AdminPropertyPage() {
   const [refreshError, setRefreshError] = useState(null) // a change worked but the PIRs couldn't be read again
 
   useEffect(() => {
-    if (!admin) return
     let ignore = false
     setLoading(true)
     setLoadError(null)
@@ -78,7 +81,7 @@ export default function AdminPropertyPage() {
       .catch(err => { if (!ignore) setLoadError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [admin, propertyId, attempt])
+  }, [propertyId, attempt])
 
   const open = (show) => {
     setActionError(null)
@@ -137,14 +140,13 @@ export default function AdminPropertyPage() {
     setPending(null)
   }
 
-  const backTo = property ? `/admin/projects/${property.project_id}/properties` : '/admin/projects'
   const back = (
     <button
-      onClick={() => navigate(backTo)}
+      onClick={() => navigate(`/project/${projectId}/properties`)}
       className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 mb-6"
     >
       <ArrowLeft className="h-5 w-5" />
-      <span className="font-medium">{property ? `Back to Properties — ${property.project_id}` : 'Back to All Projects (Admin)'}</span>
+      <span className="font-medium">Back to Properties — {projectId}</span>
     </button>
   )
 
@@ -156,14 +158,6 @@ export default function AdminPropertyPage() {
       </main>
     </div>
   )
-
-  if (!admin) {
-    return page(
-      <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-        Only an admin can manage properties.
-      </div>
-    )
-  }
 
   if (loading && !property) {
     return (
@@ -183,6 +177,8 @@ export default function AdminPropertyPage() {
   }
 
   const deleted = Boolean(property.deleted_at)
+  // A deleted property is the admin's: anyone else can't change it or its PIR (the backend refuses with 400)
+  const canChange = writer && (!deleted || admin)
 
   return page(
     <>
@@ -195,6 +191,8 @@ export default function AdminPropertyPage() {
         )}
       </h2>
 
+      {!writer && <p className="text-sm text-gray-600 mb-4">{DEMO_NOTE}</p>}
+
       {refreshError && (
         <p role="alert" className="text-sm text-red-600 mb-4">
           {refreshError}{' '}
@@ -206,7 +204,7 @@ export default function AdminPropertyPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 id="property-heading" className="text-lg font-semibold text-gray-900">Property</h3>
           <div className="flex flex-wrap gap-3">
-            {deleted ? (
+            {deleted ? (admin && (
               <button
                 type="button"
                 onClick={() => open(() => setPending({ kind: 'property-undelete', target: property }))}
@@ -214,24 +212,28 @@ export default function AdminPropertyPage() {
               >
                 Un-delete
               </button>
-            ) : (
+            )) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => open(() => setForm({ kind: 'property' }))}
-                  className="btn-secondary inline-flex items-center space-x-2"
-                >
-                  <Pencil className="h-4 w-4" />
-                  <span>Edit</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => open(() => setPending({ kind: 'property-delete', target: property }))}
-                  className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete</span>
-                </button>
+                {writer && (
+                  <button
+                    type="button"
+                    onClick={() => open(() => setForm({ kind: 'property' }))}
+                    className="btn-secondary inline-flex items-center space-x-2"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span>Edit</span>
+                  </button>
+                )}
+                {admin && (
+                  <button
+                    type="button"
+                    onClick={() => open(() => setPending({ kind: 'property-delete', target: property }))}
+                    className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete</span>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -251,24 +253,28 @@ export default function AdminPropertyPage() {
             <span>PIR</span>
             <PirStatusBadge pir={livePir} />
           </h3>
-          {livePir && (
+          {livePir && (canChange || admin) && (
             <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => open(() => setForm({ kind: 'pir', mode: 'edit' }))}
-                className="btn-secondary inline-flex items-center space-x-2"
-              >
-                <Pencil className="h-4 w-4" />
-                <span>Edit PIR</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => open(() => setPending({ kind: 'pir-delete', target: livePir }))}
-                className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete PIR</span>
-              </button>
+              {canChange && (
+                <button
+                  type="button"
+                  onClick={() => open(() => setForm({ kind: 'pir', mode: 'edit' }))}
+                  className="btn-secondary inline-flex items-center space-x-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  <span>Edit PIR</span>
+                </button>
+              )}
+              {admin && (
+                <button
+                  type="button"
+                  onClick={() => open(() => setPending({ kind: 'pir-delete', target: livePir }))}
+                  className="btn-secondary inline-flex items-center space-x-2 text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete PIR</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -289,7 +295,7 @@ export default function AdminPropertyPage() {
             <p className="text-gray-600">
               {NO_PIR_TEXT}{deleted ? ' A deleted property takes no PIR; un-delete it first.' : ''}
             </p>
-            {!deleted && (
+            {!deleted && writer && (
               <button
                 type="button"
                 onClick={() => open(() => setForm({ kind: 'pir', mode: 'add' }))}
@@ -302,7 +308,7 @@ export default function AdminPropertyPage() {
           </div>
         )}
 
-        {deletedPirs.length > 0 && (
+        {admin && deletedPirs.length > 0 && (
           <div className="mt-6 border-t border-gray-200 pt-4">
             <h4 className="text-sm font-medium text-gray-500 mb-2">Deleted PIRs</h4>
             <ul className="divide-y divide-gray-200">

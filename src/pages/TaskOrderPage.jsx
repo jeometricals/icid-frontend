@@ -7,7 +7,7 @@
  * Delete and Unbundle are confirmed first. A deleted task order reads Deleted and can't be changed: an admin gets
  * only "Un-delete", anyone else nothing (the backend refuses them). After each change the page shows the task
  * order the backend returned, and a delete, un-delete, unbundle or batch of additions is announced in a toast. A
- * BBL links to the property's page for an admin only, since that page is theirs. Back returns to the project's
+ * BBL links to the property's page, which is open to anyone on the project. Back returns to the project's
  * task orders; "Go to Project Page" sits beside it. The backend refuses anyone not on the project (403), which
  * shows as the load error.
  */
@@ -279,7 +279,6 @@ export default function TaskOrderPage() {
               <p className="text-sm text-gray-600 mb-3">{propertyCount(properties.length)} bundled</p>
               <PropertiesTable
                 properties={properties}
-                linkToProperty={admin}
                 renderActions={property => (!changeable ? <span className="text-gray-400">—</span> : (
                   <button
                     type="button"

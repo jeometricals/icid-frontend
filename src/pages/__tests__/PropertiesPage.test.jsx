@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminPropertiesPage, { EMPTY_TEXT } from '../AdminPropertiesPage'
+import PropertiesPage, { DEMO_NOTE, EMPTY_TEXT, EMPTY_TEXT_READ_ONLY } from '../PropertiesPage'
 import { BBL_TAKEN } from '../../components/PropertyFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
@@ -13,7 +13,6 @@ import { DEMO_USER, TEST_USER } from '../../test/users'
 // ---------------------------------------------------------------------------
 
 const ADMIN = { ...TEST_USER, role: 'admin' }
-const PROJECTS = [{ project_id: 'HWS0023', project_name: 'S/W Queens 2025' }]
 const YEAR = new Date().getFullYear()
 
 const property = (number, bbl, address, property_type, extra = {}) => ({
@@ -28,7 +27,7 @@ const LISTED = [
 const byAddress = (a, b) => a.address.localeCompare(b.address)
 
 vi.mock('../../services/api', () => ({
-  listProperties: vi.fn(), listAdminProjects: vi.fn(), createProperty: vi.fn(), updateProperty: vi.fn(),
+  listProperties: vi.fn(), createProperty: vi.fn(), updateProperty: vi.fn(),
   softDeleteProperty: vi.fn(), undeleteProperty: vi.fn(),
 }))
 
@@ -42,7 +41,6 @@ let server
 beforeEach(() => {
   vi.clearAllMocks()
   server = structuredClone(LISTED)
-  api.listAdminProjects.mockResolvedValue(PROJECTS)
   api.listProperties.mockImplementation(async (projectId, { includeDeleted = false } = {}) => (
     structuredClone(server.filter(row => includeDeleted || live(row)))
   ))
@@ -74,9 +72,9 @@ function CurrentUrl() {
 function renderPage(user = ADMIN) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={['/admin/projects/HWS0023/properties']}>
+    <MemoryRouter initialEntries={['/project/HWS0023/properties']}>
       <Routes>
-        <Route path="/admin/projects/:projectId/properties" element={<AdminPropertiesPage />} />
+        <Route path="/project/:projectId/properties" element={<PropertiesPage />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>
@@ -94,25 +92,54 @@ async function renderListed(user) {
   await screen.findByRole('table')
 }
 
-describe('AdminPropertiesPage — who sees it', () => {
-  it.each([['a regular user', TEST_USER], ['a demo user', DEMO_USER]])('tells %s it is for admins and asks nothing', async (_, user) => {
-    renderPage(user)
-    expect(screen.getByText('Only an admin can manage properties.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Add property/ })).not.toBeInTheDocument()
-    expect(api.listProperties).not.toHaveBeenCalled()
+describe('PropertiesPage — who can do what', () => {
+  it("lets a project member who isn't an admin add and edit, but not delete or see deleted ones", async () => {
+    await renderListed(TEST_USER)
+    expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
+    expect(screen.getByRole('button', { name: 'Add property' })).toBeInTheDocument()
+    expect(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(table()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Show deleted' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' }))
+    await userEvent.clear(screen.getByLabelText('Address'))
+    await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(rowOf('4001230045')).toHaveTextContent('14 Main St'))
   })
 
-  it('goes back to the admin project list', async () => {
-    await renderListed()
-    await userEvent.click(screen.getByRole('button', { name: /Back to All Projects/ }))
-    expect(screen.getByTestId('url')).toHaveTextContent('/admin/projects')
+  it('gives a demo user the list read-only: no Add, no Actions column, and a note saying so', async () => {
+    await renderListed(DEMO_USER)
+    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add property' })).not.toBeInTheDocument()
+    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
+      .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added'])
+    expect(within(table()).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it("tells a demo user with no properties only that there are none", async () => {
+    server = []
+    renderPage(DEMO_USER)
+    expect(await screen.findByText(EMPTY_TEXT_READ_ONLY)).toBeInTheDocument()
+  })
+
+  it("shows the backend's refusal of someone not on the project as the load error", async () => {
+    api.listProperties.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
+    renderPage(TEST_USER)
+    expect(await screen.findByText("Couldn't load the properties: Project access required")).toBeInTheDocument()
+  })
+
+  it('goes back to the project page', async () => {
+    await renderListed(TEST_USER)
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Project Page' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023')
   })
 })
 
-describe('AdminPropertiesPage — the list', () => {
+describe('PropertiesPage — the list', () => {
   it('heads the page with the project and lists BBL, address, type label, PIR status and added date', async () => {
     await renderListed()
-    expect(screen.getByRole('heading', { name: 'Properties — HWS0023 S/W Queens 2025' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Properties — HWS0023' })).toBeInTheDocument()
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added', 'Actions'])
@@ -136,7 +163,7 @@ describe('AdminPropertiesPage — the list', () => {
   it("links each BBL to the property's page", async () => {
     await renderListed()
     await userEvent.click(within(table()).getByRole('link', { name: '4001230045' }))
-    expect(screen.getByTestId('url')).toHaveTextContent(`/admin/properties/${LISTED[0].id}`)
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${LISTED[0].id}`)
   })
 
   it('shows the empty state when the project has none', async () => {
@@ -154,7 +181,7 @@ describe('AdminPropertiesPage — the list', () => {
   })
 })
 
-describe('AdminPropertiesPage — adding and editing', () => {
+describe('PropertiesPage — adding and editing', () => {
   it('adds a property, and the list read again shows it with its type label', async () => {
     await renderListed()
     await userEvent.click(screen.getByRole('button', { name: 'Add property' }))
@@ -203,7 +230,7 @@ describe('AdminPropertiesPage — adding and editing', () => {
   })
 })
 
-describe('AdminPropertiesPage — deleting and un-deleting', () => {
+describe('PropertiesPage — deleting and un-deleting', () => {
   it('soft-deletes a row once confirmed, and it leaves the list', async () => {
     await renderListed()
     await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Delete' }))

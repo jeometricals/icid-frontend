@@ -25,6 +25,16 @@ describe('PropertiesTable', () => {
     expect(headings()).toEqual(['BBL', 'Address', 'Type', 'Added', 'Actions'])
   })
 
+  it('links each BBL to its page under its project', () => {
+    renderTable()
+    expect(screen.getByRole('link', { name: '4001230045' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
+  })
+
+  it('has no Actions column without renderActions, as for a demo user', () => {
+    renderTable({ renderActions: undefined })
+    expect(headings()).toEqual(['BBL', 'Address', 'Type', 'Added'])
+  })
+
   it('shows each row\'s pir_status as a badge when asked', () => {
     renderTable({ properties: [{ ...ROW, pir_status: 'dot_signed' }], showPirStatus: true })
     expect(headings()).toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added', 'Actions'])

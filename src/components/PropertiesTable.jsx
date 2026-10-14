@@ -6,17 +6,19 @@ import { pirStatusFromApi } from '../lib/pirs'
 import StatusBadge from './StatusBadge'
 import PirStatusBadge from './PirStatusBadge'
 
+/** The page of one property: under its project, open to anyone on it. */
+export const propertyPath = (property) => `/project/${property.project_id}/properties/${property.id}`
+
 /**
- * A table of properties: BBL (a link to the property's admin page, unless linkToProperty is false), address (the
- * notes as a tooltip), type (its label), PIR (when asked for: the row's pir_status as a PirStatusBadge), added (when the property was added to the
- * project) and an Actions cell the caller fills. A soft-deleted property is muted, its BBL crossed out beside a
- * Deleted badge (the date as a tooltip). Rows are in the order given.
- * Props: properties, renderActions(property) (the Actions cell's content), showPirStatus (off by default: only the
- * project's property list carries pir_status), linkToProperty (on by default; off for anyone but an admin, since
- * the property page is admin only).
+ * A table of properties: BBL (a link to the property's page), address (the notes as a tooltip), type (its label),
+ * PIR (when asked for: the row's pir_status as a PirStatusBadge), added (when the property was added to the project)
+ * and, when the caller gives renderActions, an Actions cell it fills. A soft-deleted property is muted, its BBL
+ * crossed out beside a Deleted badge (the date as a tooltip). Rows are in the order given.
+ * Props: properties, renderActions(property) (the Actions cell's content; leave it out for no Actions column, as for
+ * a demo user), showPirStatus (off by default: only the project's property list carries pir_status).
  */
-export default function PropertiesTable({ properties, renderActions, showPirStatus = false, linkToProperty = true }) {
-  const headings = ['BBL', 'Address', 'Type', ...(showPirStatus ? ['PIR'] : []), 'Added', 'Actions']
+export default function PropertiesTable({ properties, renderActions, showPirStatus = false }) {
+  const headings = ['BBL', 'Address', 'Type', ...(showPirStatus ? ['PIR'] : []), 'Added', ...(renderActions ? ['Actions'] : [])]
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -41,17 +43,13 @@ export default function PropertiesTable({ properties, renderActions, showPirStat
                 <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                   {deleted ? (
                     <span className="inline-flex items-center gap-2">
-                      {linkToProperty
-                        ? <Link to={`/admin/properties/${row.id}`} className="line-through hover:underline">{row.bbl}</Link>
-                        : <span className="line-through">{row.bbl}</span>}
+                      <Link to={propertyPath(row)} className="line-through hover:underline">{row.bbl}</Link>
                       <span title={`Deleted ${format(parseISO(row.deleted_at), 'MMM d, yyyy')}`}>
                         <StatusBadge status="deleted" />
                       </span>
                     </span>
                   ) : (
-                    linkToProperty
-                      ? <Link to={`/admin/properties/${row.id}`} className="text-construction-700 hover:underline">{row.bbl}</Link>
-                      : row.bbl
+                    <Link to={propertyPath(row)} className="text-construction-700 hover:underline">{row.bbl}</Link>
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm">
@@ -68,7 +66,7 @@ export default function PropertiesTable({ properties, renderActions, showPirStat
                 <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
                   {shortDate(row.created_at)}
                 </td>
-                <td className="px-6 py-4 text-sm">{renderActions(row)}</td>
+                {renderActions && <td className="px-6 py-4 text-sm">{renderActions(row)}</td>}
               </tr>
             )
           })}

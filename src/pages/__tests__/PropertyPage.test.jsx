@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import AdminPropertyPage, { LIVE_PIR_TOOLTIP, NOT_CONFIRMED_TEXT, NO_PIR_TEXT } from '../AdminPropertyPage'
+import PropertyPage, { DEMO_NOTE, LIVE_PIR_TOOLTIP, NOT_CONFIRMED_TEXT, NO_PIR_TEXT } from '../PropertyPage'
 import { PIR_TAKEN } from '../../components/PirFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
@@ -21,7 +21,7 @@ const YEAR = new Date().getFullYear()
 vi.mock('../../services/api', () => ({
   getProperty: vi.fn(), updateProperty: vi.fn(), softDeleteProperty: vi.fn(), undeleteProperty: vi.fn(),
   listPirs: vi.fn(), createPir: vi.fn(), updatePir: vi.fn(), softDeletePir: vi.fn(), undeletePir: vi.fn(),
-  listAdminUsers: vi.fn(),
+  listAdminUsers: vi.fn(), listUsers: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -45,6 +45,7 @@ beforeEach(() => {
     property_type: '4_plus_family', notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
   pirs = []
   api.listAdminUsers.mockResolvedValue([ADMIN, RE])
+  api.listUsers.mockResolvedValue([ADMIN, RE].map(({ uuid, ...rest }) => ({ user_id: uuid, ...rest })))
   api.getProperty.mockImplementation(async () => structuredClone(property))
   api.updateProperty.mockImplementation(async (id, values) => {
     property = { ...property, ...values }
@@ -88,9 +89,9 @@ function CurrentUrl() {
 function renderPage(user = ADMIN) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={[`/admin/properties/${PROPERTY_ID}`]}>
+    <MemoryRouter initialEntries={[`/project/HWS0023/properties/${PROPERTY_ID}`]}>
       <Routes>
-        <Route path="/admin/properties/:propertyId" element={<AdminPropertyPage />} />
+        <Route path="/project/:projectId/properties/:propertyId" element={<PropertyPage />} />
         <Route path="*" element={<CurrentUrl />} />
       </Routes>
     </MemoryRouter>
@@ -114,16 +115,67 @@ async function addPir(initials = 'JD', date = `${YEAR}-09-14`) {
   await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 }
 
-describe('AdminPropertyPage — who sees it', () => {
-  it.each([['a regular user', TEST_USER], ['a demo user', DEMO_USER]])('tells %s it is for admins and asks nothing', (_, user) => {
-    renderPage(user)
-    expect(screen.getByText('Only an admin can manage properties.')).toBeInTheDocument()
-    expect(api.getProperty).not.toHaveBeenCalled()
+describe('PropertyPage — who can do what', () => {
+  it("lets a project member who isn't an admin edit the property and add and edit its PIR, but not delete", async () => {
+    await renderLoaded(TEST_USER)
+    expect(within(propertyCard()).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(propertyCard()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+
+    await addPir('JD')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.createPir).toHaveBeenCalled()
+    expect(within(pirCard()).getByRole('button', { name: 'Edit PIR' })).toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button', { name: 'Delete PIR' })).not.toBeInTheDocument()
+    // The member's name list is GET /v1/users/, not the admin's
+    await waitFor(() => expect(valueOf(pirCard(), 'Digitized')).toHaveTextContent('by Ada Admin'))
     expect(api.listAdminUsers).not.toHaveBeenCalled()
+  })
+
+  it("doesn't show a member the property's deleted PIRs or Un-delete", async () => {
+    pirs = [pir(1, { deleted_at: `${YEAR}-10-03T09:00:00` })] // the backend leaves these out for a member anyway
+    await renderLoaded(TEST_USER)
+    expect(within(pirCard()).queryByText('Deleted PIRs')).not.toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button', { name: 'Un-delete' })).not.toBeInTheDocument()
+  })
+
+  it('gives a member a deleted property, and its live PIR, with nothing to change', async () => {
+    property = { ...property, deleted_at: `${YEAR}-10-02T09:00:00` }
+    pirs = [pir(1)]
+    await renderLoaded(TEST_USER)
+    expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it("lets an admin edit a deleted property's live PIR, to clean up", async () => {
+    property = { ...property, deleted_at: `${YEAR}-10-02T09:00:00` }
+    pirs = [pir(1)]
+    await renderLoaded()
+    expect(within(propertyCard()).getByRole('button', { name: 'Un-delete' })).toBeInTheDocument()
+    expect(within(pirCard()).getByRole('button', { name: 'Edit PIR' })).toBeInTheDocument()
+  })
+
+  it('gives a demo user the page read-only, with a note saying so', async () => {
+    pirs = [pir(1)]
+    await renderLoaded(DEMO_USER)
+    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
+    expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('gives a demo user no Add PIR either', async () => {
+    await renderLoaded(DEMO_USER)
+    expect(within(pirCard()).getByText(NO_PIR_TEXT)).toBeInTheDocument()
+    expect(within(pirCard()).queryByRole('button', { name: 'Add PIR' })).not.toBeInTheDocument()
+  })
+
+  it("shows the backend's refusal of someone not on the project as the load error", async () => {
+    api.getProperty.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
+    renderPage(TEST_USER)
+    expect(await screen.findByText("Couldn't load the property: Project access required")).toBeInTheDocument()
   })
 })
 
-describe('AdminPropertyPage — the property', () => {
+describe('PropertyPage — the property', () => {
   it('heads the page with the project and address, and lists BBL, address, type, notes and added', async () => {
     await renderLoaded()
     expect(api.getProperty).toHaveBeenCalledWith(PROPERTY_ID)
@@ -138,7 +190,7 @@ describe('AdminPropertyPage — the property', () => {
   it('goes back to the project\'s properties', async () => {
     await renderLoaded()
     await userEvent.click(screen.getByRole('button', { name: 'Back to Properties — HWS0023' }))
-    expect(screen.getByTestId('url')).toHaveTextContent('/admin/projects/HWS0023/properties')
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/properties')
   })
 
   it('shows a load failure with Retry', async () => {
@@ -177,7 +229,7 @@ describe('AdminPropertyPage — the property', () => {
   })
 })
 
-describe('AdminPropertyPage — the PIR', () => {
+describe('PropertyPage — the PIR', () => {
   it('reads "No PIR yet." with Add PIR and a dash for its status when there is none', async () => {
     await renderLoaded()
     expect(within(pirCard()).getByText(NO_PIR_TEXT)).toBeInTheDocument()
