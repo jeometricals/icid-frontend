@@ -27,7 +27,7 @@ export const PIR_ACTIONS = {
   delete: {
     run: pir => softDeletePir(pir.id),
     title: () => 'Delete this PIR?',
-    message: pir => `The PIR signed by ${pir.inspector_initials} is kept but no longer counts, and the property can take a new one.`,
+    message: pir => `The PIR signed by ${pir.inspector_initials} is kept but no longer counts, and the site can take a new one.`,
     confirmLabel: 'Delete',
     confirmClassName: 'btn-danger',
     done: () => 'PIR deleted.',
@@ -35,7 +35,7 @@ export const PIR_ACTIONS = {
   undelete: {
     run: pir => undeletePir(pir.id),
     title: () => 'Un-delete this PIR?',
-    message: pir => `The PIR signed by ${pir.inspector_initials} becomes the property's PIR again.`,
+    message: pir => `The PIR signed by ${pir.inspector_initials} becomes the site's PIR again.`,
     confirmLabel: 'Un-delete',
     confirmClassName: 'btn-primary',
     done: () => 'PIR restored.',

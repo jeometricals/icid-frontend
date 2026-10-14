@@ -1,6 +1,7 @@
 /**
  * One project's task orders (route param :projectId), at /project/:projectId/task-orders, reached from the
- * project page's "Task Orders". For anyone on the project: a table (number, issued, how many properties) in the
+ * project page's "Task Order" tile. A "Site Info" link in the header leads to the project's properties (the sites
+ * a task order bundles). For anyone on the project: a table (number, issued, how many properties) in the
  * backend's order, which is by number. A number opens its task order's page. A member who isn't a demo user also
  * gets "Add task order" beside the heading and Edit on each row; both share one dialog. The destructive controls
  * are an admin's alone: Delete (a soft delete) on each row, and "Show deleted" (off to start), which asks the
@@ -131,17 +132,25 @@ export default function TaskOrdersPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Task Orders — {projectId}</h2>
-          {writer && (
-            <button
-              type="button"
-              onClick={() => open(() => setForm({ mode: 'add' }))}
-              disabled={!loaded}
-              className="btn-primary inline-flex items-center space-x-2"
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              to={`/project/${projectId}/properties`}
+              className="text-sm font-medium text-construction-700 hover:text-construction-800 hover:underline"
             >
-              <Plus className="h-4 w-4" />
-              <span>Add task order</span>
-            </button>
-          )}
+              Site Info
+            </Link>
+            {writer && (
+              <button
+                type="button"
+                onClick={() => open(() => setForm({ mode: 'add' }))}
+                disabled={!loaded}
+                className="btn-primary inline-flex items-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add task order</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {!writer && <p className="text-sm text-gray-600 mb-4">{DEMO_NOTE}</p>}

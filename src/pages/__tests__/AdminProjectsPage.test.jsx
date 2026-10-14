@@ -95,17 +95,17 @@ describe('AdminProjectsPage — the table', () => {
     expect(cells('SE384')).toEqual(['SE384', 'Sewer Rehab', '—', 'Brooklyn', '—', '—'])
   })
 
-  it('has Pay items, Properties, Task orders and Manage roles on each row', async () => {
+  it('has Pay items, Site Info, Task orders and Manage roles on each row', async () => {
     renderPage()
     await ready()
     for (const row of rows()) {
-      expect(within(row).getAllByRole('button').map(button => button.textContent)).toEqual(['Pay items', 'Properties', 'Task orders', 'Manage roles'])
+      expect(within(row).getAllByRole('button').map(button => button.textContent)).toEqual(['Pay items', 'Site Info', 'Task orders', 'Manage roles'])
     }
   })
 
   it.each([
     ['Pay items', '/admin/projects/SE384/pay-items'],
-    ['Properties', '/project/SE384/properties'],
+    ['Site Info', '/project/SE384/properties'],
     ['Task orders', '/project/SE384/task-orders'],
     ['Manage roles', '/admin/projects/SE384/roles'],
   ])('%s opens that project\'s page', async (name, path) => {

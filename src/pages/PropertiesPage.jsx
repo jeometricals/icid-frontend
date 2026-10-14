@@ -20,9 +20,9 @@ import PropertiesTable from '../components/PropertiesTable'
 import PropertyFormModal from '../components/PropertyFormModal'
 import Toast from '../components/Toast'
 
-export const EMPTY_TEXT = "No properties yet. Click 'Add property' to start."
-export const EMPTY_TEXT_READ_ONLY = 'No properties yet.'
-export const DEMO_NOTE = 'Demo mode: properties are read-only.'
+export const EMPTY_TEXT = "No sites yet. Click 'Add site' to start."
+export const EMPTY_TEXT_READ_ONLY = 'No sites yet.'
+export const DEMO_NOTE = 'Demo mode: sites are read-only.'
 
 const isDeleted = (row) => Boolean(row.deleted_at)
 
@@ -152,7 +152,7 @@ export default function PropertiesPage() {
         </button>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Properties — {projectId}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Site Info — {projectId}</h2>
           {writer && (
             <button
               type="button"
@@ -161,7 +161,7 @@ export default function PropertiesPage() {
               className="btn-primary inline-flex items-center space-x-2"
             >
               <Plus className="h-4 w-4" />
-              <span>Add property</span>
+              <span>Add site</span>
             </button>
           )}
         </div>
@@ -174,7 +174,7 @@ export default function PropertiesPage() {
           </div>
         ) : loadError ? (
           <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <p className="text-red-600 mb-4">Couldn't load the properties: {loadError}</p>
+            <p className="text-red-600 mb-4">Couldn't load the sites: {loadError}</p>
             <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
           </div>
         ) : (

@@ -8,7 +8,7 @@ export const MAX_BBL_LENGTH = 32
 export const MAX_ADDRESS_LENGTH = 200
 export const MAX_NOTES_LENGTH = 2000
 
-export const BBL_TAKEN = 'A property with this BBL already exists in this project.'
+export const BBL_TAKEN = 'A site with this BBL already exists in this project.'
 
 const KEYS = ['bbl', 'address', 'property_type', 'notes']
 const REQUIRED = ['bbl', 'address', 'property_type']
@@ -56,7 +56,7 @@ export default function PropertyFormModal({ mode = 'add', initial, onSave, onCan
 
   return (
     <Modal
-      title={adding ? 'Add property' : 'Edit property'}
+      title={adding ? 'Add site' : 'Edit site'}
       onClose={onCancel}
       busy={busy}
       footer={
@@ -105,7 +105,7 @@ export default function PropertyFormModal({ mode = 'add', initial, onSave, onCan
         </div>
 
         <div>
-          <label htmlFor="property-type" className="input-label">Property type</label>
+          <label htmlFor="property-type" className="input-label">Site type</label>
           <select
             id="property-type"
             className="input-field"

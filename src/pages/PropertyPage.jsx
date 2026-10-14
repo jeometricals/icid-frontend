@@ -31,8 +31,8 @@ import Toast from '../components/Toast'
 
 export const NO_PIR_TEXT = 'No PIR yet.'
 export const NOT_CONFIRMED_TEXT = 'Not yet confirmed'
-export const LIVE_PIR_TOOLTIP = 'This property has a live PIR. Delete it first to restore this one.'
-export const DEMO_NOTE = 'Demo mode: properties and PIRs are read-only.'
+export const LIVE_PIR_TOOLTIP = 'This site has a live PIR. Delete it first to restore this one.'
+export const DEMO_NOTE = 'Demo mode: sites and PIRs are read-only.'
 
 // "Sep 14 by Ada Admin", or the date alone when the name isn't known
 const dateBy = (timestamp, name) => `${shortDate(timestamp)}${name ? ` by ${name}` : ''}`
@@ -146,7 +146,7 @@ export default function PropertyPage() {
       className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 mb-6"
     >
       <ArrowLeft className="h-5 w-5" />
-      <span className="font-medium">Back to Properties — {projectId}</span>
+      <span className="font-medium">Back to Site Info — {projectId}</span>
     </button>
   )
 
@@ -170,7 +170,7 @@ export default function PropertyPage() {
   if (loadError) {
     return page(
       <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-        <p className="text-red-600 mb-4">Couldn't load the property: {loadError}</p>
+        <p className="text-red-600 mb-4">Couldn't load the site: {loadError}</p>
         <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
       </div>
     )
@@ -202,7 +202,7 @@ export default function PropertyPage() {
 
       <section aria-labelledby="property-heading" className="bg-white rounded-lg shadow-sm p-6 mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h3 id="property-heading" className="text-lg font-semibold text-gray-900">Property</h3>
+          <h3 id="property-heading" className="text-lg font-semibold text-gray-900">Site</h3>
           <div className="flex flex-wrap gap-3">
             {deleted ? (admin && (
               <button
@@ -293,7 +293,7 @@ export default function PropertyPage() {
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-gray-600">
-              {NO_PIR_TEXT}{deleted ? ' A deleted property takes no PIR; un-delete it first.' : ''}
+              {NO_PIR_TEXT}{deleted ? ' A deleted site takes no PIR; un-delete it first.' : ''}
             </p>
             {!deleted && writer && (
               <button

@@ -320,8 +320,9 @@ describe('ProjectDashboard progress button', () => {
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
     const progress = await screen.findByRole('button', { name: 'Progress' })
-    const tiles = within(progress.parentElement).getAllByRole('button').map(button => button.textContent)
-    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress', 'Properties', 'Task Orders'])
+    const tiles = within(progress.parentElement).getAllByRole('button')
+      .map(button => [...button.children].map(line => line.textContent).join(' / '))
+    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress', 'Task Order / for Sidewalk and Ped-Ramp'])
   })
 })
 
@@ -329,23 +330,34 @@ describe('ProjectDashboard progress button', () => {
 // Task Orders entry point
 // ---------------------------------------------------------------------------
 
-describe('ProjectDashboard properties button', () => {
-  it("navigates to this project's properties, for a member who isn't an admin", async () => {
-    mockAuth()
-    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
-    renderDashboard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Properties' }))
-    expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/properties')
-  })
-})
-
 describe('ProjectDashboard task orders button', () => {
   it("navigates to this project's task orders, for a member who isn't an admin", async () => {
     mockAuth()
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Task Orders' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Task Order/ }))
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/task-orders')
+  })
+
+  it('reads "Task Order" over a smaller, muted "for Sidewalk and Ped-Ramp"', async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    const tile = await screen.findByRole('button', { name: /Task Order/ })
+    const [title, subtitle] = tile.children
+    expect(title).toHaveTextContent('Task Order')
+    expect(title).toHaveClass('font-bold', 'text-lg')
+    expect(subtitle).toHaveTextContent('for Sidewalk and Ped-Ramp')
+    expect(subtitle).toHaveClass('text-sm', 'text-gray-500')
+    expect(subtitle).not.toHaveClass('font-bold')
+  })
+
+  it('leaves the properties to the task orders page: no tile of their own', async () => {
+    mockAuth()
+    vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
+    renderDashboard()
+    await screen.findByRole('button', { name: /Task Order/ })
+    expect(screen.queryByRole('button', { name: /Properties|Site Info/ })).not.toBeInTheDocument()
   })
 })
 

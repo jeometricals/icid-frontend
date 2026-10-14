@@ -103,7 +103,7 @@ async function renderLoaded(user) {
   await screen.findByRole('heading', { name: /HWS0023 · 12 Main St/ })
 }
 
-const propertyCard = () => screen.getByRole('region', { name: 'Property' })
+const propertyCard = () => screen.getByRole('region', { name: 'Site' })
 const pirCard = () => screen.getByRole('region', { name: /^PIR/ })
 const valueOf = (card, term) => within(card).getByText(term).nextSibling
 const dialog = () => screen.getByRole('dialog')
@@ -171,7 +171,7 @@ describe('PropertyPage — who can do what', () => {
   it("shows the backend's refusal of someone not on the project as the load error", async () => {
     api.getProperty.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
     renderPage(TEST_USER)
-    expect(await screen.findByText("Couldn't load the property: Project access required")).toBeInTheDocument()
+    expect(await screen.findByText("Couldn't load the site: Project access required")).toBeInTheDocument()
   })
 })
 
@@ -189,14 +189,14 @@ describe('PropertyPage — the property', () => {
 
   it('goes back to the project\'s properties', async () => {
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Properties — HWS0023' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Info — HWS0023' }))
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/properties')
   })
 
   it('shows a load failure with Retry', async () => {
     api.getProperty.mockRejectedValueOnce(new Error('Property not found'))
     renderPage()
-    expect(await screen.findByText("Couldn't load the property: Property not found")).toBeInTheDocument()
+    expect(await screen.findByText("Couldn't load the site: Property not found")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('heading', { name: /12 Main St/ })).toBeInTheDocument()
   })
@@ -204,7 +204,7 @@ describe('PropertyPage — the property', () => {
   it('edits the property in its pre-filled dialog', async () => {
     await renderLoaded()
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Edit' }))
-    expect(dialog()).toHaveAccessibleName('Edit property')
+    expect(dialog()).toHaveAccessibleName('Edit site')
     await userEvent.clear(screen.getByLabelText('Address'))
     await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -216,10 +216,10 @@ describe('PropertyPage — the property', () => {
   it('deletes the property once confirmed, then offers Un-delete and no new PIR', async () => {
     await renderLoaded()
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Delete' }))
-    expect(dialog()).toHaveAccessibleName('Delete property 4001230045?')
+    expect(dialog()).toHaveAccessibleName('Delete site 4001230045?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByText('Property 4001230045 deleted.')).toBeInTheDocument()
+    expect(await screen.findByText('Site 4001230045 deleted.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /12 Main St/ })).toHaveTextContent('Deleted')
     expect(within(pirCard()).queryByRole('button', { name: 'Add PIR' })).not.toBeInTheDocument()
 

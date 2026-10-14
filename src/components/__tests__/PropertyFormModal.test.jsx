@@ -17,7 +17,7 @@ function renderModal(props = {}) {
 
 const bbl = () => screen.getByLabelText('BBL')
 const address = () => screen.getByLabelText('Address')
-const type = () => screen.getByLabelText('Property type')
+const type = () => screen.getByLabelText('Site type')
 const notes = () => screen.getByLabelText(/Notes/)
 const saveButton = () => screen.getByRole('button', { name: 'Save' })
 
@@ -28,9 +28,9 @@ async function fill({ bblText = '4001230045', addressText = '12 Main St', typeVa
 }
 
 describe('PropertyFormModal — adding', () => {
-  it('opens empty, titled "Add property", with Save off', () => {
+  it('opens empty, titled "Add site", with Save off', () => {
     renderModal()
-    expect(screen.getByRole('dialog', { name: 'Add property' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Add site' })).toBeInTheDocument()
     expect(bbl()).toHaveDisplayValue('')
     expect(address()).toHaveDisplayValue('')
     expect(type()).toHaveValue('')
@@ -87,9 +87,9 @@ describe('PropertyFormModal — adding', () => {
 })
 
 describe('PropertyFormModal — editing', () => {
-  it('opens pre-filled, titled "Edit property", with Save off until something changes', async () => {
+  it('opens pre-filled, titled "Edit site", with Save off until something changes', async () => {
     renderModal({ mode: 'edit', initial: PROPERTY })
-    expect(screen.getByRole('dialog', { name: 'Edit property' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Edit site' })).toBeInTheDocument()
     expect(bbl()).toHaveDisplayValue('4001230045')
     expect(address()).toHaveDisplayValue('12 Main St')
     expect(type()).toHaveValue('1_3_family')

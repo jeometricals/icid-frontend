@@ -3,7 +3,7 @@
  * code, status) in the backend's order, which is by project ID, and a "Create project" button that opens a dialog
  * for a new one. After a save the list is read again, so the new row shows what the backend wrote. A created
  * project is announced once, in a banner that goes when dismissed or when the dialog is opened again. Each row
- * has "Pay items", "Properties", "Task orders" and "Manage roles", which open that project's pay items,
+ * has "Pay items", "Site Info" (the properties page), "Task orders" and "Manage roles", which open that project's pay items,
  * properties and task orders (the project-level pages, /project/<id>/properties and /project/<id>/task-orders) and roles pages. Anyone who isn't an
  * admin is told so instead.
  */
@@ -178,7 +178,7 @@ export default function AdminProjectsPage() {
                               onClick={() => navigate(`/project/${row.project_id}/properties`)}
                               className="btn-secondary whitespace-nowrap"
                             >
-                              Properties
+                              Site Info
                             </button>
                             <button
                               type="button"

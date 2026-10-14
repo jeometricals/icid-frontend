@@ -5,7 +5,7 @@ import { formErrors } from '../lib/formErrors'
 // The longest initials the backend takes
 export const MAX_INITIALS_LENGTH = 16
 
-export const PIR_TAKEN = 'This property already has a PIR. Cancel to see it.'
+export const PIR_TAKEN = 'This site already has a PIR. Cancel to see it.'
 
 const KEYS = ['inspector_initials', 'inspector_sign_date']
 

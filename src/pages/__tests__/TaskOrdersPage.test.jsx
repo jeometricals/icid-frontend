@@ -136,6 +136,14 @@ describe('TaskOrdersPage — who can do what', () => {
     expect(await screen.findByText("Couldn't load the task orders: Not a member of this project")).toBeInTheDocument()
   })
 
+  it('links to the Site Info page from the header, for anyone, demo users included', async () => {
+    await renderListed(DEMO_USER)
+    const link = screen.getByRole('link', { name: 'Site Info' })
+    expect(link.closest('main').querySelector('h2').parentElement).toContainElement(link)
+    await userEvent.click(link)
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/properties')
+  })
+
   it('goes back to the project page', async () => {
     await renderListed()
     await userEvent.click(screen.getByRole('button', { name: 'Back to Project Page' }))

@@ -96,7 +96,7 @@ describe('PropertiesPage — who can do what', () => {
   it("lets a project member who isn't an admin add and edit, but not delete or see deleted ones", async () => {
     await renderListed(TEST_USER)
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
-    expect(screen.getByRole('button', { name: 'Add property' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add site' })).toBeInTheDocument()
     expect(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(within(table()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: 'Show deleted' })).not.toBeInTheDocument()
@@ -111,7 +111,7 @@ describe('PropertiesPage — who can do what', () => {
   it('gives a demo user the list read-only: no Add, no Actions column, and a note saying so', async () => {
     await renderListed(DEMO_USER)
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add property' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add site' })).not.toBeInTheDocument()
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added'])
     expect(within(table()).queryByRole('button')).not.toBeInTheDocument()
@@ -126,7 +126,7 @@ describe('PropertiesPage — who can do what', () => {
   it("shows the backend's refusal of someone not on the project as the load error", async () => {
     api.listProperties.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
     renderPage(TEST_USER)
-    expect(await screen.findByText("Couldn't load the properties: Project access required")).toBeInTheDocument()
+    expect(await screen.findByText("Couldn't load the sites: Project access required")).toBeInTheDocument()
   })
 
   it('goes back to the project page', async () => {
@@ -139,7 +139,7 @@ describe('PropertiesPage — who can do what', () => {
 describe('PropertiesPage — the list', () => {
   it('heads the page with the project and lists BBL, address, type label, PIR status and added date', async () => {
     await renderListed()
-    expect(screen.getByRole('heading', { name: 'Properties — HWS0023' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Site Info — HWS0023' })).toBeInTheDocument()
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
     expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added', 'Actions'])
@@ -175,7 +175,7 @@ describe('PropertiesPage — the list', () => {
   it('shows a load failure with Retry', async () => {
     api.listProperties.mockRejectedValueOnce(new Error('Project not found'))
     renderPage()
-    expect(await screen.findByText("Couldn't load the properties: Project not found")).toBeInTheDocument()
+    expect(await screen.findByText("Couldn't load the sites: Project not found")).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('table')).toBeInTheDocument()
   })
@@ -184,11 +184,11 @@ describe('PropertiesPage — the list', () => {
 describe('PropertiesPage — adding and editing', () => {
   it('adds a property, and the list read again shows it with its type label', async () => {
     await renderListed()
-    await userEvent.click(screen.getByRole('button', { name: 'Add property' }))
-    expect(dialog()).toHaveAccessibleName('Add property')
+    await userEvent.click(screen.getByRole('button', { name: 'Add site' }))
+    expect(dialog()).toHaveAccessibleName('Add site')
     await userEvent.type(screen.getByLabelText('BBL'), '4005550001')
     await userEvent.type(screen.getByLabelText('Address'), '7 Elm Pl')
-    await userEvent.selectOptions(screen.getByLabelText('Property type'), 'expedited')
+    await userEvent.selectOptions(screen.getByLabelText('Site type'), 'expedited')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -201,10 +201,10 @@ describe('PropertiesPage — adding and editing', () => {
 
   it('shows a duplicate BBL in the dialog and adds no row', async () => {
     await renderListed()
-    await userEvent.click(screen.getByRole('button', { name: 'Add property' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add site' }))
     await userEvent.type(screen.getByLabelText('BBL'), '4001230045')
     await userEvent.type(screen.getByLabelText('Address'), '99 Other St')
-    await userEvent.selectOptions(screen.getByLabelText('Property type'), '1_3_family')
+    await userEvent.selectOptions(screen.getByLabelText('Site type'), '1_3_family')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await within(dialog()).findByText(BBL_TAKEN)).toBeInTheDocument()
@@ -217,7 +217,7 @@ describe('PropertiesPage — adding and editing', () => {
   it('edits a row from its pre-filled dialog, and the list reflects the change', async () => {
     await renderListed()
     await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' }))
-    expect(dialog()).toHaveAccessibleName('Edit property')
+    expect(dialog()).toHaveAccessibleName('Edit site')
     const address = screen.getByLabelText('Address')
     expect(address).toHaveDisplayValue('12 Main St')
     await userEvent.clear(address)
@@ -234,12 +234,12 @@ describe('PropertiesPage — deleting and un-deleting', () => {
   it('soft-deletes a row once confirmed, and it leaves the list', async () => {
     await renderListed()
     await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Delete' }))
-    expect(dialog()).toHaveAccessibleName('Delete property 4001230045?')
+    expect(dialog()).toHaveAccessibleName('Delete site 4001230045?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(queryRowOf('4001230045')).toBeNull())
     expect(api.softDeleteProperty).toHaveBeenCalledWith(LISTED[0].id)
-    expect(screen.getByRole('status')).toHaveTextContent('Property 4001230045 deleted.')
+    expect(screen.getByRole('status')).toHaveTextContent('Site 4001230045 deleted.')
   })
 
   it('cancelling a delete changes nothing', async () => {

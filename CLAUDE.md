@@ -425,8 +425,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   only an admin sees. One `GET /v1/admin/projects` (`listAdminProjects` in `services/projects.js`), shown in the
   backend's order (by project ID): project ID, name, description, borough, registration code and status, a dash
   for whatever a project lacks. Nothing on a row is editable. Each row's Actions cell has "Pay items"
-  (`/admin/projects/<project_id>/pay-items`), "Properties" (`/admin/projects/<project_id>/properties`), "Task
-  orders" (the project-level `/project/<project_id>/task-orders`) and "Manage roles"
+  (`/admin/projects/<project_id>/pay-items`), "Site Info" (the project-level `/project/<project_id>/properties`),
+  "Task orders" (the project-level `/project/<project_id>/task-orders`) and "Manage roles"
   (`/admin/projects/<project_id>/roles`).
   "Create project" (right of the heading) opens `CreateProjectModal`: project ID, project name, description,
   borough (free text: there is no borough list) and registration code (optional). Save is off until the first
@@ -438,20 +438,30 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   project has no status and is on nobody's project list until someone is given a role on it
   (`/admin/projects/<project_id>/roles`). A non-admin who opens the URL is told it is for admins; the backend
   returns 403 to them anyway.
-- **Properties.** `/project/:projectId/properties` (`PropertiesPage`), reached from "Properties" on the project
-  page (and on an `/admin/projects` row); Back returns to the project page. The project's properties (the lots its
-  work is done at), kept by hand. A project-level feature since S2, as task orders are since S1: any member of the
-  project reads, adds and edits them; only the destructive controls (Delete, Un-delete, Show deleted) are an
-  admin's. A demo user reads only: no Add, no Actions column, and the note "Demo mode: properties are read-only."
-  (the backend answers 403). The backend refuses anyone not on the project (403), which shows as the load error. A property is `{id, project_id, bbl, address, property_type, notes, created_at,
-  updated_at, created_by, deleted_at, deleted_by}`; `property_type` is one of `1_3_family` ("1-3 family"),
-  `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), listed with their labels in
-  `src/data/propertyTypes.js` (the backend's CHECK holds the same three; a new type needs it first).
+- **Properties ("Site Info" in the UI).** `/project/:projectId/properties` (`PropertiesPage`), reached from the
+  "Site Info" link in the task orders page's header (and "Site Info" on an `/admin/projects` row); the dashboard
+  has no tile for it. Back returns to the project page. The project's properties (the lots its work is done at),
+  kept by hand.
+  - **Naming.** Internally a property is a property: files, components, services, routes (`/properties`), query
+    keys and backend fields keep the word. What the user reads says "site": "Site Info" for the list and its
+    links, "site" / "sites" in buttons, dialogs, confirms, toasts, empty states and notes ("Add site", "Edit
+    site", "Site type", "Delete site <bbl>?", "Site <bbl> deleted."). The column headings (BBL, Address, Type,
+    PIR, Added) are unchanged. Messages the backend words itself ("Property not found", its 409 details) still
+    say "property". The task-order pages' own wording ("Bundled properties", "Add properties", "24 properties")
+    hasn't been renamed yet.
+  - **Who does what.** Since S2 (as for task orders since S1) any member of the project reads, adds and edits
+    them; only the destructive controls (Delete, Un-delete, Show deleted) are an admin's. A demo user reads only:
+    no Add, no Actions column, and the note "Demo mode: sites are read-only." (the backend answers 403). The
+    backend refuses anyone not on the project (403), which shows as the load error.
+  - A property is `{id, project_id, bbl, address, property_type, notes, created_at, updated_at, created_by,
+    deleted_at, deleted_by}`; `property_type` is one of `1_3_family` ("1-3 family"),
+    `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), listed with their labels in
+    `src/data/propertyTypes.js` (the backend's CHECK holds the same three; a new type needs it first).
   - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })`, `getProperty`,
     `createProperty(projectId, data)`, `updateProperty(propertyId, data)`, `softDeleteProperty` and
     `undeleteProperty`. Reading, adding and editing are for anyone on the project (or an admin), deleting and
     un-deleting for an admin; `include_deleted` from a non-admin is ignored by the backend.
-  - **Load:** one `listProperties`; the heading is "Properties — <project_id>". A failure is the load error with
+  - **Load:** one `listProperties`; the heading is "Site Info — <project_id>". A failure is the load error with
     Retry.
   - **The table** (`PropertiesTable`, shared with a task order's bundle) is in the backend's order (by address):
     BBL (a link to `/project/<project_id>/properties/<id>`, `propertyPath`), address (the notes as a tooltip), type (its label), PIR (the row's
@@ -459,12 +469,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     leaves it off, its properties carrying no `pir_status`), added (`created_at` through `lib/shortDate.js`:
     "Sep 14", with the year when it isn't this one) and, when the page passes `renderActions`, Actions: Edit for a
     member, Delete too for an admin (none for a demo user, whose table has no Actions column). No properties reads
-    "No properties yet. Click 'Add property' to start." ("No properties yet." for a demo user)
-  - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add property" / "Edit property"): BBL, address
-    and "Property type" (a select of the three labels) required, notes optional. Save is off until the three are
+    "No sites yet. Click 'Add site' to start." ("No sites yet." for a demo user)
+  - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add site" / "Edit site"): BBL, address
+    and "Site type" (a select of the three labels) required, notes optional. Save is off until the three are
     in, and when editing until something changed; adding sends all four, editing only what changed (the backend
     answers 400 to an empty PATCH). Text is trimmed and blank notes are `null` (which clears them). The page
-    passes the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A property with this BBL already exists in this project."
+    passes the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A site with this BBL already exists in this project."
     above the BBL field (its `existing_property_id` isn't used yet), a 422's messages sit under the fields their
     `loc` names, anything else (a blank or over-long value is the backend's 400) shows below the form as worded.
     The form keeps what was typed. After a save the list is read again.
@@ -473,7 +483,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     BBL crossed out beside a Deleted badge (the date as a tooltip), and has "Un-delete" instead of Edit / Delete.
   - **Delete** (a soft delete; it frees the BBL) and **Un-delete** are each confirmed in `ConfirmDialog`, a refusal
     shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success the list
-    is read again and a toast reads "Property <bbl> deleted." / "Property <bbl> restored." The backend takes a
+    is read again and a toast reads "Site <bbl> deleted." / "Site <bbl> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
   admin. One live
@@ -488,29 +498,29 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     admin.
   - **One property:** `/project/:projectId/properties/:propertyId` (`PropertyPage`), from a BBL in
     `PropertiesTable` (the properties list or a task order's bundle), for anyone on the project; Back ("Back to
-    Properties — <project_id>") returns to the project's properties. One `getProperty` and one
+    Site Info — <project_id>") returns to the project's properties. One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
-    "<project_id> · <address>". The Property card lists BBL, address, type, notes and added, with Edit
+    "<project_id> · <address>". The Site card (the property's) lists BBL, address, type, notes and added, with Edit
     (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
     (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
     PIR), anyone else no controls (the backend answers them 400). A demo user gets no controls and the note "Demo
-    mode: properties and PIRs are read-only."
+    mode: sites and PIRs are read-only."
   - **The PIR card** carries the status badge in its heading. With a live PIR: inspector initials, signed on, digitized
     ("Sep 20 by <name>") and as-built ("Not yet confirmed", or "As-built signed by <name> on <date>"), with Edit PIR
     for a member and Delete PIR for an admin. Without one: "No PIR yet." and, for a member, Add PIR. Names come
     from `useUserNames` (an admin's list with deleted users, or the members' list); when it fails or lacks the
     user, the date stands alone.
   - **Deleted PIRs** (an admin's) are listed under the card, muted and struck ("JD, signed Sep 14 · deleted Oct 3"), each with
-    Un-delete. While the property has a live PIR, Un-delete is off with the tooltip "This property has a live PIR.
+    Un-delete. While the property has a live PIR, Un-delete is off with the tooltip "This site has a live PIR.
     Delete it first to restore this one." (the backend's 409 otherwise).
   - **`PirFormModal`** (`mode`, `initial`; "Add PIR" / "Edit PIR"): inspector initials (trimmed, at most 16) and
     inspector sign date, both required. Save is off until both are in and, when editing, something changed;
     editing sends only what changed. A 409 (the property got a live PIR since the page loaded) reads "This
-    property already has a PIR. Cancel to see it." below the form, and the page reads the PIRs again behind the
+    site already has a PIR. Cancel to see it." below the form, and the page reads the PIRs again behind the
     dialog; a 400 reads as the backend worded it; a 422 sits under its field (`lib/formErrors.js`, whose 409 can
     now name no field). Creating after a delete is not a 409: the deleted PIR freed the property.
   - Every delete and un-delete (the property's and the PIR's) is confirmed in `ConfirmDialog`; a refusal shows
-    there; the toasts read "Property <bbl> deleted." / "restored." and "PIR deleted." / "PIR restored.". After a
+    there; the toasts read "Site <bbl> deleted." / "restored." and "PIR deleted." / "PIR restored.". After a
     PIR change the page reads the PIRs again; after a property change it shows the property the call returned.
   - **The status badge** (`PirStatusBadge`, from `pirStatus` in `lib/pirs.js`): a dash for no live PIR, "Signed by
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
@@ -532,10 +542,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Service:** `services/taskOrders.js`: `listTaskOrders(projectId, { includeDeleted })`, `getTaskOrder`,
     `createTaskOrder`, `updateTaskOrder`, `softDeleteTaskOrder`, `undeleteTaskOrder`, `bundleProperty(taskOrderId,
     propertyId)` and `unbundleProperty`.
-  - **The list:** `/project/:projectId/task-orders` (`TaskOrdersPage`), reached from the "Task Orders" tile on the
-    project dashboard (after Progress) and from "Task orders" on an `/admin/projects` row. Back ("Back to Project
-    Page") returns to the dashboard. "Task Orders — <project_id>" (no project name, as on Progress) and "Add task
-    order". The table, in the backend's order (by number): Number (a link to the task order's page), Issued
+  - **The list:** `/project/:projectId/task-orders` (`TaskOrdersPage`), reached from the dashboard's last tile
+    (after Progress), which reads "Task Order" over a smaller, muted, normal-weight "for Sidewalk and Ped-Ramp"
+    (`text-sm text-gray-500`), and from "Task orders" on an `/admin/projects` row. Back ("Back to Project Page")
+    returns to the dashboard. "Task Orders — <project_id>" (no project name, as on Progress); on its right a
+    plain "Site Info" link (small construction-coloured text, not a button) to `/project/<id>/properties`, for
+    everyone, demo users included, then "Add task order". The table, in the backend's order (by number): Number (a link to the task order's page), Issued
     (`shortDate`, or a dash), Properties ("24 properties", "1 property") and Edit (and Delete, for an admin).
     "Show deleted", the muted deleted rows with Un-delete, the confirm dialogs, the toasts ("Task order <number>
     deleted." / "restored."), reading the list again after every change and the load error are as on the
