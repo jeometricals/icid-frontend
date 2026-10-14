@@ -29,7 +29,12 @@ beforeEach(() => {
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens 2025' })
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.listIdrs.mockResolvedValue([])
-  api.listQuantities.mockResolvedValue({ rows: [], totals_by_unit: {}, row_count: 0, truncated: false })
+  // The Progress page reads only the roll-ups (Q0): an empty project, nothing approved and no budget
+  api.listQuantities.mockResolvedValue({
+    pay_items: [], totals_by_budget_code: [],
+    project_total: { actual_value: 0, budgeted_value: 0, percent: null },
+    unbudgeted_total: { actual_value: null, row_count: 0 },
+  })
   api.getIdr.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
 })
 
