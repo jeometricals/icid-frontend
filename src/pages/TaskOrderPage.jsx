@@ -7,7 +7,7 @@
  * Delete and Unbundle are confirmed first. A deleted task order reads Deleted and can't be changed: an admin gets
  * only "Un-delete", anyone else nothing (the backend refuses them). After each change the page shows the task
  * order the backend returned, and a delete, un-delete, unbundle or batch of additions is announced in a toast. A
- * BBL links to the property's page, which is open to anyone on the project. Back returns to the project's
+ * site's block and lot ("Ped ramp" for a ped ramp) link to the property's page, which is open to anyone on the project. Back returns to the project's
  * task orders; "Go to Project Page" sits beside it. The backend refuses anyone not on the project (403), which
  * shows as the load error.
  */

@@ -44,7 +44,7 @@ let pages
 
 beforeEach(() => {
   vi.clearAllMocks()
-  property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', bbl: '4001230045', address: '12 Main St',
+  property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45', address: '12 Main St',
     display_address: '12 Main St', deleted_at: null }
   pages = [page(1), page(2, { scale_px_per_ft: null }), page(3)]
   api.getProperty.mockImplementation(async () => structuredClone(property))
@@ -112,13 +112,13 @@ describe('PirPage — loading', () => {
 
   it('goes back to the site, or to the project', async () => {
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Site 4001230045' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Block 123 Lot 45' }))
     expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${PROPERTY_ID}`)
   })
 
   it("heads a ped ramp's workspace with its intersection, and names it so on Back", async () => {
     const name = 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)'
-    property = { ...property, kind: 'ped_ramp', bbl: null, address: null, display_address: name }
+    property = { ...property, kind: 'ped_ramp', block: null, lot: null, address: null, display_address: name }
     renderPage()
     expect(await screen.findByRole('heading', { name: `PIR · ${name} Signed by DOT` })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Back to Site ${name}` })).toBeInTheDocument()

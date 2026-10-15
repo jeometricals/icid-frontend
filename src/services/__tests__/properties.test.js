@@ -9,10 +9,10 @@ beforeEach(() => {
 })
 
 const PROPERTY_ID = 'c0000000-0000-4000-8000-000000000001'
-const PROPERTY = { id: PROPERTY_ID, project_id: 'HWS0023', bbl: '4001230045', address: '12 Main St',
+const PROPERTY = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45', address: '12 Main St',
   property_type: '1_3_family', notes: null, created_at: '2026-09-14T12:00:00Z', updated_at: '2026-09-14T12:00:00Z',
   created_by: 'u1', deleted_at: null, deleted_by: null }
-const VALUES = { bbl: '4001230045', address: '12 Main St', property_type: '1_3_family', notes: null }
+const VALUES = { kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45', address: '12 Main St', property_type: '1_3_family', notes: null }
 
 describe('listProperties', () => {
   it('GETs the project\'s properties without include_deleted by default', async () => {
@@ -52,8 +52,8 @@ describe('createProperty', () => {
     expect(JSON.parse(fetchInit().body)).toEqual(VALUES)
   })
 
-  it('throws a taken BBL\'s 409 with the property that has it', async () => {
-    mockFetch(409, { detail: 'A property with this BBL already exists in this project', existing_property_id: PROPERTY_ID })
+  it('throws a taken lot\'s 409 with the property that has it', async () => {
+    mockFetch(409, { detail: 'A site at Queens Block 123 Lot 45 already exists in this project.', existing_property_id: PROPERTY_ID })
     await expect(createProperty('HWS0023', VALUES)).rejects.toMatchObject({
       status: 409, body: { existing_property_id: PROPERTY_ID },
     })
@@ -85,10 +85,10 @@ describe('softDeleteProperty and undeleteProperty', () => {
     expect(fetchInit().method).toBe('POST')
   })
 
-  it('throws the backend message when another property now has the BBL', async () => {
-    mockFetch(409, { detail: 'Another property in this project now has this BBL', existing_property_id: 'x' })
+  it('throws the backend message when another site is now at its lot', async () => {
+    mockFetch(409, { detail: 'Another site at Queens Block 123 Lot 45 now exists in this project.', existing_property_id: 'x' })
     await expect(undeleteProperty(PROPERTY_ID)).rejects.toMatchObject({
-      message: 'Another property in this project now has this BBL', status: 409,
+      message: 'Another site at Queens Block 123 Lot 45 now exists in this project.', status: 409,
     })
   })
 })

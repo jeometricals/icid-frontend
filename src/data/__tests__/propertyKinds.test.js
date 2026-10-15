@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { facingStreetName, parseBbl, propertyKindLabel, rampTypeLabel } from '../propertyKinds'
+import { facingStreetName, propertyKindLabel, rampTypeLabel, withoutLeadingZeros } from '../propertyKinds'
 
-describe('parseBbl', () => {
-  it('reads the borough, block and lot of a 10-digit BBL, without leading zeros', () => {
-    expect(parseBbl('4001230045')).toEqual({ borough: 'Queens', block: '123', lot: '45' })
-    expect(parseBbl(' 1000010001 ')).toEqual({ borough: 'Manhattan', block: '1', lot: '1' })
-    expect(parseBbl('5000000000')).toEqual({ borough: 'Staten Island', block: '0', lot: '0' })
-  })
+describe('withoutLeadingZeros', () => {
+  it.each([['00123', '123'], [' 0045 ', '45'], ['0000', '0'], ['0', '0'], ['120', '120']])(
+    'reads %j as %j', (text, number) => {
+      expect(withoutLeadingZeros(text)).toBe(number)
+    })
 
-  it.each(['', '400123004', '40012300451', '6001230045', '0001230045', '40012300a5'])('reads %j as nothing', (text) => {
-    expect(parseBbl(text)).toBeNull()
+  it.each([['', ''], [' 12a ', '12a'], ['4-5', '4-5']])('leaves %j that is not all digits trimmed, as %j', (text, kept) => {
+    expect(withoutLeadingZeros(text)).toBe(kept)
   })
 })
 

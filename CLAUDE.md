@@ -19,7 +19,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
-- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `parseBbl` and `facingStreetName`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
+- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `facingStreetName` and `withoutLeadingZeros`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
 - `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection` and the admin import's `SmartPirImportForm`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
@@ -450,13 +450,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Properties ("Site Info" in the UI).** `/project/:projectId/properties` (`PropertiesPage`), reached from the
   "Site Info" link in the task orders page's header (and "Site Info" on an `/admin/projects` row); the dashboard
   has no tile for it. Back returns to the project page. The project's properties (where its work is done), kept by
-  hand, of two kinds since migration 035: a **sidewalk** (a tax lot, named by its BBL) and a **ped ramp** (a corner
-  of an intersection).
+  hand, of two kinds since migration 035: a **sidewalk** (a tax lot, named by its borough, block and lot; R1e.3,
+  migration 036, dropped the BBL) and a **ped ramp** (a corner of an intersection).
   - **Naming.** Internally a property is a property: files, components, services, routes (`/properties`), query
     keys and backend fields keep the word. What the user reads says "site": "Site Info" for the list and its
     links, "site" / "sites" in dialogs, confirms, toasts and notes ("Site type: Sidewalk", "Delete site <name>?",
-    "Site <name> deleted."), where the name is `siteName` (`lib/properties.js`): a sidewalk's BBL, a ped ramp's
-    `display_address`. The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle
+    "Site <name> deleted."), where the name is `siteName` (`lib/properties.js`): a sidewalk's "Block 123 Lot 45"
+    (`blockLot`), a ped ramp's `display_address`. Nothing the user reads says "BBL". The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle
     site <name>?", the picker), and the task orders list's column is "Sites". Messages the backend words itself
     ("Property not found", "Cannot bundle a deleted property", its 409 details) still say "property" and are shown
     as worded: the backend's entity is still a property, and they appear only on errors. Backlog: if the backend
@@ -466,19 +466,18 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     controls (Delete, Un-delete, Show deleted) are an admin's. A demo user reads only: no Add, Edit or Delete, and
     the note "Demo mode: sites are read-only." (the backend answers 403). The backend refuses anyone not on the
     project (403), which shows as the load error.
-  - A property is `{id, project_id, kind, boro, bbl, address, property_type, violation_no, intersection_street_1,
-    intersection_street_2, quadrant, facing_street, ramp_type, notes, display_address, block_display, lot_display,
-    created_at, updated_at, created_by, deleted_at, deleted_by}`. A sidewalk has `bbl` (10 digits, the first 1-5),
-    `address`, `property_type` and an optional `violation_no`; a ped ramp has the two streets, `quadrant` (`NE` `NW`
+  - A property is `{id, project_id, kind, boro, block, lot, address, property_type, violation_no,
+    intersection_street_1, intersection_street_2, quadrant, facing_street, ramp_type, notes, display_address,
+    created_at, updated_at, created_by, deleted_at, deleted_by}`. A sidewalk has `block` (1-5 digits) and `lot` (1-4),
+    stored without leading zeros, `address`, `property_type` and an optional `violation_no`; a ped ramp has the two streets, `quadrant` (`NE` `NW`
     `SE` `SW`), `facing_street` (`street_1` / `street_2`: which of its streets it faces) and `ramp_type`
     (`PERPENDICULAR` `PARALLEL` `CUT_THROUGH`), and none of the sidewalk's. Both have `boro` (the five boroughs
-    spelled out); a sidewalk's is its BBL's first digit, set by the backend. `display_address` (a sidewalk's
-    address; a ped ramp's "Atlantic Ave & Court St — NE Quadrant (Facing Court St)"), `block_display` and
-    `lot_display` are the backend's, and the app shows them as sent: `display_address` wherever a site is named by
+    spelled out), chosen in the form. `display_address` (a sidewalk's address; a ped ramp's "Atlantic Ave & Court St
+    — NE Quadrant (Facing Court St)") is the backend's, and the app shows it as sent: `display_address` wherever a site is named by
     its place (the PIR and site page headings, a task order's bundle, the picker). `property_type` is one of
     `1_3_family` ("1-3 family"), `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), in
     `src/data/propertyTypes.js`; the kinds, boroughs, quadrants and ramp types are in `src/data/propertyKinds.js`
-    (with `facingStreetName` and `parseBbl`, the form's preview). The list adds `pir_status`, `status` (`{state:
+    (with `facingStreetName`, `withoutLeadingZeros` and `MAX_BLOCK_DIGITS` / `MAX_LOT_DIGITS`). The list adds `pir_status`, `status` (`{state:
     none | task_ordered | constructed_on, date}`) and `task_order_no`.
   - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })` (both kinds; the
     backend's `?kind=` isn't used), `getProperty`, `createProperty(projectId, data)`, `updateProperty(propertyId,
@@ -490,7 +489,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     of live sites ("Prior Notice Violation Sidewalks (12)", `aria-expanded`), which folds the section; then "Bulk
     Upload Sidewalks" / "Bulk Upload Ped Ramps", disabled for everyone with the tooltip "AI import — coming soon"
     (on a wrapper too); then, for a member who isn't a demo user, "Add Sidewalk" / "Add Ped Ramp". Rows are in the backend's order.
-    - Sidewalk columns: Borough, Block, Lot (`block_display` / `lot_display`; no parsing here), Address (a link to
+    - Sidewalk columns: Borough, Block, Lot (the site's own `block` and `lot`), Address (a link to
       the site's page), Violation No., Status, Added, Task Order No., Actions.
     - Ped ramp columns: Borough, Intersection 1st Street (a link to the site's page), Intersection 2nd Street,
       Quadrant, Facing (the street's name, `facingStreetName`), Type (the ramp type's label), Status, Added, Task
@@ -506,29 +505,33 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     sidewalk" / "Edit ped ramp"), which branches on the kind (the section's when adding, the property's when
     editing; editing shows it as the fixed line "Site type: Sidewalk" / "Site type: Pedestrian Ramp"). Both kinds
     end with Notes (optional, at most 2,000 characters; blank is `null`, which clears them).
-    - Sidewalk: Borough, BBL (it must be 10 digits starting 1-5, the hint says so; under it "Block 123 · Lot 45" as
-      typed, `parseBbl`, and once it is valid the borough follows it and its select is locked, since the backend
-      refuses a borough that isn't the BBL's), Address, Violation No. (optional; blank is `null`) and "Property
-      type".
+    - Sidewalk: Borough (a select with no default, first and focused; free to change when editing), Block (numeric,
+      at most 5 characters, hint "Block number as it appears on the Prior Notice (no leading zeros).") and Lot (at
+      most 4, hint "Lot number (no leading zeros)."), each losing its leading zeros when it loses focus (`"00123"` is
+      `"123"`, `"0000"` is `"0"`) and sent that way; one that isn't digits turns its hint into the rule ("A block is 1
+      to 5 digits.") and keeps Save off. Then Address, Violation No. (optional; blank is `null`) and "Property type".
     - Ped ramp: Borough, Intersection 1st Street, Intersection 2nd Street, Quadrant, Facing (disabled with "Fill in
       both intersection streets to pick the one it faces." until both are in, then the two street names; it sends
       `street_1` / `street_2`) and Type.
     - Save is off until every required field is in and, when editing, something changed. Adding sends `kind` and
-      the kind's fields, editing only what changed (a new BBL brings its borough); text is trimmed. The page passes
-      the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A site with this BBL
-      already exists in this project." above the BBL field, a 422's messages sit under the fields their `loc`
+      the kind's fields, editing only what changed (a block typed with leading zeros is no change); text is trimmed. The page passes
+      the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A site at this Borough +
+      Block + Lot already exists in this project." above the three (`property-location-error`; all three marked
+      invalid and described by it, since the duplicate is the three together), a 422's messages sit under the fields their `loc`
       names, anything else (a 400, the backend's "Property kind cannot be changed. Delete and recreate." included)
       below the form as worded. The form keeps what was typed. After a save the list is read again.
   - **Show deleted** (an admin's checkbox above the sections, off to start) asks the backend again with
     `?include_deleted=true`; the sections stay on screen meanwhile. A deleted row is muted (`text-gray-400`), its
     link crossed out, its status a Deleted badge (the date as a tooltip), and it doesn't count in the title.
-  - **Delete** (a soft delete; a sidewalk's frees its BBL) and **Un-delete** are each confirmed in `ConfirmDialog`,
-    a refusal shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success
+  - **Delete** (a soft delete; a sidewalk's frees its borough, block and lot) and **Un-delete** are each confirmed in
+    `ConfirmDialog`, a refusal shows in the dialog (an un-delete's 409: another live sidewalk is now at its lot, as
+    the backend words it), and after a success
     the list is read again and a toast reads "Site <name> deleted." / "Site <name> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
-  - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: BBL
-    ("Ped ramp" for a ped ramp, still the link to its page), `display_address`, and the property type or ramp type.
-    The picker's search matches the BBL or the `display_address`.
+  - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: Site
+    (`siteLabel`: a sidewalk's "Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page),
+    `display_address`, and the property type or ramp type. The picker's search ("Search by block, lot or address")
+    matches a sidewalk's block, lot or address and a ped ramp's `display_address` (its streets).
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
   admin. One live
   PIR per property; a soft-deleted one frees the property for a new one. A PIR is `{id, property_id, project_id,
@@ -544,7 +547,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Site Info or a task order's bundle, for anyone on the project; Back ("Back to
     Site Info — <project_id>") returns to the project's properties. One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
-    "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's BBL,
+    "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's block, lot,
     address, violation no. and type or a ped ramp's intersection, quadrant, facing street and ramp type, then notes
     and added, with Edit (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
     (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
@@ -566,7 +569,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     dialog; a 400 reads as the backend worded it; a 422 sits under its field (`lib/formErrors.js`, whose 409 can
     now name no field). Creating after a delete is not a 409: the deleted PIR freed the property.
   - Every delete and un-delete (the property's and the PIR's) is confirmed in `ConfirmDialog`; a refusal shows
-    there; the toasts read "Site <bbl> deleted." / "restored." and "PIR deleted." / "PIR restored.". After a
+    there; the toasts read "Site <name> deleted." / "restored." and "PIR deleted." / "PIR restored.". After a
     PIR change the page reads the PIRs again; after a property change it shows the property the call returned.
   - **The status badge** (`PirStatusBadge`, from `pirStatus` in `lib/pirs.js`): a dash for no live PIR, "Signed by
     DOT" (blue) for a live PIR whose as-built isn't signed, "As-built signed" (green) once it is. It takes the PIR
@@ -796,13 +799,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     (and Delete, for an admin); a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by
     <name>"; the name comes from `useUserNames`, and when that fails or doesn't have them the card gives the date
     alone). Then "Bundled sites": "N sites bundled", `PropertiesTable` with Unbundle on each row, and
-    "Add sites". A BBL links to the property's page (`/project/<project_id>/properties/<id>`), which is open
+    "Add sites". A site's block and lot ("Ped ramp" for a ped ramp) link to the property's page (`/project/<project_id>/properties/<id>`), which is open
     to anyone on the project. Nothing bundled reads "No sites bundled yet. Click 'Add sites' to pick from this
     project." Its Added column is when the property was added to the project: the response doesn't carry when it
     was bundled.
     - Edit uses the same dialog; Delete, Un-delete and Unbundle are each confirmed in `ConfirmDialog`, a refusal
       shows in the dialog, and the page then shows the task order the call returned (Unbundle answers 204, so
-      the page reads it again). Toasts: "Task order <number> deleted." / "restored.", "Site <bbl>
+      the page reads it again). Toasts: "Task order <number> deleted." / "restored.", "Site <name>
       unbundled."
     - **A deleted task order** reads Deleted (the number crossed out) and can't be changed: an admin gets only
       Un-delete, anyone else nothing. Add sites and Unbundle are hidden (the backend refuses bundling into
@@ -811,13 +814,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       `property_count` by the backend, so it disappears from the page until it is un-deleted.
   - **`PropertyPickerModal`** (`taskOrder`, `onClose`, `onDone`), from Add sites (its title too): reads the project's live
     properties (`listProperties`, which any member may) and leaves out those already in this task order. One
-    checkbox row each (BBL, address, type). The search box keeps the rows whose BBL or address holds the text, any
+    checkbox row each (block and lot, address, type). The search box keeps the rows whose block, lot or address holds the text, any
     case. "Select all shown" ticks every row shown; a ticked row stays ticked while the search hides it, and Clear
     selection unticks all. "Add N sites" bundles the ticked ones **one at a time** (never in parallel), in
     list order, and stops at the first refusal, so nothing after it is tried. Then the picker closes and
     `onDone({added, failed, taskOrder})` hands the page the count, the refusal (`{property, message}`) and the last
     task order the backend returned; the page shows that and a toast: "Added 3 sites." or "Added 1 site.
-    Couldn't add <bbl>: <message> The rest weren't tried."
+    Couldn't add <name>: <message> The rest weren't tried."
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with
@@ -861,7 +864,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
     `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (adding and editing
     for anyone on the project but a demo user, soft-delete and un-delete admin only; body `kind`, `notes` and a
-    sidewalk's `{boro, bbl, address, violation_no, property_type}` or a ped ramp's `{boro, intersection_street_1,
+    sidewalk's `{boro, block, lot, address, violation_no, property_type}` or a ped ramp's `{boro, intersection_street_1,
     intersection_street_2, quadrant, facing_street, ramp_type}`; a PATCH sends only what changed and never the kind)
   - Task orders: `GET /v1/projects/{id}/task-orders?include_deleted=` · `POST /v1/projects/{id}/task-orders` ·
     `GET /v1/task-orders/{id}` · `PATCH /v1/task-orders/{id}` · `POST /v1/task-orders/{id}/admin/soft-delete` ·

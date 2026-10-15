@@ -1,8 +1,8 @@
 import { apiFetch } from './apiClient'
 
 // A project's properties ("sites"), each a sidewalk or a ped ramp (kind). A property is {id, project_id, kind, boro,
-// bbl, address, property_type, violation_no (a sidewalk's), intersection_street_1, intersection_street_2, quadrant,
-// facing_street, ramp_type (a ped ramp's), notes, display_address, block_display, lot_display, created_at, updated_at,
+// block, lot, address, property_type, violation_no (a sidewalk's), intersection_street_1, intersection_street_2,
+// quadrant, facing_street, ramp_type (a ped ramp's), notes, display_address, created_at, updated_at,
 // created_by, deleted_at, deleted_by}; property_type is one of '1_3_family', '4_plus_family', 'expedited'. The list
 // adds pir_status, status ({state: 'none' | 'task_ordered' | 'constructed_on', date}) and task_order_no. Reading is for
 // a user on the project, or an admin; adding and editing for a member but a demo user (the UI keeps them to an
@@ -26,11 +26,12 @@ export async function getProperty(propertyId) {
 }
 
 /**
- * Adds a property to a project and returns it. Takes its kind and that kind's fields: a sidewalk's {bbl (10 digits),
- * address, property_type, violation_no, boro} or a ped ramp's {boro, intersection_street_1, intersection_street_2,
- * quadrant, facing_street, ramp_type}. The backend trims the text and answers 400 for a blank or over-long value, a
- * malformed BBL or a borough that isn't the BBL's, 422 for an unknown value or a field of the wrong kind, and 409 when
- * a live property of the project has the BBL (the thrown error's body then carries existing_property_id).
+ * Adds a property to a project and returns it. Takes its kind and that kind's fields: a sidewalk's {boro, block (1-5
+ * digits), lot (1-4 digits), address, property_type, violation_no} or a ped ramp's {boro, intersection_street_1,
+ * intersection_street_2, quadrant, facing_street, ramp_type}. The backend trims the text, drops a block's and a lot's
+ * leading zeros, and answers 400 for a blank or over-long value, 422 for an unknown value, a block or lot that isn't
+ * digits, or a field of the wrong kind, and 409 when a live sidewalk of the project is at that borough, block and lot
+ * (the thrown error's body then carries existing_property_id).
  */
 export async function createProperty(projectId, data) {
   const json = await apiFetch(`/v1/projects/${projectId}/properties`, { method: 'POST', body: data })
@@ -48,7 +49,7 @@ export async function updateProperty(propertyId, data) {
 }
 
 /**
- * Admin only: soft-deletes a property and returns it. It leaves the project's list and frees its BBL. Deleting
+ * Admin only: soft-deletes a property and returns it. It leaves the project's list and frees a sidewalk's lot. Deleting
  * one already deleted succeeds and changes nothing.
  */
 export async function softDeleteProperty(propertyId) {
@@ -57,8 +58,8 @@ export async function softDeleteProperty(propertyId) {
 }
 
 /**
- * Admin only: brings a soft-deleted property back, with its BBL, and returns it. The backend answers 404 for one
- * that isn't deleted and 409 when another live property of the project now has its BBL.
+ * Admin only: brings a soft-deleted property back, at its borough, block and lot, and returns it. The backend answers
+ * 404 for one that isn't deleted and 409 when another live sidewalk of the project is now there.
  */
 export async function undeleteProperty(propertyId) {
   const json = await apiFetch(`/v1/properties/${propertyId}/admin/undelete`, { method: 'POST' })

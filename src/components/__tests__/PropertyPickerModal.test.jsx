@@ -6,15 +6,15 @@ import * as api from '../../services/api'
 
 vi.mock('../../services/api', () => ({ listProperties: vi.fn(), bundleProperty: vi.fn() }))
 
-const property = (number, bbl, address, property_type = '1_3_family') => ({
-  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', kind: 'sidewalk', bbl, address,
+const property = (number, block, lot, address, property_type = '1_3_family') => ({
+  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block, lot, address,
   display_address: address, property_type,
   notes: null, created_at: '2026-09-14T12:00:00Z', deleted_at: null,
 })
-const ELM = property(1, '4001110001', '7 Elm Pl')
-const MAIN = property(2, '4001230045', '12 Main St', '4_plus_family')
-const MAPLE = property(3, '4009990003', '3 Maple Rd', 'expedited')
-const OAK = property(4, '4001230099', '40 Oak Ave')
+const ELM = property(1, '111', '1', '7 Elm Pl')
+const MAIN = property(2, '123', '45', '12 Main St', '4_plus_family')
+const MAPLE = property(3, '999', '3', '3 Maple Rd', 'expedited')
+const OAK = property(4, '123', '99', '40 Oak Ave')
 const TASK_ORDER = { id: 'd0000000-0000-4000-8000-000000000001', project_id: 'HWS0023', task_order_number: 'TO-001',
   properties: [OAK] }
 
@@ -32,35 +32,38 @@ async function renderPicker() {
   return { onClose, onDone }
 }
 
-const box = (bbl) => screen.getByRole('checkbox', { name: new RegExp(bbl) })
-const shownBbls = () => screen.getAllByRole('checkbox').map(input => input.closest('label').textContent.slice(0, 10))
-const search = () => screen.getByRole('searchbox', { name: 'Search by BBL or address' })
+const box = (site) => screen.getByRole('checkbox', { name: new RegExp(`^${site}`) })
+const shownSites = () => screen.getAllByRole('checkbox').map(input => input.closest('label').querySelector('span').textContent)
+const search = () => screen.getByRole('searchbox', { name: 'Search by block, lot or address' })
 
 describe('PropertyPickerModal', () => {
-  it('lists the project\'s live properties that aren\'t already in the task order, with BBL, address and type', async () => {
+  it('lists the project\'s live properties that aren\'t already in the task order, with block and lot, address and type', async () => {
     await renderPicker()
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023')
-    expect(shownBbls()).toEqual(['4001110001', '4001230045', '4009990003'])
-    expect(screen.queryByRole('checkbox', { name: /4001230099/ })).not.toBeInTheDocument()
-    expect(box('4001230045').closest('label')).toHaveTextContent('12 Main St')
-    expect(box('4001230045').closest('label')).toHaveTextContent('4+ family / commercial')
+    expect(shownSites()).toEqual(['Block 111 Lot 1', 'Block 123 Lot 45', 'Block 999 Lot 3'])
+    expect(screen.queryByRole('checkbox', { name: /Block 123 Lot 99/ })).not.toBeInTheDocument()
+    expect(box('Block 123 Lot 45').closest('label')).toHaveTextContent('12 Main St')
+    expect(box('Block 123 Lot 45').closest('label')).toHaveTextContent('4+ family / commercial')
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
   })
 
-  it('filters by BBL or address, any case', async () => {
+  it('filters by block, lot or address, any case', async () => {
     await renderPicker()
     await userEvent.type(search(), 'MAIN')
-    expect(shownBbls()).toEqual(['4001230045'])
+    expect(shownSites()).toEqual(['Block 123 Lot 45'])
     await userEvent.clear(search())
-    await userEvent.type(search(), '400999')
-    expect(shownBbls()).toEqual(['4009990003'])
+    await userEvent.type(search(), '999')
+    expect(shownSites()).toEqual(['Block 999 Lot 3'])
+    await userEvent.clear(search())
+    await userEvent.type(search(), '45')
+    expect(shownSites()).toEqual(['Block 123 Lot 45'])
     await userEvent.clear(search())
     await userEvent.type(search(), 'nowhere')
     expect(screen.getByText('No sites match "nowhere".')).toBeInTheDocument()
   })
 
   it('lists a ped ramp by its intersection and ramp type, and finds it by a street', async () => {
-    const RAMP = { ...property(5, null, null, null), kind: 'ped_ramp', ramp_type: 'PARALLEL',
+    const RAMP = { ...property(5, null, null, null, null), kind: 'ped_ramp', ramp_type: 'PARALLEL',
       display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)' }
     api.listProperties.mockResolvedValue([ELM, RAMP])
     await renderPicker()
@@ -72,15 +75,15 @@ describe('PropertyPickerModal', () => {
 
   it('selects several, and "Select all shown" ticks only the rows the search shows', async () => {
     await renderPicker()
-    await userEvent.click(box('4001110001'))
+    await userEvent.click(box('Block 111 Lot 1'))
     expect(screen.getByRole('button', { name: 'Add 1 site' })).toBeEnabled()
     await userEvent.type(search(), 'Rd')
     await userEvent.click(screen.getByRole('button', { name: 'Select all shown' }))
     expect(screen.getByRole('button', { name: 'Select all shown' })).toBeDisabled()
     await userEvent.clear(search())
-    expect(box('4001110001')).toBeChecked()
-    expect(box('4009990003')).toBeChecked()
-    expect(box('4001230045')).not.toBeChecked()
+    expect(box('Block 111 Lot 1')).toBeChecked()
+    expect(box('Block 999 Lot 3')).toBeChecked()
+    expect(box('Block 123 Lot 45')).not.toBeChecked()
     expect(screen.getByRole('button', { name: 'Add 2 sites' })).toBeEnabled()
     await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()

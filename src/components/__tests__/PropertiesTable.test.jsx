@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import PropertiesTable from '../PropertiesTable'
 
 const ROW = {
-  id: 'c0000000-0000-4000-8000-000000000001', project_id: 'HWS0023', kind: 'sidewalk', bbl: '4001230045',
+  id: 'c0000000-0000-4000-8000-000000000001', project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45',
   address: '12 Main St', display_address: '12 Main St', property_type: '1_3_family', notes: null,
   created_at: '2026-09-14T12:00:00', updated_at: '2026-09-14T12:00:00',
   created_by: 'a0000000-0000-4000-8000-000000000001', deleted_at: null, deleted_by: null,
@@ -21,25 +21,25 @@ function renderTable(props) {
 const headings = () => within(screen.getByRole('table')).getAllByRole('columnheader').map(th => th.textContent)
 
 describe('PropertiesTable', () => {
-  it('lists BBL, address, type and added', () => {
+  it('lists the site (its block and lot), address, type and added', () => {
     renderTable()
-    expect(headings()).toEqual(['BBL', 'Address', 'Type', 'Added', 'Actions'])
-    expect(screen.getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['4001230045', '12 Main St', '1-3 family'])
+    expect(headings()).toEqual(['Site', 'Address', 'Type', 'Added', 'Actions'])
+    expect(screen.getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['Block 123 Lot 45', '12 Main St', '1-3 family'])
   })
 
-  it('links each BBL to its page under its project', () => {
+  it('links each site to its page under its project', () => {
     renderTable()
-    expect(screen.getByRole('link', { name: '4001230045' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
+    expect(screen.getByRole('link', { name: 'Block 123 Lot 45' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
   })
 
   it('has no Actions column without renderActions, as for a demo user', () => {
     renderTable({ renderActions: undefined })
-    expect(headings()).toEqual(['BBL', 'Address', 'Type', 'Added'])
+    expect(headings()).toEqual(['Site', 'Address', 'Type', 'Added'])
   })
 
   it('shows a ped ramp by its intersection and ramp type, its link reading "Ped ramp"', () => {
     renderTable({ properties: [{
-      ...ROW, kind: 'ped_ramp', bbl: null, address: null, property_type: null, ramp_type: 'PARALLEL',
+      ...ROW, kind: 'ped_ramp', block: null, lot: null, address: null, property_type: null, ramp_type: 'PARALLEL',
       display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
     }] })
     expect(screen.getByRole('link', { name: 'Ped ramp' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)

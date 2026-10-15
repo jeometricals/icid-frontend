@@ -42,7 +42,7 @@ const live = () => pirs.find(row => !row.deleted_at)
 beforeEach(() => {
   vi.clearAllMocks()
   created = 0
-  property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', bbl: '4001230045',
+  property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45',
     address: '12 Main St', display_address: '12 Main St', property_type: '4_plus_family', violation_no: 'V-77',
     notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
   pirs = []
@@ -180,12 +180,14 @@ describe('PropertyPage — who can do what', () => {
 })
 
 describe('PropertyPage — the property', () => {
-  it("heads the page with the project and address, and lists a sidewalk's borough, BBL, address, violation, type, notes and added", async () => {
+  it("heads the page with the project and address, and lists a sidewalk's borough, block, lot, address, violation, type, notes and added", async () => {
     await renderLoaded()
     expect(api.getProperty).toHaveBeenCalledWith(PROPERTY_ID)
     expect(api.listPirs).toHaveBeenCalledWith(PROPERTY_ID, { includeDeleted: true })
     expect(valueOf(propertyCard(), 'Borough')).toHaveTextContent('Queens')
-    expect(valueOf(propertyCard(), 'BBL')).toHaveTextContent('4001230045')
+    expect(valueOf(propertyCard(), 'Block')).toHaveTextContent('123')
+    expect(valueOf(propertyCard(), 'Lot')).toHaveTextContent('45')
+    expect(within(propertyCard()).queryByText('BBL')).not.toBeInTheDocument()
     expect(valueOf(propertyCard(), 'Violation No.')).toHaveTextContent('V-77')
     expect(valueOf(propertyCard(), 'Address')).toHaveTextContent('12 Main St')
     expect(valueOf(propertyCard(), 'Type')).toHaveTextContent('4+ family / commercial')
@@ -195,7 +197,7 @@ describe('PropertyPage — the property', () => {
 
   it("heads a ped ramp's page with its intersection, and lists its quadrant, the street it faces and its type", async () => {
     property = {
-      ...property, kind: 'ped_ramp', boro: 'Brooklyn', bbl: null, address: null, property_type: null, violation_no: null,
+      ...property, kind: 'ped_ramp', boro: 'Brooklyn', block: null, lot: null, address: null, property_type: null, violation_no: null,
       intersection_street_1: 'Atlantic Ave', intersection_street_2: 'Court St', quadrant: 'NE', facing_street: 'street_2',
       ramp_type: 'CUT_THROUGH', display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
     }
@@ -207,7 +209,7 @@ describe('PropertyPage — the property', () => {
     expect(valueOf(propertyCard(), 'Quadrant')).toHaveTextContent('NE')
     expect(valueOf(propertyCard(), 'Facing')).toHaveTextContent('Court St')
     expect(valueOf(propertyCard(), 'Ramp type')).toHaveTextContent('Cut-through')
-    expect(within(propertyCard()).queryByText('BBL')).not.toBeInTheDocument()
+    expect(within(propertyCard()).queryByText('Block')).not.toBeInTheDocument()
   })
 
   it('goes back to the project\'s properties', async () => {
@@ -240,10 +242,10 @@ describe('PropertyPage — the property', () => {
   it('deletes the property once confirmed, then offers Un-delete and no new PIR', async () => {
     await renderLoaded()
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Delete' }))
-    expect(dialog()).toHaveAccessibleName('Delete site 4001230045?')
+    expect(dialog()).toHaveAccessibleName('Delete site Block 123 Lot 45?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByText('Site 4001230045 deleted.')).toBeInTheDocument()
+    expect(await screen.findByText('Site Block 123 Lot 45 deleted.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /12 Main St/ })).toHaveTextContent('Deleted')
     expect(within(pirCard()).queryByRole('button', { name: 'Add PIR' })).not.toBeInTheDocument()
 

@@ -6,7 +6,7 @@ export const PROPERTY_KINDS = [
   { value: 'ped_ramp', label: 'Pedestrian Ramp' },
 ]
 
-// The five boroughs; a sidewalk's is its BBL's first digit (1 Manhattan ... 5 Staten Island)
+// The five boroughs, as the backend spells them
 export const BOROUGHS = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
 
 export const QUADRANTS = ['NE', 'NW', 'SE', 'SW']
@@ -33,14 +33,15 @@ export function facingStreetName(property) {
   return null
 }
 
+// The most digits a sidewalk's block and lot have, without their leading zeros (the backend's limits)
+export const MAX_BLOCK_DIGITS = 5
+export const MAX_LOT_DIGITS = 4
+
 /**
- * A BBL as typed, read for the form's preview: {borough, block, lot} once it is 10 digits with a first digit of 1-5
- * (block and lot without their leading zeros, as the backend's block_display / lot_display), else null. Only the
- * form uses it; tables show what the backend sends.
+ * A block or a lot as the tax map numbers it, the way the backend stores it: trimmed and, when it is all digits,
+ * without its leading zeros ("00123" is "123", "0000" is "0"). Anything else comes back trimmed, as typed.
  */
-export function parseBbl(text) {
-  const bbl = text.trim()
-  if (!/^[1-5]\d{9}$/.test(bbl)) return null
-  const part = (start, end) => bbl.slice(start, end).replace(/^0+/, '') || '0'
-  return { borough: BOROUGHS[Number(bbl[0]) - 1], block: part(1, 6), lot: part(6, 10) }
+export function withoutLeadingZeros(text) {
+  const value = text.trim()
+  return /^\d+$/.test(value) ? value.replace(/^0+/, '') || '0' : value
 }

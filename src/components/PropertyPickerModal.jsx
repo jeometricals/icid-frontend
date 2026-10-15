@@ -5,17 +5,19 @@ import { bundleProperty, listProperties } from '../services/api'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { rampTypeLabel } from '../data/propertyKinds'
 import { propertyCount } from '../lib/taskOrders'
+import { siteLabel } from '../lib/properties'
 
-// Whether a property matches the search: its BBL or its display_address (a ped ramp's intersection) holds the text, any case
+// Whether a property matches the search: a sidewalk's block, lot or address, or a ped ramp's display_address (its
+// intersection), holds the text, any case
 const matches = (property, text) => {
   const needle = text.trim().toLowerCase()
-  return !needle || [property.bbl, property.display_address].some(text => text?.toLowerCase().includes(needle))
+  return !needle || [property.block, property.lot, property.display_address].some(text => text?.toLowerCase().includes(needle))
 }
 
 /**
  * Lets an admin pick properties of the task order's project to bundle into it: the project's live properties that
- * aren't in the task order already (read when the dialog opens), each a checkbox row with BBL, address and type.
- * A search box narrows the rows to a BBL or address holding the text; "Select all shown" ticks every row shown
+ * aren't in the task order already (read when the dialog opens), each a checkbox row with its block and lot ("Ped
+ * ramp" for a ped ramp), address and type. A search box narrows the rows to a block, lot or address holding the text; "Select all shown" ticks every row shown
  * (a ticked row stays ticked when the search hides it). Add bundles the ticked ones one at a time, in the order
  * shown unfiltered, and stops at the first refusal, so nothing after it is tried; then it hands over what happened.
  * Props: taskOrder (with project_id and its properties), onClose, onDone({added, failed, taskOrder}) — added is how
@@ -107,8 +109,8 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
             <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="search"
-              aria-label="Search by BBL or address"
-              placeholder="Search by BBL or address"
+              aria-label="Search by block, lot or address"
+              placeholder="Search by block, lot or address"
               className="input-field pl-9"
               value={search}
               disabled={busy}
@@ -151,7 +153,7 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
                       disabled={busy}
                       onChange={() => toggle(property.id)}
                     />
-                    <span className="font-medium text-gray-900 whitespace-nowrap">{property.kind === 'ped_ramp' ? 'Ped ramp' : property.bbl}</span>
+                    <span className="font-medium text-gray-900 whitespace-nowrap">{siteLabel(property)}</span>
                     <span className="flex-1 text-gray-700">{property.display_address}</span>
                     <span className="text-gray-500 whitespace-nowrap">{property.kind === 'ped_ramp' ? rampTypeLabel(property.ramp_type) : propertyTypeLabel(property.property_type)}</span>
                   </label>

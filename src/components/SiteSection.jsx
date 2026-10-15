@@ -41,8 +41,8 @@ const dash = (value) => value || '—'
 // The columns between Borough and Status, by kind
 const KIND_COLUMNS = {
   sidewalk: [
-    { heading: 'Block', cell: row => dash(row.block_display) },
-    { heading: 'Lot', cell: row => dash(row.lot_display) },
+    { heading: 'Block', cell: row => dash(row.block) },
+    { heading: 'Lot', cell: row => dash(row.lot) },
     { heading: 'Address', cell: row => siteLink(row, row.address), wide: true },
     { heading: 'Violation No.', cell: row => dash(row.violation_no) },
   ],
@@ -66,7 +66,7 @@ export const siteHeadings = (kind) => ['Borough', ...KIND_COLUMNS[kind].map(colu
  * Columns: Borough, the kind's own (a sidewalk's Block, Lot, Address, Violation No.; a ped ramp's two intersection
  * streets, Quadrant, Facing by street name, Type), Status (SiteStatus; Deleted for a deleted row), Added, Task Order
  * No. and Actions (renderActions(row)). A sidewalk's address and a ped ramp's first street link to the site's page.
- * Block and lot are the backend's block_display / lot_display.
+ * Block and lot are the site's own, as the backend stores them.
  * Props: kind ('sidewalk' | 'ped_ramp'), title, addLabel ('Add Sidewalk'), bulkLabel, emptyText, rows, onAdd
  * (leave it out for no Add), addDisabled, renderActions(row).
  */

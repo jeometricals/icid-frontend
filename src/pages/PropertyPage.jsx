@@ -1,6 +1,6 @@
 /**
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
- * on the project: a card with the site's details (a sidewalk's borough, BBL, address, violation no. and property
+ * on the project: a card with the site's details (a sidewalk's borough, block, lot, address, violation no. and property
  * type; a ped ramp's borough, intersection, quadrant, the street it faces and ramp type; then notes and when it was
  * added), headed by its display_address; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
@@ -255,7 +255,8 @@ export default function PropertyPage() {
             </>
           ) : (
             <>
-              <Detail term="BBL">{property.bbl}</Detail>
+              <Detail term="Block">{property.block}</Detail>
+              <Detail term="Lot">{property.lot}</Detail>
               <Detail term="Address">{property.address}</Detail>
               <Detail term="Violation No.">{property.violation_no || '—'}</Detail>
               <Detail term="Type">{propertyTypeLabel(property.property_type)}</Detail>
