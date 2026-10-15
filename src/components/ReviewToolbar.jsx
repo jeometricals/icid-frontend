@@ -4,6 +4,7 @@ import { useTaskCount } from '../contexts/TaskCountContext'
 import { acceptStage1, acceptStage2, approveStage1, approveStage2, returnIdr } from '../services/api'
 import { reviewStage, stageAcceptedTimes, untouchedPayItems } from '../lib/fieldEdits'
 import { reviewActionsFor } from '../lib/reviewRoles'
+import { claimSentence, claimSummary, countOf, formatAmount } from '../lib/idrFlags'
 import AcceptStage1Modal from './AcceptStage1Modal'
 import ConfirmDialog from './ConfirmDialog'
 import ReturnCommentModal from './ReturnCommentModal'
@@ -29,6 +30,23 @@ const RETURNS = {
 const APPROVE_STAGE1_MESSAGE = 'Send this IDR on to the Resident Engineer for final approval?'
 const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped on every page of its export.'
 
+// The toast after an approval that left out flags another IDR claimed first
+export const droppedText = (count) =>
+  `IDR approved; ${countOf(count, 'flag')} already claimed by another IDR ${count === 1 ? 'was' : 'were'} left out.`
+
+// What approving claims, for its dialog: the summary sentence (shown first, the approval question after the lines)
+// and, as its lines, the pay items the flags come to. Nothing when the flags couldn't be read or there are none.
+function claimWords(idrFlags) {
+  if (!idrFlags || idrFlags.frozen || idrFlags.flags.length === 0) return { sentence: null, items: null }
+  const count = idrFlags.unmapped
+  const unmapped = count > 0
+    ? ` ${countOf(count, 'flag')} ${count === 1 ? 'adds' : 'add'} no quantity (no pay item, or a unit a flag can't be measured in).`
+    : ''
+  const items = idrFlags.pay_items.map(item =>
+    `${[item.pay_item_ref, item.description].filter(Boolean).join(' ')}: ${formatAmount(item.amount)} ${item.unit ?? ''}`.trim())
+  return { sentence: `${claimSentence(claimSummary(idrFlags))}${unmapped}`, items }
+}
+
 /**
  * The review actions on an IDR's page: the buttons the signed-in user may use at the IDR's current status, given
  * the roles they hold on its project (Accept Task - IDR Check, Approve → RE Review, Accept for RE Review, Final
@@ -39,12 +57,15 @@ const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped
  * in this round of the stage (since the IDR's stage1_accepted_at / stage2_accepted_at). They stay enabled: the
  * backend is the gate. When it refuses (400 with untouched), the toolbar shows its reason as a toast and calls
  * onPayItemsUntouched.
+ * Final Approve & Sign claims the PIR flags attributed to the IDR (R1f): its dialog says how many flags across how
+ * many sites, their square feet by thickness and the pay items they come to (from idrFlags), and after an approval
+ * that left out flags another IDR claimed first a toast says how many.
  * Props: idr, roles (the user's roles on the IDR's project), reports and fieldEdits (the IDR's, for the count),
- * onChanged (async; refetches the IDR), onPayItemsUntouched({detail, untouched}) (optional), disabled (the page is
- * busy with something else).
+ * idrFlags (getIdrFlags' answer, or null), onChanged (async; refetches the IDR), onPayItemsUntouched({detail,
+ * untouched}) (optional), disabled (the page is busy with something else).
  */
 export default function ReviewToolbar({
-  idr, roles, reports = [], fieldEdits = [], onChanged, onPayItemsUntouched, disabled = false,
+  idr, roles, reports = [], fieldEdits = [], idrFlags = null, onChanged, onPayItemsUntouched, disabled = false,
 }) {
   const { user } = useAuth()
   const { refresh: refreshTaskCount } = useTaskCount()
@@ -109,6 +130,12 @@ export default function ReviewToolbar({
 
   const locked = busy || disabled
   const returning = RETURNS[dialog]
+  const claim = claimWords(idrFlags)
+
+  const approve = async () => {
+    const approved = await approveStage2(idr.idr_id)
+    if (approved?.flags_dropped > 0) setToast(droppedText(approved.flags_dropped))
+  }
 
   return (
     <section aria-label="Review" className="bg-white rounded-lg shadow-sm p-4 mb-6">
@@ -168,11 +195,13 @@ export default function ReviewToolbar({
       {dialog === 'approve-stage2' && (
         <ConfirmDialog
           title="Final Approve & Sign"
-          message={APPROVE_STAGE2_MESSAGE}
+          message={claim.sentence ?? APPROVE_STAGE2_MESSAGE}
+          items={claim.items}
+          note={claim.sentence ? APPROVE_STAGE2_MESSAGE : null}
           confirmLabel="Approve & Sign"
           cancelLabel="Cancel"
           confirmClassName="btn-primary"
-          onConfirm={() => run(() => approveStage2(idr.idr_id))}
+          onConfirm={() => run(approve)}
           onCancel={closeDialog}
           busy={busy}
           error={error?.message}

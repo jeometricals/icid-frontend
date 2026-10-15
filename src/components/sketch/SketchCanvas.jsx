@@ -25,6 +25,11 @@ const segmentStyle = (type) => SEGMENT_STYLES[type] ?? SEGMENT_STYLES.other
 
 // The ink of the area outlines and their labels
 const AREA_INK = '#a16207'
+// The fill of the badge on a flag an approved IDR claimed (constructed)
+const CLAIM_INK = '#047857'
+
+/** What a claimed flag's badge reads: "IDR #042" (or "IDR" for one without a number). */
+export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${flag.claimed_by_idr_number}` : 'IDR')
 
 /**
  * One PIR page with its sketch: the page's image (RotatedPage) and an SVG overlay over it in the page's native
@@ -37,8 +42,9 @@ const AREA_INK = '#a16207'
  * - non-assessable areas, in yellow stripes, labelled A1, A2, ... at render time (`labelledAreas`);
  * - features, by their key symbols (FeatureGlyph);
  * - each flag's number in an orange circle at its top-left and its defect codes in its middle;
- * - "4\" Conc." / "7\" Conc." on each run of consecutive same-thickness flags (`thicknessRuns`).
- * Only the flags take clicks; the rest is drawing. A legend (SketchLegend) sits in the page's lower-left corner.
+ * - "4\" Conc." / "7\" Conc." on each run of consecutive same-thickness flags (`thicknessRuns`);
+ * - on a flag an approved IDR claimed (R1f), an "IDR #042" badge at its top-right, which opens that IDR (onOpenIdr).
+ * Only the flags and the badges take clicks; the rest is drawing. A legend (SketchLegend) sits in the page's lower-left corner.
  * - A click on empty page: places the armed shape there (onPlace), else a calibration point while calibrating
  *   (onCalibratePoint), else clears the selection (onSelect(null)).
  * - A click on a flag selects it (while calibrating it is a calibration point instead), armed shape or not. For a
@@ -48,12 +54,12 @@ const AREA_INK = '#a16207'
  * Pointer positions are turned into page pixels with toNativeCoords against the page's on-screen box.
  * Props: page, flags, areas, features and segments (this page's), selectedId, activeShape, calibrating,
  * calibratePoints ([{x, y}]), writer,
- * onPlace({x, y}), onSelect(id or null), onMove(id, {x, y}), onCalibratePoint({x, y}), onImageError, showCorners
+ * onPlace({x, y}), onSelect(id or null), onMove(id, {x, y}), onCalibratePoint({x, y}), onOpenIdr(flag), onImageError, showCorners
  * (marks the overlay's corners (0, 0) and (width, height), to check its alignment by eye).
  */
 export default function SketchCanvas({
   page, flags, areas = [], features = [], segments = [], selectedId = null, activeShape = null, calibrating = false, calibratePoints = [], writer = false,
-  onPlace, onSelect, onMove, onCalibratePoint, onImageError, showCorners = false,
+  onPlace, onSelect, onMove, onCalibratePoint, onOpenIdr, onImageError, showCorners = false,
 }) {
   const boxRef = useRef(null)
   const [drag, setDrag] = useState(null) // {id, start, origin, at}: a selected flag being moved
@@ -304,6 +310,48 @@ export default function SketchCanvas({
               {run.label}
             </text>
           ))}
+        </g>
+
+        <g data-testid="claim-badges" className="select-none">
+          {drawn.filter(({ flag }) => flag.claimed_by_idr_id).map(({ flag, outline }) => {
+            const box = boundsOf(outline)
+            const label = claimBadgeText(flag)
+            const size = text * 0.75
+            const width = label.length * size * 0.62 + size
+            const height = size * 1.5
+            const open = () => onOpenIdr?.(flag)
+            return (
+              <g
+                key={flag.id}
+                role="link"
+                tabIndex={0}
+                aria-label={`Open ${label.replace('#', '')}, which claimed flag #${flag.display_order}`}
+                data-claim-badge={flag.id}
+                className="cursor-pointer"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={open}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  open()
+                }}
+              >
+                <title>{`${label}: constructed${flag.constructed_on ? ` ${flag.constructed_on}` : ''}`}</title>
+                <rect x={box.maxX - width} y={box.minY - height / 2} width={width} height={height} rx={height / 2} fill={CLAIM_INK} />
+                <text
+                  x={box.maxX - width / 2}
+                  y={box.minY}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={size}
+                  fontWeight="700"
+                  fill="#ffffff"
+                >
+                  {label}
+                </text>
+              </g>
+            )
+          })}
         </g>
 
         {calibrating && first && (

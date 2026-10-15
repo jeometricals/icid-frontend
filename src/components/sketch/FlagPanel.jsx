@@ -7,6 +7,7 @@ import {
   FLAG_MARKS, FLAG_NON_ASSESSABLE_REASONS, FLAG_SHAPES, FLAG_THICKNESSES, shapeLabel,
 } from '../../data/flagEnums'
 import ContractItemPicker from '../ContractItemPicker'
+import { shortDate } from '../../lib/shortDate'
 
 // How long a change waits for the next before it is sent
 export const SAVE_DELAY_MS = 300
@@ -80,9 +81,11 @@ function draftOf(flag) {
  * sent); the thickness; the pay item (ContractItemPicker); the computed area; the reported quantity (an override,
  * with "Clear override") and the quantity delta reason. Nothing out of range is sent; a refusal shows at the top.
  * A reader sees it all disabled, without Delete.
- * Props: flag, contractItems, writer, onSaved(flag), onDelete(flag); render it with key={flag.id}.
+ * A flag an approved IDR claimed (R1f) says so under its heading, "Claimed by IDR 042 · constructed Oct 3", the IDR
+ * a button that opens it (onOpenIdr).
+ * Props: flag, contractItems, writer, onSaved(flag), onDelete(flag), onOpenIdr(flag); render it with key={flag.id}.
  */
-export default function FlagPanel({ flag, contractItems, writer, onSaved, onDelete }) {
+export default function FlagPanel({ flag, contractItems, writer, onSaved, onDelete, onOpenIdr }) {
   const [draft, setDraft] = useState(() => draftOf(flag))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -149,6 +152,15 @@ export default function FlagPanel({ flag, contractItems, writer, onSaved, onDele
         <h4 className="text-base font-semibold text-gray-900">Flag #{flag.display_order}</h4>
         <span className="text-xs text-gray-500" aria-live="polite">{saving ? 'Saving...' : ''}</span>
       </div>
+      {flag.claimed_by_idr_id && (
+        <p className="text-sm text-emerald-800 bg-emerald-50 rounded-md px-3 py-2">
+          Claimed by{' '}
+          <button type="button" onClick={() => onOpenIdr?.(flag)} className="font-semibold underline">
+            IDR {flag.claimed_by_idr_number ?? ''}
+          </button>
+          {flag.constructed_on && ` · constructed ${shortDate(flag.constructed_on)}`}
+        </p>
+      )}
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
       <fieldset disabled={!writer} className="space-y-4">

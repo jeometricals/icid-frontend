@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import SketchCanvas from '../SketchCanvas'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import SketchCanvas, { claimBadgeText } from '../SketchCanvas'
 
 const PAGE = { pir_page_id: 'p1', page_number: 1, image_url: 'https://s/p1.png', width_px: 1200, height_px: 800, scale_px_per_ft: 10 }
 
@@ -179,5 +180,34 @@ describe('SketchCanvas — the SMART PIR layers', () => {
   it.each(['segments', 'features', 'flag-marks', 'group-labels'])('draws the %s layer of the fixture as before', (name) => {
     renderSmart()
     expect(layer(name)).toMatchSnapshot()
+  })
+})
+
+describe('SketchCanvas — flags an approved IDR claimed', () => {
+  const claimed = { ...FLAGS[0], claimed_by_idr_id: 'idr-9', claimed_by_idr_number: '042', constructed_on: '2026-10-03' }
+
+  it('badges a claimed flag "IDR #042" and leaves the rest alone', () => {
+    render(<SketchCanvas page={{ ...PAGE, rotation_deg: 0 }} flags={[claimed, FLAGS[1]]} />)
+    const badges = screen.getByTestId('claim-badges').querySelectorAll('[data-claim-badge]')
+    expect([...badges].map(badge => badge.dataset.claimBadge)).toEqual(['f1'])
+    expect(screen.getByRole('link', { name: 'Open IDR 042, which claimed flag #1' })).toHaveTextContent('IDR #042')
+  })
+
+  it('opens the IDR on a click or Enter, without touching the selection', async () => {
+    const onOpenIdr = vi.fn()
+    const onSelect = vi.fn()
+    render(<SketchCanvas page={{ ...PAGE, rotation_deg: 0 }} flags={[claimed]} onOpenIdr={onOpenIdr} onSelect={onSelect} />)
+    const badge = screen.getByRole('link', { name: /Open IDR 042/ })
+    fireEvent.pointerDown(badge)
+    await userEvent.click(badge)
+    expect(onOpenIdr).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1', claimed_by_idr_id: 'idr-9' }))
+    expect(onSelect).not.toHaveBeenCalled()
+    fireEvent.keyDown(badge, { key: 'Enter' })
+    expect(onOpenIdr).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads "IDR" for a claim without a number', () => {
+    expect(claimBadgeText({ claimed_by_idr_number: null })).toBe('IDR')
+    expect(claimBadgeText({ claimed_by_idr_number: '042' })).toBe('IDR #042')
   })
 })

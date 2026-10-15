@@ -15,13 +15,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties, one property and its PIR workspace, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items, and the Smart PIR import). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`, `nonAssessableAreas.js`, `features.js`, `segments.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`, `nonAssessableAreas.js`, `features.js`, `segments.js`, `idrFlags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent), `idrFlags.js` (an IDR's flags as the pages word them: a flag's site, amount and sketch link, who may exclude or include one, the claim and release sentences; see IDR flags) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `facingStreetName` and `withoutLeadingZeros`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
-- `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection` and the admin import's `SmartPirImportForm`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), `contractItems.js` (a `getContractItems` response fixture for the pay-item picker) and `idrFlags.js` (`idrFlag` and `idrFlagsData`: a `getIdrFlags` response).
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, the admin import's `SmartPirImportForm` and the IDR page's `IdrFlagsSection`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -301,6 +301,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `lib/reviewRoles.js` (`approved`, `stage2_review`: what the backend accepts), "Unlock". A deleted IDR has
     "Un-delete" and "Delete forever" instead. Each is confirmed first, a refusal shows in its dialog, and after
     a success the page reads the list again rather than patching the row, then refreshes the task count.
+  - **Releasing flags (R1f).** Unlock and Soft-delete on an approved IDR release the flags it claimed. Their dialog
+    reads how many first (`getIdrFlags`, `counts.attributed`): "Counting the flags it claimed...", then "This will
+    release 18 flags back to the pool." ("It has claimed no flags, so none are released."; a failed count says so
+    and the action still goes). The toast after repeats the backend's `flags_released`: "IDR 004 unlocked; 18 flags
+    released." / "IDR 004 deleted; ...". An IDR at any other status has claimed nothing and isn't asked about. An
+    un-delete back to approved adds "3 flags claimed back." to its toast.
   - **Unlock** on an IDR in RE Review that no RE has accepted (no `re_reviewer_uuid`) sends nothing and shows
     the toast "Already unlocked — IDR is in RE Review"; once an RE has accepted it, Unlock still asks and goes
     through, since that takes the IDR off them.
@@ -597,7 +603,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     ("Back to Site <siteName>") returns to the property, with `GoToProjectButton` beside it. One `getProperty` and one
     `getPirByProperty`, then `listPirPages`; a failure (a non-member's 403 included) is the load error with Retry.
     The heading is "PIR · <display_address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
-    one on the site page first."
+    one on the site page first." `?flag=<id>` (the IDR page's "View in sketch") selects that flag to start.
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
       the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
       Each page shows at its rotation in the sketch workspace (`SketchWorkspace`; see Flags) with "Scale: 15 px/ft"
@@ -630,8 +636,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **A flag** is `{id, pir_id, pir_page_id, property_id, project_id, display_order, added_in_field, shape,
     dimensions, sketch_x, sketch_y, rotation, surveyed_mark, surveyed_is_assessable, surveyed_non_assessable_reason,
     surveyed_thickness, is_constructed, pay_item_id, computed_quantity, reported_quantity, quantity, is_overridden,
-    quantity_delta_reason, created_at, updated_at, created_by, deleted_at, deleted_by}`. `is_constructed` isn't
-    shown or set yet. Flags made before pages (R1b's form) were soft-deleted by migration 033 and can't come back.
+    quantity_delta_reason, created_at, updated_at, created_by, deleted_at, deleted_by, claimed_by_idr_id,
+    claimed_by_idr_number, constructed_on}`. Only an IDR's approval sets `is_constructed` and the claim (see IDR
+    flags); nothing here edits them. A claimed flag carries an "IDR #042" badge at its top-right on the canvas
+    (green, `claimBadgeText`; a link, Enter too) and "Claimed by IDR 042 · constructed Oct 3" under its panel's
+    heading; either opens the IDR (`onOpenIdr`, which `PirPage` turns into a navigation). A claimed flag can still
+    be edited: the IDR keeps what it signed off on. Flags made before pages (R1b's form) were soft-deleted by migration 033 and can't come back.
   - **Service:** `services/flags.js`: `listFlags(pirId)` (the live flags across the live pages, by display order),
     `getFlag`, `createFlagOnPage(pirPageId, data)`, `updateFlag` and `deleteFlag` (a soft delete, for any member).
     The admin's soft-delete / un-delete routes and the deprecated `POST /v1/pirs/{id}/flags` aren't called.
@@ -821,6 +831,49 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `onDone({added, failed, taskOrder})` hands the page the count, the refusal (`{property, message}`) and the last
     task order the backend returned; the page shows that and a toast: "Added 3 sites." or "Added 1 site.
     Couldn't add <name>: <message> The rest weren't tried."
+- **IDR flags (R1f).** An IDR's sidewalk quantities come from the PIR flags it covers, as a live rollup, beside its
+  reports' hand-entered pay items.
+  - **Scope.** An IDR names a task order (`task_order_id`, saved through `saveIdrHeader` on a draft); it covers the
+    live flags on that task order's sites, without one none. Per-IDR overrides change that: `exclude` leaves a flag
+    out, `include` brings one in (the backend also lets an include bring a flag in from elsewhere in the project;
+    the UI has no picker for that yet, so it only re-includes listed flags).
+  - **Service:** `services/idrFlags.js`: `getIdrFlags(idrId)`, `excludeIdrFlag(idrId, flagId)` and
+    `includeIdrFlag`, each answering `{idr_id, status, task_order_id, frozen, counts: {attributed, excluded,
+    claimed_elsewhere, total}, flags, pay_items, unmapped}`. A flag's `state` is `attributed`, `excluded`, `claimed`
+    (by this IDR, approved) or `claimed_elsewhere`; its `amount` is in its pay item's unit (SF, SY, CY, EA), else
+    null. Before approval the answer is live; once approved (`frozen`) it is what the approval claimed and wrote.
+  - **`IdrFlagsSection`** on the IDR page, after the reports, open to start and folded by its heading "Flags
+    attributed (18 of 23)" (attributed of all listed; "Flags claimed (18)" once approved):
+    - the task order: a select of the project's task orders (`listTaskOrders`) on a draft, saved at once and alone
+      (`{task_order_id}`; "No task order" sends null), then the IDR and its flags are read again; past draft its
+      number, a link to it, or "None";
+    - "Pay items from flags", read-only (pay item, description, budget code, quantity in its unit, and before
+      approval how many flags), "Live: follows the flags until the IDR is approved." / "Frozen at approval.", and
+      "N flags add nothing here: ..." for `unmapped`;
+    - one row per flag: #display order, site (`flagSiteName`), page, pay item, amount (`flagAmountText`), status
+      ("Attributed", "Excluded", "Claimed · constructed Oct 3", or "Claimed by IDR 003" linking to that IDR) and
+      "View in sketch" (`sketchLink`: the PIR page at the flag's page, `?flag=` selecting it). Excluded and
+      claimed-elsewhere rows are muted.
+    - Without flags: "Pick a task order to bring in its sites' flags." (a draft), "No task order: this IDR covers no
+      flags.", or "No flags on this task order's sites yet."
+  - **Who excludes and includes** (`canChangeIdrFlags`, as the backend allows): the inspector on their own draft,
+    the reviewer who accepted it at its stage (`canEditInReview`), or an admin; never a demo user, and nobody on a
+    submitted (not yet accepted), approved or deleted IDR. They get a checkbox per row (ticked when attributed;
+    none on a flag claimed elsewhere); unticking excludes, ticking includes, one at a time, and the panel shows
+    the IDR's flags the call answers with. A refusal reads "Couldn't exclude flag #3: ..." above the rows.
+    Everyone else reads the status as text.
+  - **The page** reads the flags beside the IDR (`getIdrFlags`) and again after every change it refetches for; a
+    failure is the panel's ("Couldn't load this IDR's flags: ..." with Retry), not the page's.
+  - **Approving claims them.** "Final Approve & Sign" (`ReviewToolbar`, given `idrFlags`) words its dialog from
+    them: "This will claim 18 flags across 4 sites. Total: 420 SF 4\", 180 SF 7\"." (`claimSummary`: the attributed
+    flags' square feet by thickness), the pay items they come to as its lines, a count of flags that add no
+    quantity, then the usual signing question. Without flags it reads as before. When the backend left out flags
+    another IDR claimed first (`flags_dropped` on the IDR `approveStage2` returns), a toast says "IDR approved; 2
+    flags already claimed by another IDR were left out."
+  - **Un-approving releases them**: the admin's Unlock and Soft-delete (see All IDRs). The review services put the
+    response's `flags_claimed` / `flags_dropped` / `flags_released` on the IDR they return.
+  - **Hand entry of a flag-filled pay item** (same item number and budget code) is refused by the backend on a
+    report save (400); the report page shows that refusal as worded. The picker doesn't hide such items yet.
 - **Pay-item approval (the stage gate).** The backend only approves a stage (`approve-stage1`, `approve-stage2`)
   once the user approving has attested to every pay item on every report but an auto-generated General: approved
   it, revised its quantity or added it, at this stage, since the stage was last accepted, for the quantity it has now. Otherwise it answers 400 with
@@ -902,7 +955,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `POST /v1/idrs/` · `GET /v1/idrs/?project_id=&reporter_uuid=&status=` (plus `include_deleted=` and
     `include_all_drafts=`, admin only; and the archive's `idr_number=`, `work_date=`, `from=`, `to=` and
     repeatable `discipline=`; each row carries `disciplines`) · `GET /v1/idrs/{id}`
-  - `PUT /v1/idrs/{id}/header` · `POST /v1/idrs/{id}/submit`
+  - `PUT /v1/idrs/{id}/header` (the header fields and `task_order_id`) · `POST /v1/idrs/{id}/submit`
+  - IDR flags: `GET /v1/idrs/{id}/attributed-flags` · `POST /v1/idrs/{id}/attributed-flags/{flag_id}/exclude` ·
+    `POST /v1/idrs/{id}/attributed-flags/{flag_id}/include` (reading for anyone who can read the IDR; changes for
+    its inspector on a draft, the stage's reviewer in review, an admin; never a demo user). approve-stage2,
+    admin/unlock, admin/delete and admin/undelete add `flags_claimed` / `flags_dropped` / `flags_released`.
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
     `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`
   - Reviewer edits: `PATCH /v1/idrs/{id}/field` · `POST /v1/idrs/{id}/pay-items/{item id}/revise` ·

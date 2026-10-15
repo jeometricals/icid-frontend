@@ -318,6 +318,27 @@ describe('PirPage — the sketch workspace', () => {
     expect(screen.getByRole('complementary', { name: 'Flag #7' })).toBeInTheDocument()
   })
 
+  const FLAG_ON_3 = {
+    id: 'f9', pir_id: PIR.id, project_id: 'HWS0023', pir_page_id: 'page-3', display_order: 7, shape: 'rectangle',
+    dimensions: { L: 5, W: 5 }, sketch_x: 100, sketch_y: 100, rotation: 0, surveyed_mark: 'number_only',
+    surveyed_is_assessable: true, surveyed_non_assessable_reason: null, surveyed_thickness: '4in', added_in_field: false,
+    pay_item_id: null, computed_quantity: 25, reported_quantity: null, quantity_delta_reason: null,
+  }
+
+  it("opens on the page and flag the URL names (the IDR page's View in sketch)", async () => {
+    api.listFlags.mockResolvedValue([FLAG_ON_3])
+    await renderLoaded({ search: '?page=3&flag=f9' })
+    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument()
+    expect(await screen.findByRole('complementary', { name: 'Flag #7' })).toBeInTheDocument()
+  })
+
+  it("opens the IDR that claimed a flag from its badge", async () => {
+    api.listFlags.mockResolvedValue([{ ...FLAG_ON_3, claimed_by_idr_id: 'idr-9', claimed_by_idr_number: '042' }])
+    await renderLoaded({ search: '?page=3' })
+    await userEvent.click(await screen.findByRole('link', { name: /Open IDR 042/ }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-9')
+  })
+
   it('keeps the shape tools off on a page without a scale', async () => {
     await renderLoaded({ search: '?page=2' })
     expect(screen.getByText('Scale: not set')).toBeInTheDocument()

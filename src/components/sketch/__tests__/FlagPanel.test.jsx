@@ -171,3 +171,19 @@ describe('parseDimensions', () => {
     expect(parseDimensions('polygon', { vertices: [{ x: '0', y: '0' }, { x: '1', y: '1' }, { x: '2', y: '2' }] })).toBeNull()
   })
 })
+
+describe('FlagPanel — a flag an approved IDR claimed', () => {
+  it('says which IDR claimed it and when it was constructed, the IDR a button that opens it', async () => {
+    const onOpenIdr = vi.fn()
+    const claimed = { ...FLAG, claimed_by_idr_id: 'idr-9', claimed_by_idr_number: '042', constructed_on: '2026-10-03', is_constructed: true }
+    renderPanel({ flag: claimed, onOpenIdr })
+    expect(screen.getByText(/Claimed by/)).toHaveTextContent('Claimed by IDR 042 · constructed Oct 3')
+    await userEvent.click(screen.getByRole('button', { name: 'IDR 042' }))
+    expect(onOpenIdr).toHaveBeenCalledWith(claimed)
+  })
+
+  it('says nothing of a claim on an unclaimed flag', () => {
+    renderPanel()
+    expect(screen.queryByText(/Claimed by/)).not.toBeInTheDocument()
+  })
+})

@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import ReviewToolbar from '../ReviewToolbar'
+import ReviewToolbar, { droppedText } from '../ReviewToolbar'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { TaskCountContext } from '../../contexts/TaskCountContext'
 import { TEST_USER, UNSIGNED_USER } from '../../test/users'
+import { idrFlag, idrFlagsData } from '../../test/idrFlags'
 
 // The real modal needs a canvas and the signature service; here it is a stand-in that can succeed or be cancelled
 vi.mock('../SignatureSetupModal', () => ({
@@ -41,7 +42,7 @@ let refreshTaskCount
 
 let onPayItemsUntouched
 
-function renderToolbar(idr, roles, { user = TEST_USER, disabled = false, reports, fieldEdits } = {}) {
+function renderToolbar(idr, roles, { user = TEST_USER, disabled = false, reports, fieldEdits, idrFlags } = {}) {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
     <MemoryRouter>
@@ -51,6 +52,7 @@ function renderToolbar(idr, roles, { user = TEST_USER, disabled = false, reports
           roles={roles}
           reports={reports}
           fieldEdits={fieldEdits}
+          idrFlags={idrFlags}
           onChanged={onChanged}
           onPayItemsUntouched={onPayItemsUntouched}
           disabled={disabled}
@@ -508,5 +510,52 @@ describe('ReviewToolbar — un-approved pay items', () => {
     await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
     expect(await within(dialog('Final Approve & Sign')).findByRole('alert')).toHaveTextContent('Signature required before approving')
     expect(onPayItemsUntouched).not.toHaveBeenCalled()
+  })
+})
+
+describe('ReviewToolbar — the flags an approval claims', () => {
+  const FLAGS = idrFlagsData([
+    idrFlag(),
+    idrFlag({ flag_id: 'f2', property_id: 'prop-2', surveyed_thickness: '7in', quantity_sf: 180, amount: 180 }),
+    idrFlag({ flag_id: 'f3', state: 'excluded' }),
+  ], { unmapped: 1 })
+
+  it('sums up the claim in the Final Approve & Sign dialog: flags, sites, square feet by thickness, pay items', async () => {
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_MINE, ['re'], { idrFlags: FLAGS })
+    await user.click(button('Final Approve & Sign'))
+    const confirm = dialog('Final Approve & Sign')
+    expect(confirm).toHaveTextContent('This will claim 2 flags across 2 sites. Total: 50 SF 4", 180 SF 7".')
+    expect(confirm).toHaveTextContent("1 flag adds no quantity (no pay item, or a unit a flag can't be measured in).")
+    expect(within(confirm).getByRole('listitem')).toHaveTextContent('608-01 4" Concrete Sidewalk: 230 SF')
+    expect(confirm).toHaveTextContent('Your signature will be stamped on every page of its export.')
+  })
+
+  it('keeps the plain words when the IDR covers no flags, or they could not be read', async () => {
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_MINE, ['re'], { idrFlags: idrFlagsData([], { taskOrderId: null }) })
+    await user.click(button('Final Approve & Sign'))
+    expect(dialog('Final Approve & Sign')).not.toHaveTextContent(/claim/)
+    expect(within(dialog('Final Approve & Sign')).queryByRole('listitem')).not.toBeInTheDocument()
+  })
+
+  it('says how many flags another IDR claimed first, once approved', async () => {
+    api.approveStage2.mockResolvedValue({ idr_id: 'idr-1', status: 'approved', flags_claimed: 1, flags_dropped: 1 })
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_MINE, ['re'], { idrFlags: FLAGS })
+    await user.click(button('Final Approve & Sign'))
+    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
+    expect(await screen.findByText('IDR approved; 1 flag already claimed by another IDR was left out.')).toBeInTheDocument()
+    expect(droppedText(2)).toBe('IDR approved; 2 flags already claimed by another IDR were left out.')
+  })
+
+  it('says nothing more when every flag was claimed', async () => {
+    api.approveStage2.mockResolvedValue({ idr_id: 'idr-1', status: 'approved', flags_claimed: 2, flags_dropped: 0 })
+    const user = userEvent.setup()
+    renderToolbar(STAGE2_MINE, ['re'], { idrFlags: FLAGS })
+    await user.click(button('Final Approve & Sign'))
+    await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
+    expect(api.approveStage2).toHaveBeenCalledWith('idr-1')
+    expect(screen.queryByText(/left out/)).not.toBeInTheDocument()
   })
 })

@@ -50,10 +50,14 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * It also reads the PIR's features and segments and the non-assessable areas of every flag that has some
  * (non_assessable_areas_count), and draws them (rendering only: there is no editor for them yet; a Smart PIR file
  * is imported on the admin's /admin/import-smart-pirs). "Auto-detect with AI" is a disabled stub whose tooltip says
- * when it comes.
- * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onJump(pageNumber), onImageError.
+ * when it comes. A flag an approved IDR claimed carries an "IDR #042" badge on the page and a line in its panel; either
+ * opens that IDR (onOpenIdr).
+ * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onJump(pageNumber), onImageError,
+ * initialFlagId (the flag selected to start, from the URL's ?flag=), onOpenIdr(flag).
  */
-export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved, onJump, onImageError }) {
+export default function SketchWorkspace({
+  pir, page, pages, writer, onPageSaved, onJump, onImageError, initialFlagId = null, onOpenIdr,
+}) {
   const [flags, setFlags] = useState([])
   const [areas, setAreas] = useState([])
   const [features, setFeatures] = useState([])
@@ -63,7 +67,7 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
 
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = useState(initialFlagId)
   const [activeShape, setActiveShape] = useState(null)
   const [calibrating, setCalibrating] = useState(false)
   const [calibratePoints, setCalibratePoints] = useState([])
@@ -212,6 +216,7 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
           onSelect={setSelectedId}
           onMove={move}
           onCalibratePoint={(point) => setCalibratePoints(current => (current.length < 2 ? [...current, point] : current))}
+          onOpenIdr={onOpenIdr}
           onImageError={onImageError}
         />
         <div className="rounded-lg border border-gray-200 p-4 self-start">
@@ -232,6 +237,7 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
               writer={writer}
               onSaved={replaceFlag}
               onDelete={remove}
+              onOpenIdr={onOpenIdr}
             />
           ) : (
             <p className="text-sm text-gray-600">{writer ? PANEL_EMPTY_WRITER_TEXT : PANEL_EMPTY_TEXT}</p>

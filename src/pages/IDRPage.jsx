@@ -5,7 +5,9 @@
  * it and when, and keeps its Export button. The title carries the IDR's status and number. From submission on, a
  * reviewer gets the review toolbar (accept, approve, return); an IDR carrying a return comment shows it. Reviewer
  * edits of the header read as redlines; the reviewer who holds the IDR gets an edit-mode switch, which carries over to
- * its report pages.
+ * its report pages. Under the reports, the PIR flags it covers (IdrFlagsSection: its task order, the pay items its
+ * flags come to, and each flag with a checkbox for whoever may exclude or include it), read with the IDR and again
+ * after every change; the review toolbar's approval dialog sums them up.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -14,13 +16,15 @@ import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
-import { getIdr, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
+import { getIdr, getIdrFlags, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
 import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
 import { listOrigin } from '../lib/listOrigin'
+import { canChangeIdrFlags } from '../lib/idrFlags'
 import IdrHeaderForm from '../components/IdrHeaderForm'
 import IdrReportRow from '../components/IdrReportRow'
+import IdrFlagsSection from '../components/IdrFlagsSection'
 import AddReportControl from '../components/AddReportControl'
 import SaveDraftButton from '../components/SaveDraftButton'
 import SubmitReportButton from '../components/SubmitReportButton'
@@ -99,6 +103,12 @@ export default function IDRPage() {
   const [signatureSetupOpen, setSignatureSetupOpen] = useState(false) // shown first when the user has no signature yet
   const [signerName, setSignerName] = useState('') // who signed a submitted IDR, for its banner; '' until known
 
+  // The PIR flags it covers (getIdrFlags), read beside the IDR; a failure is the panel's, not the page's
+  const [idrFlags, setIdrFlags] = useState(null)
+  const [flagsLoading, setFlagsLoading] = useState(true)
+  const [flagsError, setFlagsError] = useState(null)
+  const [flagsAttempt, setFlagsAttempt] = useState(0) // bump to retry
+
   // A signed IDR's banner names its signer: the IDR's reporter. Usually that is the signed-in user; otherwise the name
   // comes from the user list. Until (or unless) it is known, the banner reads "Submitted on <date>".
   const reporterUuid = idr?.reporter_uuid
@@ -153,14 +163,37 @@ export default function IDRPage() {
     return () => { ignore = true }
   }, [projectId, idrId, loadAttempt, applyIdr])
 
+  useEffect(() => {
+    let ignore = false
+    setFlagsLoading(true)
+    setFlagsError(null)
+    getIdrFlags(idrId)
+      .then(data => { if (!ignore) setIdrFlags(data) })
+      .catch(err => { if (!ignore) setFlagsError(err.message) })
+      .finally(() => { if (!ignore) setFlagsLoading(false) })
+    return () => { ignore = true }
+  }, [idrId, flagsAttempt])
+
+  // Reads the flags again after a change (approval claims them, a task order changes their scope)
+  const refreshFlags = async () => {
+    try {
+      setIdrFlags(await getIdrFlags(idrId))
+      setFlagsError(null)
+    } catch (err) {
+      setFlagsError(err.message)
+    }
+  }
+
   // Silent refetch after a change: the old UI stays up until it lands; a failure gets its own message
   const refresh = async () => {
+    const flagsRead = refreshFlags()
     try {
       applyIdr(await getIdr(idrId), { resetForm: false })
       setRefreshError(null)
     } catch (err) {
       setRefreshError(err.message)
     }
+    await flagsRead
   }
 
   // Runs one change, reports its error through onError, then refetches whether it worked or not
@@ -244,6 +277,17 @@ export default function IDRPage() {
     if (!window.confirm(deleteConfirmMessage(report, reports))) return
     runAction(report.report_id, () => deleteReport(idrId, report.report_id),
       message => setActionError({ scope: 'reports', message: `Couldn't delete report: ${message}` }))
+  }
+
+  // The task order is saved on its own, at once, through the header call; the panel shows a refusal
+  const handleTaskOrderChange = async (taskOrderId) => {
+    setBusyAction('taskOrder')
+    try {
+      await saveIdrHeader(idrId, { task_order_id: taskOrderId })
+    } finally {
+      await refresh()
+      setBusyAction(null)
+    }
   }
 
   // Blocks on unsaved header edits so what gets submitted is what's on screen, then asks for certification.
@@ -346,6 +390,7 @@ export default function IDRPage() {
             roles={rolesByProject?.[projectId] || []}
             reports={reports}
             fieldEdits={fieldEdits}
+            idrFlags={idrFlags}
             onChanged={refresh}
             onPayItemsUntouched={showUntouchedPayItem}
             disabled={busy}
@@ -446,6 +491,18 @@ export default function IDRPage() {
             </div>
           )}
         </section>
+
+        <IdrFlagsSection
+          idr={idr}
+          data={idrFlags}
+          loading={flagsLoading}
+          error={flagsError}
+          onRetry={() => setFlagsAttempt(a => a + 1)}
+          canChange={canChangeIdrFlags(idr, user, rolesByProject?.[projectId] || [])}
+          canPickTaskOrder={!readOnly}
+          onTaskOrderChange={handleTaskOrderChange}
+          onChanged={setIdrFlags}
+        />
 
         {/* Export and Submit */}
         {!readOnly && (

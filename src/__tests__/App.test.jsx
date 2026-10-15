@@ -19,6 +19,8 @@ vi.mock('../services/api', () => ({
   startDemo: vi.fn(),
   fetchCurrentUser: vi.fn(),
   signOutOnServer: vi.fn(),
+  getIdrFlags: vi.fn(),
+  listTaskOrders: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -29,6 +31,12 @@ beforeEach(() => {
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens 2025' })
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.listIdrs.mockResolvedValue([])
+  // The IDR page reads the flags it covers and the project's task orders: none here
+  api.getIdrFlags.mockResolvedValue({
+    frozen: false, task_order_id: null, counts: { attributed: 0, excluded: 0, claimed_elsewhere: 0, total: 0 },
+    flags: [], pay_items: [], unmapped: 0,
+  })
+  api.listTaskOrders.mockResolvedValue([])
   // The Progress page reads only the roll-ups (Q0): an empty project, nothing approved and no budget
   api.listQuantities.mockResolvedValue({
     pay_items: [], totals_by_budget_code: [],

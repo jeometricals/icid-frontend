@@ -9,6 +9,8 @@
  * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
  * heading names the site by its display_address (a ped ramp's intersection), Back by siteName. The backend refuses
  * anyone not on the project (403), which shows as the load error.
+ * ?flag=<id> selects that flag to start (the IDR page's "View in sketch"), and a flag's "IDR #042" badge opens
+ * the IDR that claimed it.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -287,6 +289,8 @@ export default function PirPage() {
               }}
               onJump={goTo}
               onImageError={() => setImageFailed(true)}
+              initialFlagId={searchParams.get('flag')}
+              onOpenIdr={(flag) => navigate(`/project/${flag.project_id}/idr/${flag.claimed_by_idr_id}`)}
             />
           )}
         </section>

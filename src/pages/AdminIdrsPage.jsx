@@ -5,7 +5,10 @@
  * Deleted, and has Un-delete and Delete forever instead. "Show all drafts" (off to start) brings in other people's
  * drafts from what was fetched. Each action is confirmed first (Delete forever by typing the IDR's number), and
  * the list is read again afterwards, so a row shows what the backend wrote. Unlock on an IDR in RE Review that no
- * RE has accepted has nothing to undo: it only says so, in a toast. Anyone who isn't an admin is told so instead.
+ * RE has accepted has nothing to undo: it only says so, in a toast. Unlocking or deleting an approved IDR releases
+ * the PIR flags it claimed (R1f): its dialog reads how many first (getIdrFlags) and says so, and the toast after
+ * repeats the count the backend gives; an un-delete back to approved says how many it claimed back. Anyone who isn't
+ * an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -13,8 +16,9 @@ import { ArrowLeft } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
-import { adminDeleteIdr, adminUnlockIdr, listIdrs, permanentDeleteIdr, undeleteIdr } from '../services/api'
+import { adminDeleteIdr, adminUnlockIdr, getIdrFlags, listIdrs, permanentDeleteIdr, undeleteIdr } from '../services/api'
 import { ADMIN_UNLOCKABLE_STATUSES, STATUS_LABELS, isAdmin } from '../lib/reviewRoles'
+import { countOf, releaseSentence } from '../lib/idrFlags'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DeleteForeverModal from '../components/DeleteForeverModal'
 import IdrTable from '../components/IdrTable'
@@ -44,6 +48,10 @@ const ACTIONS = {
     confirmLabel: 'Unlock',
     confirmClassName: 'btn-primary',
     failure: "Couldn't unlock the IDR",
+    releases: true,
+    done: (idr, unlocked) => (unlocked?.flags_released > 0
+      ? `${idrName(idr)} unlocked; ${countOf(unlocked.flags_released, 'flag')} released.`
+      : null),
   },
   delete: {
     run: idrId => adminDeleteIdr(idrId),
@@ -52,6 +60,10 @@ const ACTIONS = {
     confirmLabel: 'Soft-delete',
     confirmClassName: 'btn-danger',
     failure: "Couldn't delete the IDR",
+    releases: true,
+    done: (idr, deleted) => (deleted?.flags_released > 0
+      ? `${idrName(idr)} deleted; ${countOf(deleted.flags_released, 'flag')} released.`
+      : null),
   },
   undelete: {
     run: idrId => undeleteIdr(idrId),
@@ -62,7 +74,8 @@ const ACTIONS = {
     failure: "Couldn't un-delete the IDR",
     done: (idr, restored) => {
       const status = STATUS_LABELS[restored?.status]
-      return status ? `${idrName(idr)} restored to ${status}.` : `${idrName(idr)} restored.`
+      const claimed = restored?.flags_claimed > 0 ? ` ${countOf(restored.flags_claimed, 'flag')} claimed back.` : ''
+      return `${status ? `${idrName(idr)} restored to ${status}.` : `${idrName(idr)} restored.`}${claimed}`
     },
   },
   // Confirmed in DeleteForeverModal, not ConfirmDialog, so it has no dialog words here
@@ -120,6 +133,22 @@ export default function AdminIdrsPage() {
   const [actionError, setActionError] = useState(null)
   const [refreshError, setRefreshError] = useState(null) // an action worked but the list couldn't be read again
   const [toast, setToast] = useState(null)
+  // How many flags the pending unlock or delete would release: {loading, count, error}, or null when it releases none
+  const [release, setRelease] = useState(null)
+
+  // Only an approved IDR has claimed flags; read how many before its unlock or delete is confirmed
+  useEffect(() => {
+    if (!pending || !ACTIONS[pending.action].releases || pending.idr.status !== 'approved') {
+      setRelease(null)
+      return
+    }
+    let ignore = false
+    setRelease({ loading: true, count: null, error: null })
+    getIdrFlags(pending.idr.idr_id)
+      .then(data => { if (!ignore) setRelease({ loading: false, count: data.counts.attributed, error: null }) })
+      .catch(err => { if (!ignore) setRelease({ loading: false, count: null, error: err.message }) })
+    return () => { ignore = true }
+  }, [pending])
 
   useEffect(() => {
     if (!admin) return
@@ -176,6 +205,11 @@ export default function AdminIdrsPage() {
     setPending(null)
     setBusy(false)
   }
+
+  // The pending action's dialog words, with what it releases
+  const releaseText = !release ? '' : release.loading
+    ? ' Counting the flags it claimed...'
+    : release.error ? ` Couldn't count the flags it claimed: ${release.error}` : ` ${releaseSentence(release.count)}`
 
   const changeSort = (key) => {
     setSort(current => (current.key === key
@@ -295,7 +329,7 @@ export default function AdminIdrsPage() {
         {pending && pending.action !== 'purge' && (
           <ConfirmDialog
             title={ACTIONS[pending.action].title(pending.idr)}
-            message={ACTIONS[pending.action].message}
+            message={`${ACTIONS[pending.action].message}${releaseText}`}
             note={`IDR: ${describeIdr(pending.idr)}`}
             confirmLabel={ACTIONS[pending.action].confirmLabel}
             cancelLabel="Cancel"

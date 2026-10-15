@@ -59,7 +59,13 @@ const STATUS_BEFORE_DELETE = { deleted: 'approved', 'deleted-draft': 'draft' }
 
 vi.mock('../../services/api', () => ({
   listIdrs: vi.fn(), adminUnlockIdr: vi.fn(), adminDeleteIdr: vi.fn(), undeleteIdr: vi.fn(), permanentDeleteIdr: vi.fn(),
+  getIdrFlags: vi.fn(),
 }))
+
+// An approved IDR's flags, as getIdrFlags answers: frozen, with this many claimed
+const claimedFlags = (count) => ({
+  frozen: true, counts: { attributed: count, excluded: 0, claimed_elsewhere: 0, total: count }, flags: [], pay_items: [], unmapped: 0,
+})
 
 let server
 let refreshTaskCount
@@ -89,6 +95,7 @@ beforeEach(() => {
   api.permanentDeleteIdr.mockImplementation(async (idrId) => {
     server = server.filter(row => row.idr_id !== idrId)
   })
+  api.getIdrFlags.mockResolvedValue(claimedFlags(0))
 })
 
 function CurrentUrl() {
@@ -721,5 +728,68 @@ describe('AdminIdrsPage — not an admin', () => {
     expect(screen.getByText('Only an admin can see every IDR.')).toBeInTheDocument()
     expect(api.listIdrs).not.toHaveBeenCalled()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+})
+
+describe('AdminIdrsPage — flags an unlock or a delete releases', () => {
+  const click = (date, name) => userEvent.click(within(rowFor(date)).getByRole('button', { name }))
+
+  it.each([
+    ['Unlock', 'Unlock', 'adminUnlockIdr', 'IDR 004 unlocked; 18 flags released.'],
+    ['Soft-delete', 'Soft-delete', 'adminDeleteIdr', 'IDR 004 deleted; 18 flags released.'],
+  ])('%s on an approved IDR reads how many flags it claimed, warns, and says how many went', async (button, confirmLabel, call, done) => {
+    api.getIdrFlags.mockResolvedValue(claimedFlags(18))
+    api[call].mockResolvedValue({ idr_id: 'approved', flags_released: 18 })
+    renderPage()
+    await ready()
+    await click('Sep 16, 2026', button)
+    expect(await within(dialog()).findByText(/This will release 18 flags back to the pool\./)).toBeInTheDocument()
+    expect(api.getIdrFlags).toHaveBeenCalledWith('approved')
+
+    await userEvent.click(within(dialog()).getByRole('button', { name: confirmLabel }))
+    expect(await screen.findByText(done)).toBeInTheDocument()
+  })
+
+  it('says it is counting while the flags are read', async () => {
+    api.getIdrFlags.mockReturnValue(new Promise(() => {}))
+    renderPage()
+    await ready()
+    await click('Sep 16, 2026', 'Unlock')
+    expect(dialog()).toHaveTextContent('Counting the flags it claimed...')
+  })
+
+  it('says an approved IDR that claimed nothing releases nothing', async () => {
+    renderPage()
+    await ready()
+    await click('Sep 16, 2026', 'Unlock')
+    expect(await within(dialog()).findByText(/It has claimed no flags, so none are released\./)).toBeInTheDocument()
+  })
+
+  it("still lets the admin go on when the flags can't be counted", async () => {
+    api.getIdrFlags.mockRejectedValue(new Error('Network error'))
+    renderPage()
+    await ready()
+    await click('Sep 16, 2026', 'Unlock')
+    expect(await within(dialog()).findByText(/Couldn't count the flags it claimed: Network error/)).toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    expect(api.adminUnlockIdr).toHaveBeenCalledWith('approved')
+  })
+
+  it("doesn't ask about the flags of an IDR that isn't approved: it has claimed none", async () => {
+    renderPage()
+    await ready()
+    await click('Sep 23, 2026', 'Soft-delete')
+    expect(dialog()).not.toHaveTextContent(/flags/)
+    expect(api.getIdrFlags).not.toHaveBeenCalled()
+  })
+
+  it('says how many flags an un-delete back to approved claimed back', async () => {
+    api.undeleteIdr.mockResolvedValue({ idr_id: 'deleted', status: 'approved', flags_claimed: 3 })
+    renderPage()
+    await ready()
+    await includeDeleted()
+    await click('Sep 10, 2026', 'Un-delete')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
+    expect(await screen.findByText('IDR 002 restored to Approved. 3 flags claimed back.')).toBeInTheDocument()
   })
 })

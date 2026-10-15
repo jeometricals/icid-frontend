@@ -63,8 +63,9 @@ export async function getIdr(idrId) {
 }
 
 /**
- * Saves shared header fields on a draft IDR. Pass ONLY the fields that changed: the backend leaves omitted
- * fields untouched and clears fields sent as null, so sending all eight overwrites values edited elsewhere.
+ * Saves shared header fields on a draft IDR, and its task_order_id (the task order whose sites' flags it covers;
+ * 400 for one that isn't a live task order of its project). Pass ONLY the fields that changed: the backend leaves
+ * omitted fields untouched and clears fields sent as null, so sending all eight overwrites values edited elsewhere.
  * Returns the updated IDR without its reports.
  */
 export async function saveIdrHeader(idrId, header) {

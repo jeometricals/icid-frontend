@@ -1,5 +1,14 @@
 import { apiFetch } from './apiClient'
 
+// The counts a move that claims or releases an IDR's flags adds to its response (R1f)
+const FLAG_COUNTS = ['flags_claimed', 'flags_dropped', 'flags_released']
+
+// The IDR a move returned, with whichever flag counts the response carries set on it
+function movedIdr(json) {
+  const counts = Object.fromEntries(FLAG_COUNTS.filter(key => typeof json[key] === 'number').map(key => [key, json[key]]))
+  return { ...json.data, ...counts }
+}
+
 /**
  * Lists the IDRs waiting in one review queue, oldest submission first, on the projects where the signed-in user
  * works that queue. status is 'submitted' (waiting to be picked up), 'stage1_review' or 'stage2_review'.
@@ -43,12 +52,13 @@ export async function acceptStage2(idrId) {
 
 /**
  * Approves an IDR for good, signed with the signed-in user's signature. Only its RE reviewer (or an admin) can;
- * fails with 400 when they have no signature.
- * Returns the approved IDR.
+ * fails with 400 when they have no signature. Approving claims the flags attributed to it (see idrFlags.js).
+ * Returns the approved IDR, with flags_claimed and flags_dropped (attributed flags another IDR claimed first, left
+ * out) on it.
  */
 export async function approveStage2(idrId) {
   const json = await apiFetch(`/v1/idrs/${idrId}/approve-stage2`, { method: 'POST' })
-  return json.data
+  return movedIdr(json)
 }
 
 /**
@@ -63,34 +73,36 @@ export async function returnIdr(idrId, { to, comment }) {
 
 /**
  * Admin only: unlocks an approved IDR (or one already in Stage 2 review) for the RE to review again. It goes to
- * stage2_review with the RE's signature and the RE reviewer cleared; its IDR number stays. Fails with 400 for an
- * IDR at any other status.
- * Returns the updated IDR.
+ * stage2_review with the RE's signature and the RE reviewer cleared; its IDR number stays, and the flags it claimed
+ * are released. Fails with 400 for an IDR at any other status.
+ * Returns the updated IDR, with flags_released on it.
  */
 export async function adminUnlockIdr(idrId) {
   const json = await apiFetch(`/v1/idrs/${idrId}/admin/unlock`, { method: 'POST' })
-  return json.data
+  return movedIdr(json)
 }
 
 /**
  * Admin only: soft-deletes an IDR at any status. The record is kept (status 'deleted') but leaves every list, and
- * its day and IDR number become free again. Deleting one that is already deleted succeeds and changes nothing.
- * Returns the deleted IDR.
+ * its day and IDR number become free again, and the flags it claimed are released. Deleting one that is already
+ * deleted succeeds and changes nothing.
+ * Returns the deleted IDR, with flags_released on it.
  */
 export async function adminDeleteIdr(idrId) {
   const json = await apiFetch(`/v1/idrs/${idrId}/admin/delete`, { method: 'POST' })
-  return json.data
+  return movedIdr(json)
 }
 
 /**
  * Admin only: brings a soft-deleted IDR back with the status it had when it was deleted (a draft when that isn't
  * on record), and into the lists again. Fails with 404 for an IDR that isn't deleted and 409 when another IDR has
- * since taken its day or its IDR number (the thrown error's body then carries existing_idr_id).
- * Returns the restored IDR.
+ * since taken its day or its IDR number, or claimed one of the flags it would claim back (the thrown error's body
+ * then carries existing_idr_id). One that comes back approved claims back the flags its delete released.
+ * Returns the restored IDR, with flags_claimed on it.
  */
 export async function undeleteIdr(idrId) {
   const json = await apiFetch(`/v1/idrs/${idrId}/admin/undelete`, { method: 'POST' })
-  return json.data
+  return movedIdr(json)
 }
 
 /**

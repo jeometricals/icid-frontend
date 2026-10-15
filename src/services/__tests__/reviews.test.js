@@ -109,6 +109,18 @@ describe.each([
   })
 })
 
+describe.each([
+  ['approveStage2', approveStage2, { flags_claimed: 18, flags_dropped: 2 }],
+  ['adminUnlockIdr', adminUnlockIdr, { flags_released: 18 }],
+  ['adminDeleteIdr', adminDeleteIdr, { flags_released: 0 }],
+  ['undeleteIdr', undeleteIdr, { flags_claimed: 3 }],
+])('%s with flags', (_, call, counts) => {
+  it('puts the flag counts the response carries on the IDR it returns', async () => {
+    mockFetch(200, { status: 'success', data: MOCK_IDR, ...counts })
+    expect(await call(IDR_ID)).toEqual({ ...MOCK_IDR, ...counts })
+  })
+})
+
 describe('approveStage2', () => {
   it('surfaces the missing-signature refusal', async () => {
     mockFetch(400, { detail: 'Signature required before approving' })

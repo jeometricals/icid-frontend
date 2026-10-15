@@ -408,3 +408,21 @@ describe('SketchWorkspace — the coming tool', () => {
     expect(screen.queryByRole('button', { name: 'Bulk upload PIRs' })).not.toBeInTheDocument()
   })
 })
+
+describe('SketchWorkspace — R1f: the flag to start with, and claims', () => {
+  it('starts with the flag the URL names selected', async () => {
+    await renderLoaded({ initialFlagId: 'f2' })
+    expect(flagShape(2)).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('complementary', { name: 'Flag #2' })).toBeInTheDocument()
+  })
+
+  it('opens the IDR that claimed a flag from its badge and from its panel', async () => {
+    flags[0] = { ...flags[0], claimed_by_idr_id: 'idr-9', claimed_by_idr_number: '042', constructed_on: '2026-10-03' }
+    const onOpenIdr = vi.fn()
+    await renderLoaded({ onOpenIdr, initialFlagId: 'f1' })
+    await userEvent.click(screen.getByRole('link', { name: /Open IDR 042/ }))
+    expect(onOpenIdr).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1' }))
+    await userEvent.click(within(screen.getByRole('complementary', { name: 'Flag #1' })).getByRole('button', { name: 'IDR 042' }))
+    expect(onOpenIdr).toHaveBeenCalledTimes(2)
+  })
+})
