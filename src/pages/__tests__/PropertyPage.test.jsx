@@ -242,10 +242,10 @@ describe('PropertyPage — the property', () => {
   it('deletes the property once confirmed, then offers Un-delete and no new PIR', async () => {
     await renderLoaded()
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Delete' }))
-    expect(dialog()).toHaveAccessibleName('Delete site Block 123 Lot 45?')
+    expect(dialog()).toHaveAccessibleName('Delete site Queens Block 123 Lot 45?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByText('Site Block 123 Lot 45 deleted.')).toBeInTheDocument()
+    expect(await screen.findByText('Site Queens Block 123 Lot 45 deleted.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /12 Main St/ })).toHaveTextContent('Deleted')
     expect(within(pirCard()).queryByRole('button', { name: 'Add PIR' })).not.toBeInTheDocument()
 

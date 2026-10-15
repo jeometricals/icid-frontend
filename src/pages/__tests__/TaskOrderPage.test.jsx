@@ -110,18 +110,18 @@ describe('TaskOrderPage — who can do what', () => {
     expect(api.listUsers).toHaveBeenCalled()
     expect(api.listAdminUsers).not.toHaveBeenCalled()
     // The property page is open to anyone on the project, so a member's sites link to it too
-    expect(within(rowOf('Block 123 Lot 45')).getByRole('link', { name: 'Block 123 Lot 45' }))
+    expect(within(rowOf('Queens Block 123 Lot 45')).getByRole('link', { name: 'Queens Block 123 Lot 45' }))
       .toHaveAttribute('href', `/project/HWS0023/properties/${MAIN.id}`)
 
-    await userEvent.click(within(rowOf('Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
+    await userEvent.click(within(rowOf('Queens Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
-    await waitFor(() => expect(queryRowOf('Block 123 Lot 45')).toBeNull())
+    await waitFor(() => expect(queryRowOf('Queens Block 123 Lot 45')).toBeNull())
     expect(api.unbundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, MAIN.id)
 
     await userEvent.click(screen.getByRole('button', { name: 'Add sites' }))
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Block 111 Lot 1/ }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Queens Block 111 Lot 1/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Add 1 site' }))
-    await waitFor(() => expect(queryRowOf('Block 111 Lot 1')).not.toBeNull())
+    await waitFor(() => expect(queryRowOf('Queens Block 111 Lot 1')).not.toBeNull())
     expect(api.bundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, ELM.id)
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
@@ -134,7 +134,7 @@ describe('TaskOrderPage — who can do what', () => {
   it('gives an admin Delete, and sites that link to the property page', async () => {
     await renderLoaded()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-    expect(within(rowOf('Block 123 Lot 45')).getByRole('link', { name: 'Block 123 Lot 45' }))
+    expect(within(rowOf('Queens Block 123 Lot 45')).getByRole('link', { name: 'Queens Block 123 Lot 45' }))
       .toHaveAttribute('href', `/project/HWS0023/properties/${MAIN.id}`)
   })
 
@@ -153,7 +153,7 @@ describe('TaskOrderPage — who can do what', () => {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
-    expect(rowOf('Block 123 Lot 45')).toBeInTheDocument()
+    expect(rowOf('Queens Block 123 Lot 45')).toBeInTheDocument()
     expect(api.listUsers).not.toHaveBeenCalled()
     expect(api.listAdminUsers).not.toHaveBeenCalled()
   })
@@ -254,9 +254,9 @@ describe('TaskOrderPage — bundled properties', () => {
     expect(within(bundled()).getByText('2 sites bundled')).toBeInTheDocument()
     expect(within(bundled()).getAllByRole('columnheader').map(th => th.textContent))
       .toEqual(['Site', 'Address', 'Type', 'Added', 'Actions'])
-    expect(within(rowOf('Block 123 Lot 45')).getAllByRole('cell').map(td => td.textContent))
-      .toEqual(['Block 123 Lot 45', '12 Main St', '4+ family / commercial', 'Sep 14', 'Unbundle'])
-    expect(rowOf('Block 123 Lot 99')).toBeInTheDocument()
+    expect(within(rowOf('Queens Block 123 Lot 45')).getAllByRole('cell').map(td => td.textContent))
+      .toEqual(['Queens Block 123 Lot 45', '12 Main St', '4+ family / commercial', 'Sep 14', 'Unbundle'])
+    expect(rowOf('Queens Block 123 Lot 99')).toBeInTheDocument()
     expect(queryRowOf('4007770007')).toBeNull()
   })
 
@@ -268,20 +268,20 @@ describe('TaskOrderPage — bundled properties', () => {
 
   it('unbundles a property once confirmed, and its row goes', async () => {
     await renderLoaded()
-    await userEvent.click(within(rowOf('Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
-    expect(dialog()).toHaveAccessibleName('Unbundle site Block 123 Lot 45?')
+    await userEvent.click(within(rowOf('Queens Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
+    expect(dialog()).toHaveAccessibleName('Unbundle site Queens Block 123 Lot 45?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
 
-    await waitFor(() => expect(queryRowOf('Block 123 Lot 45')).toBeNull())
+    await waitFor(() => expect(queryRowOf('Queens Block 123 Lot 45')).toBeNull())
     expect(api.unbundleProperty).toHaveBeenCalledWith(TASK_ORDER_ID, MAIN.id)
     expect(within(bundled()).getByText('1 site bundled')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Site Block 123 Lot 45 unbundled.')
+    expect(screen.getByRole('status')).toHaveTextContent('Site Queens Block 123 Lot 45 unbundled.')
   })
 
   it('shows a refused unbundle in its dialog', async () => {
     api.unbundleProperty.mockRejectedValueOnce(new Error('Property is not in this task order'))
     await renderLoaded()
-    await userEvent.click(within(rowOf('Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
+    await userEvent.click(within(rowOf('Queens Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Unbundle' }))
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Property is not in this task order')
   })
@@ -290,12 +290,12 @@ describe('TaskOrderPage — bundled properties', () => {
     await renderLoaded()
     await userEvent.click(screen.getByRole('button', { name: 'Add sites' }))
     expect(dialog()).toHaveAccessibleName('Add sites')
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Block 111 Lot 1/ }))
-    expect(screen.queryByRole('checkbox', { name: /Block 123 Lot 45/ })).not.toBeInTheDocument() // already bundled
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Queens Block 111 Lot 1/ }))
+    expect(screen.queryByRole('checkbox', { name: /Queens Block 123 Lot 45/ })).not.toBeInTheDocument() // already bundled
     await userEvent.click(screen.getByRole('button', { name: 'Add 1 site' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(rowOf('Block 111 Lot 1')).toHaveTextContent('Expedited')
+    expect(rowOf('Queens Block 111 Lot 1')).toHaveTextContent('Expedited')
     expect(screen.getByRole('status')).toHaveTextContent('Added 1 site.')
   })
 })
@@ -307,8 +307,8 @@ describe('addedMessage', () => {
 
   it('names the refusal that stopped the batch', () => {
     expect(addedMessage({ added: 1, failed: { property: MAIN, message: 'Cannot bundle a deleted property.' } }))
-      .toBe("Added 1 site. Couldn't add Block 123 Lot 45: Cannot bundle a deleted property. The rest weren't tried.")
+      .toBe("Added 1 site. Couldn't add Queens Block 123 Lot 45: Cannot bundle a deleted property. The rest weren't tried.")
     expect(addedMessage({ added: 0, failed: { property: MAIN, message: 'Nope.' } }))
-      .toBe("No sites were added. Couldn't add Block 123 Lot 45: Nope. The rest weren't tried.")
+      .toBe("No sites were added. Couldn't add Queens Block 123 Lot 45: Nope. The rest weren't tried.")
   })
 })

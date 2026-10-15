@@ -336,12 +336,12 @@ describe('PropertiesPage — deleting and un-deleting', () => {
   it('soft-deletes a row once confirmed, and it leaves its section', async () => {
     await renderListed()
     await userEvent.click(within(rowOf('12 Main St')).getByRole('button', { name: 'Delete' }))
-    expect(dialog()).toHaveAccessibleName('Delete site Block 123 Lot 45?')
+    expect(dialog()).toHaveAccessibleName('Delete site Queens Block 123 Lot 45?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(queryRowOf('12 Main St')).toBeNull())
     expect(api.softDeleteProperty).toHaveBeenCalledWith(LISTED[0].id)
-    expect(screen.getByRole('status')).toHaveTextContent('Site Block 123 Lot 45 deleted.')
+    expect(screen.getByRole('status')).toHaveTextContent('Site Queens Block 123 Lot 45 deleted.')
   })
 
   it('names a ped ramp by its intersection in the delete dialog and toast', async () => {

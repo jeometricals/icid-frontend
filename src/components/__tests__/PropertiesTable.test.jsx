@@ -24,12 +24,12 @@ describe('PropertiesTable', () => {
   it('lists the site (its block and lot), address, type and added', () => {
     renderTable()
     expect(headings()).toEqual(['Site', 'Address', 'Type', 'Added', 'Actions'])
-    expect(screen.getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['Block 123 Lot 45', '12 Main St', '1-3 family'])
+    expect(screen.getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['Queens Block 123 Lot 45', '12 Main St', '1-3 family'])
   })
 
   it('links each site to its page under its project', () => {
     renderTable()
-    expect(screen.getByRole('link', { name: 'Block 123 Lot 45' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
+    expect(screen.getByRole('link', { name: 'Queens Block 123 Lot 45' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
   })
 
   it('has no Actions column without renderActions, as for a demo user', () => {

@@ -112,7 +112,7 @@ describe('PirPage — loading', () => {
 
   it('goes back to the site, or to the project', async () => {
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Block 123 Lot 45' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Queens Block 123 Lot 45' }))
     expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${PROPERTY_ID}`)
   })
 

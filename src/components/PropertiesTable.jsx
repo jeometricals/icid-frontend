@@ -13,7 +13,7 @@ export const propertyPath = (property) => `/project/${property.project_id}/prope
 const typeText = (row) => (row.kind === 'ped_ramp' ? rampTypeLabel(row.ramp_type) : propertyTypeLabel(row.property_type))
 
 /**
- * A table of properties (a task order's bundle): Site (a link to the property's page: a sidewalk's "Block 123 Lot 45",
+ * A table of properties (a task order's bundle): Site (a link to the property's page: a sidewalk's "Queens Block 123 Lot 45",
  * "Ped ramp" for a ped ramp), address (the display_address, so a ped ramp's intersection; the notes as a tooltip), type (a
  * sidewalk's property type, a ped ramp's ramp type), added (when the property was added to the project) and, when
  * the caller gives renderActions, an Actions cell it fills. A soft-deleted property is muted, its Site crossed out

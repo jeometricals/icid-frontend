@@ -455,7 +455,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Naming.** Internally a property is a property: files, components, services, routes (`/properties`), query
     keys and backend fields keep the word. What the user reads says "site": "Site Info" for the list and its
     links, "site" / "sites" in dialogs, confirms, toasts and notes ("Site type: Sidewalk", "Delete site <name>?",
-    "Site <name> deleted."), where the name is `siteName` (`lib/properties.js`): a sidewalk's "Block 123 Lot 45"
+    "Site <name> deleted."), where the name is `siteName` (`lib/properties.js`): a sidewalk's "Queens Block 123 Lot 45"
     (`blockLot`), a ped ramp's `display_address`. Nothing the user reads says "BBL". The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle
     site <name>?", the picker), and the task orders list's column is "Sites". Messages the backend words itself
     ("Property not found", "Cannot bundle a deleted property", its 409 details) still say "property" and are shown
@@ -529,7 +529,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     the list is read again and a toast reads "Site <name> deleted." / "Site <name> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
   - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: Site
-    (`siteLabel`: a sidewalk's "Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page),
+    (`siteLabel`: a sidewalk's "Queens Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page),
     `display_address`, and the property type or ramp type. The picker's search ("Search by block, lot or address")
     matches a sidewalk's block, lot or address and a ped ramp's `display_address` (its streets).
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
