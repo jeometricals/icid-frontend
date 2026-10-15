@@ -15,13 +15,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties, one property and its PIR workspace, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
-- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
+- `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`, `nonAssessableAreas.js`, `features.js`, `segments.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, and the Progress page's `BudgetCodeCard` and `Bar`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`; see PIR pages); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend` and `PirImportModal`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -405,6 +405,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - The amounts print through `lib/payItemFormat.js` (`formatPayItemQuantity`, `formatUnitPrice`), on the table
     and in the import preview. A non-admin who opens the URL is told it is for admins; the backend returns 403
     to them anyway.
+  - **Assessment rates** (`AssessmentRatesCard`, a section above the table, once the list has loaded): the project's
+    DOT rates per square foot, "4\" cost / SF" and "7\" cost / SF", pre-filled from the `listAdminProjects` row
+    (`cost_per_sf_4in`, `cost_per_sf_7in`; blank for none). Save is off until a rate changed and both are valid
+    (`rateOf`: 0 or more, under 1,000,000, 4 decimal places at most, as the backend checks; a blank box clears the
+    rate) and sends only what changed (`setAssessmentRates` in `services/projects.js`, `PATCH
+    /v1/admin/projects/{id}/assessment-rates`, which returns the project). A refusal reads "Couldn't save the rates:
+    ..." under the boxes, which keep what was typed; a success reads "Assessment rates saved." until the next edit.
+    The form is `noValidate`: the browser's own step check trips on floating point. Nothing computes with the rates
+    yet.
 - **Passwords.** A user changes their own; an admin resets anyone's. Neither signs anyone out: tokens already
   issued stay valid.
   - **Change password** (`ChangePasswordModal`, "Change password" in the user menu, after the signature item and
@@ -604,14 +613,18 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Classifications** (`src/data/flagEnums.js`, the backend's values with the app's labels): shape; surveyed mark
     (`number_only` "Number only", `cross` "Cross (X)", `cross_with_number` "Cross + number", `tick`, `none`);
     non-assessable reason (`tree_damage`, `city_tree`, `transition`, `no_driveway`, `hydrant`, `fronting_city`
-    "Fronting city property", `utility`, `settlement`, `other`); thickness (`4in` '4"', `7in_as_4in` '7" as 4"',
-    `7in` '7"'). The reason labels are the app's own wording of the backend's keys.
+    "Fronting city property", `utility`, `settlement`, `other`, then the Smart PIR survey's, which migration 034
+    added: `tree`, `driveway`, `grass`, `dirt`, `existing_sidewalk`, `asphalt`, `tree_pit`, `landmark`, `vault`,
+    `subway`, `scaffolding`, `other_perm_obstruction`, `other_temp_obstruction`); thickness (`4in` '4"', `7in_as_4in`
+    '7" as 4"', `7in` '7"'); defect codes (`DEFECT_CODES`: `1` to `5`, `6A`, `6B`, `6C`, read off `defect_codes`
+    and not edited yet). The reason labels are the app's own wording of the backend's keys.
   - **The survey's rules** (the backend's 422s; the panel only sends what keeps them): an assessable flag has no
     non-assessable reason and any other has one; the mark is `none` exactly when the flag was added in the field;
     a reported quantity is above zero.
-  - **`SketchWorkspace`** (`pir`, `page`, `pages`, `writer`, `onPageSaved`, `onJump`, `onImageError`; keyed by the
-    page ids, so a new upload reads afresh): reads `listFlags` and `getContractItems` once. Above the page,
-    `ShapeToolbar` and `CalibrateControl`; then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
+  - **`SketchWorkspace`** (`pir`, `page`, `pages`, `writer`, `onPageSaved`, `onPagesChanged`, `onJump`,
+    `onImageError`; keyed by the page ids, so a new upload reads afresh): reads `listFlags` and `getContractItems`
+    once, with the Smart PIR drawings (see Smart PIR drawings). Above the page, `ShapeToolbar`, `CalibrateControl`
+    and Import SMART PIR with the two coming tools; then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
     shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`.
     - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc) and the thickness
       legend. Picking one arms it (the cursor is a crosshair over the page) until it is picked again or Esc. Off
@@ -620,9 +633,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       display order, the shape's default dimensions (`DEFAULT_DIMENSIONS`: a 5 × 5 ft rectangle, a 4 / 6 × 5 ft
       trapezoid, 5 × 5 ft legs, a 5 ft square polygon, a half circle of 5 ft radius), centred on the click, rotation
       0, `number_only`, assessable, `4in`, not added in field. The new flag is selected; the shape stays armed.
-    - **`SketchCanvas`**: the page (`RotatedPage`) and the SVG overlay. Each flag on the page is its outline in its
-      thickness's colour (`THICKNESS_COLORS`: 4" blue, 7" as 4" amber, 7" red) with its display order; the
-      selected one is heavier and dashed. Clicking a flag selects it; clicking empty page clears the selection
+    - **`SketchCanvas`**: the page (`RotatedPage`) and the SVG overlay. Each flag on the page is its outline
+      stroked in its thickness's colour (`THICKNESS_COLORS`: 4" blue, 7" as 4" amber, 7" red) and filled as the DOT
+      report fills it (see Smart PIR drawings), its display order in an orange circle; the selected one is heavier
+      and dashed. Clicking a flag selects it; clicking empty page clears the selection
       (or, with a shape armed, places one there). A press on a flag never places a shape, so a just-placed flag can
       be nudged without Esc. Dragging a flag that is already selected, shape armed or not, moves only the overlay; letting go PATCHes `sketch_x` / `sketch_y`
       (a refusal puts it back and says so above the page); Esc mid-drag puts it back. The Delete key (or the panel's
@@ -653,6 +667,57 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Who does what:** any member of the project reads, adds, edits, moves and deletes flags. A reader (a demo
     user, or anyone but an admin while the site is deleted) sees the same workspace with the toolbar, Calibrate and
     the panel disabled, no Delete flag, and neither drags nor deletes. There is no un-delete in the UI.
+- **Smart PIR drawings (R1e.1).** What else migration 034 lets a PIR's page carry, drawn on the sketch: a flag's
+  non-assessable areas, features and curb segments, each flag's defect codes and the DOT report's fills and labels.
+  **Rendering only:** nothing here is edited in the UI yet (R1e.2), only imported.
+  - **Services** (reading only): `listPirFeatures(pirId)` (`services/features.js`) and `listPirSegments(pirId)`
+    (`services/segments.js`), each the PIR's live ones on its live pages; `listFlagNonAssessableAreas(flagId)`
+    (`services/nonAssessableAreas.js`). There is no list of areas per PIR, so `SketchWorkspace` asks only each flag
+    whose `non_assessable_areas_count` is above 0, and a failure of any of these is the workspace's load error. A
+    feature is `{feature_id, pir_page_id, feature_type, area_impact (marker_only, subtract, sits_on_top),
+    sketch_x, sketch_y, rotation, shape, dimensions, label, flag_id, ...}`, a segment `{segment_id, pir_page_id,
+    segment_type, points: [{x, y}, ...], length_ft, note, ...}`, an area `{non_assessable_area_id, flag_id,
+    display_order, shape, dimensions, sketch_x, sketch_y, rotation, reason, ...}`: page pixels and feet, as a
+    flag's. Their type lists are in `src/data/flagEnums.js` (`FEATURE_TYPES`, `SEGMENT_TYPES`, `AREA_REASONS`). Flags
+    now also carry `defect_codes`, `non_assessable_areas_count`, `net_quantity` (the area less its areas and
+    subtracted features) and `quantity` (the override, else the net area); the panel still calls the area
+    "computed".
+  - **`SketchCanvas` layers**, bottom to top, all but the flags taking no clicks:
+    - **Segments:** a polyline per curb run, stroked by type (`SEGMENT_STYLES`: concrete solid, depressed dashed,
+      steel-faced heavier blue, its corner dash-dotted, granite dotted, other light dashed).
+    - **Flags**, filled by `flagFill` in `lib/flagGroups.js`: light-blue stipple for a new 4" assessable flag (a 7"
+      assessed as 4" too), white for a new 7", tan hatch for one that isn't assessable, which also gets an X. The
+      patterns are `SketchPatterns`' `<defs>`, ids prefixed per canvas (`useId`), at a fill opacity that leaves the
+      scan visible.
+    - **Non-assessable areas** in yellow stripes, labelled A1, A2, ... at render time (`labelledAreas`: by their
+      flag's display order, then their own, across the page); an area whose flag isn't on the page isn't drawn.
+    - **Features** (`FeatureGlyph`): a sized one's outline (dashed and whitened for `subtract`, solid for
+      `sits_on_top`, a feature's `circle` shape included), then its key symbol at its place: letters for most
+      (`FEATURE_LETTERS`: U, MH, FA, M, S, MB, TEL, CD, T, ? for other), a filled dot for a hydrant, a ringed dot
+      for a pole, a barred square for a grate, nine purple dots for a detectable warning unit, and its label.
+    - **Flag marks:** the display order in an orange circle at the outline's top-left, and the defect codes
+      ("1 6A") in its middle.
+    - **Group labels** (`thicknessRuns`): "4\" Conc." / "7\" Conc." on each run of consecutive flags (by display
+      order) of one slab, a 7" assessed as 4" counting as 7"; at the middle of the run's bounding box, or just
+      under a run of one flag so it stays off that flag's marks.
+  - **`SketchLegend`**, always shown, unturned, in the lower-left of the page (`RotatedPage`'s `frame`): the four
+    fills, the X, the flag-number circle and a north "+". Nothing records which way north is, so the "+" is only
+    in the legend.
+  - **Import SMART PIR** (a writer's button beside Calibrate; `PirImportModal`, `pirId`, `onImported`, `onClose`):
+    a `.json` file, read and parsed in the browser (a file that isn't JSON reads "This file isn't valid JSON: ..."
+    and sends nothing), then `importSmartPir(pirId, parsed)` (`services/pirs.js`, `POST /v1/pirs/{id}/import`). A
+    refusal (a 422 for a file that isn't a Smart PIR import, a 400 for another PIR's file) reads "Couldn't import the
+    file: ..." and the file stays picked. On success the dialog shows "Imported 4 flags, 2 non-assessable areas, ...
+    and 1 title block." (`countsText`), "Set the scale, rotation or title block of N pages." when it did, and the
+    dropped items in an amber box, each with where it was, counted from 1 (`droppedPlace`: "Page 1, flag 4", "Page
+    1, flag 1, non-assessable area 2", "The file's title block") and the backend's reason; Done closes it. Behind
+    the dialog the workspace reads its drawings again and, when `pages_updated` is above 0, `PirPage` reads its
+    pages again quietly (the same page ids, so the workspace stays). Imports add: nothing drawn changes.
+  - **The coming tools**, always disabled, their tooltips on the button and a wrapper (a disabled button shows none
+    in some browsers): "Auto-detect with AI" ("Available when Vercel Pro is enabled (R1k).") and "Bulk upload PIRs"
+    ("Coming in R1m — upload a batch of signed PIRs and AI will identify each site.").
+  - Not used yet: the areas', features' and segments' writes, and the page title block (`GET` / `PUT
+    /v1/pir-pages/{id}/annotations`), which only the import sets.
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -751,7 +816,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - `GET /v1/projects/{id}/roles` · `POST /v1/projects/{id}/roles` (admin only: list, grant and revoke project roles)
   - `GET /v1/projects/{id}/quantities?from=&to=&cumulative=` (the Progress page: quantities and their budget
     roll-ups; for a user on the project, or an admin)
-  - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one)
+  - `GET /v1/admin/projects` · `POST /v1/admin/projects` (admin only: every project, and creating one) ·
+    `PATCH /v1/admin/projects/{id}/assessment-rates` (admin only: body `{cost_per_sf_4in?, cost_per_sf_7in?}`)
   - Properties: `GET /v1/projects/{id}/properties?include_deleted=` (anyone on the project; `include_deleted` is
     admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
     `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (changes admin only;
@@ -774,6 +840,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `GET /v1/flags/{id}` · `PATCH /v1/flags/{id}` · `DELETE /v1/flags/{id}` (a soft delete) (reading for anyone on
     the project; adding, editing and deleting for anyone on it but a demo user). Not called: the deprecated `POST
     /v1/pirs/{id}/flags` and the admin's `/admin/soft-delete` and `/admin/undelete`.
+  - Smart PIR drawings: `GET /v1/pirs/{id}/features` · `GET /v1/pirs/{id}/segments` ·
+    `GET /v1/flags/{id}/non-assessable-areas` (reading for anyone on the project) · `POST /v1/pirs/{id}/import`
+    (anyone on the project but a demo user). Not called yet: their per-page lists, creates, `PATCH` / `DELETE`
+    by id, and `GET` / `PUT /v1/pir-pages/{id}/annotations`.
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·
     `POST /import/preview` · `POST /import/commit` (a CSV as the multipart field `file`)

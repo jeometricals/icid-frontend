@@ -6,10 +6,11 @@ import { rotatedSize } from '../../lib/pageGeometry'
  * height swapped at 90 / 270), as wide as the column allows but never past the page's own size. Inside it, a box
  * of the page's native proportions is centred and turned with `transform: rotate(<deg>deg)`; the image fills it, and
  * so does whatever is passed as children (the sketch overlay, drawn in native page pixels), so both turn together.
- * Props: page (width_px, height_px, rotation_deg, image_url, page_number), onImageError, children; the ref is the
- * outer box (its on-screen rectangle is what pointer positions are measured against).
+ * Props: page (width_px, height_px, rotation_deg, image_url, page_number), onImageError, children, frame (drawn over the
+ * outer box, unturned: the sketch's legend); the ref is the outer box (its on-screen rectangle is what pointer
+ * positions are measured against).
  */
-const RotatedPage = forwardRef(function RotatedPage({ page, onImageError, children }, ref) {
+const RotatedPage = forwardRef(function RotatedPage({ page, onImageError, children, frame = null }, ref) {
   const { width, height } = rotatedSize(page)
   const rotation = page.rotation_deg ?? 0
   return (
@@ -39,6 +40,7 @@ const RotatedPage = forwardRef(function RotatedPage({ page, onImageError, childr
         />
         {children}
       </div>
+      {frame}
     </div>
   )
 })

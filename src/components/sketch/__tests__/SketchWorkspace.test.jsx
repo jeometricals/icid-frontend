@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import SketchWorkspace, { NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT } from '../SketchWorkspace'
+import SketchWorkspace, {
+  AI_DETECT_TOOLTIP, BULK_UPLOAD_TOOLTIP, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
+} from '../SketchWorkspace'
 import { EMPTY_TEXT } from '../FlagsFallbackList'
 import * as api from '../../../services/api'
 import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 
 vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
-  setPirPageScale: vi.fn(),
+  setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
+  importSmartPir: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -32,6 +35,9 @@ beforeEach(() => {
     flag('f3', { display_order: 3, pir_page_id: 'page-2', pay_item_id: 'ci-1', reported_quantity: 30 })]
   api.listFlags.mockImplementation(async () => structuredClone(flags))
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
+  api.listPirFeatures.mockResolvedValue([])
+  api.listPirSegments.mockResolvedValue([])
+  api.listFlagNonAssessableAreas.mockResolvedValue([])
   api.createFlagOnPage.mockImplementation(async (pageId, body) => ({ ...flag('new'), ...body, pir_page_id: pageId }))
   api.updateFlag.mockImplementation(async (id, body) => ({ ...flags.find(found => found.id === id), ...body }))
   api.deleteFlag.mockResolvedValue(undefined)
@@ -338,5 +344,103 @@ describe('SketchWorkspace — a reader (a demo user)', () => {
     await userEvent.keyboard('{Delete}')
     expect(api.updateFlag).not.toHaveBeenCalled()
     expect(api.deleteFlag).not.toHaveBeenCalled()
+  })
+})
+
+describe('SketchWorkspace — features, segments and non-assessable areas', () => {
+  const feature = (id, pageId, extra = {}) => ({
+    feature_id: id, pir_page_id: pageId, feature_type: 'hydrant', area_impact: 'marker_only', sketch_x: 50, sketch_y: 60, ...extra,
+  })
+  const segment = (id, pageId) => ({
+    segment_id: id, pir_page_id: pageId, segment_type: 'curb_concrete', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+  })
+  const area = (id, flagId, order) => ({
+    non_assessable_area_id: id, flag_id: flagId, display_order: order, shape: 'rectangle', dimensions: { L: 1, W: 1 },
+    sketch_x: 300, sketch_y: 200, rotation: 0, reason: 'driveway',
+  })
+
+  beforeEach(() => {
+    flags[0].non_assessable_areas_count = 2
+    api.listPirFeatures.mockResolvedValue([feature('ft-1', 'page-1'), feature('ft-2', 'page-2', { feature_type: 'pole' })])
+    api.listPirSegments.mockResolvedValue([segment('sg-1', 'page-1'), segment('sg-2', 'page-2')])
+    api.listFlagNonAssessableAreas.mockResolvedValue([area('na-1', 'f1', 1), area('na-2', 'f1', 2)])
+  })
+
+  it("reads the PIR's features and segments, and the areas of each flag that has some, and draws this page's", async () => {
+    await renderLoaded()
+    expect(api.listPirFeatures).toHaveBeenCalledWith(PIR.id)
+    expect(api.listPirSegments).toHaveBeenCalledWith(PIR.id)
+    expect(api.listFlagNonAssessableAreas).toHaveBeenCalledTimes(1)
+    expect(api.listFlagNonAssessableAreas).toHaveBeenCalledWith('f1')
+    const features = [...screen.getByTestId('features').querySelectorAll('[data-testid="feature"]')]
+    expect(features.map(found => found.dataset.featureType)).toEqual(['hydrant'])
+    expect(screen.getByTestId('segments').querySelectorAll('polyline')).toHaveLength(1)
+    const labels = [...screen.getByTestId('non-assessable-areas').querySelectorAll('[data-area-label]')]
+    expect(labels.map(found => found.dataset.areaLabel)).toEqual(['A1', 'A2'])
+  })
+
+  it("shows a failed read of a flag's areas as the load error, with Retry", async () => {
+    api.listFlagNonAssessableAreas.mockRejectedValueOnce(new Error('Flag not found'))
+    renderWorkspace()
+    expect(await screen.findByText("Couldn't load the flags: Flag not found")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByRole('heading', { name: 'All flags' })
+    expect(screen.getByTestId('non-assessable-areas').querySelectorAll('[data-area-label]')).toHaveLength(2)
+  })
+
+  it("drops a deleted flag's areas from the page", async () => {
+    await renderLoaded()
+    await userEvent.click(flagShape(1))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete flag' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Flag #1' })).not.toBeInTheDocument())
+    expect(screen.getByTestId('non-assessable-areas').querySelectorAll('[data-area-label]')).toHaveLength(0)
+  })
+})
+
+describe('SketchWorkspace — Import SMART PIR and the coming tools', () => {
+  const RESULT = {
+    inserted: { flags: 1, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
+    dropped: { flags: 0, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
+    dropped_items: [],
+    pages_updated: 1,
+  }
+
+  it('has the two coming tools disabled, their tooltips saying when they come', async () => {
+    await renderLoaded()
+    const ai = screen.getByRole('button', { name: 'Auto-detect with AI' })
+    const bulk = screen.getByRole('button', { name: 'Bulk upload PIRs' })
+    expect(ai).toBeDisabled()
+    expect(bulk).toBeDisabled()
+    expect(ai).toHaveAttribute('title', AI_DETECT_TOOLTIP)
+    expect(ai.parentElement).toHaveAttribute('title', 'Available when Vercel Pro is enabled (R1k).')
+    expect(bulk.parentElement).toHaveAttribute('title', 'Coming in R1m — upload a batch of signed PIRs and AI will identify each site.')
+    expect(bulk).toHaveAttribute('title', BULK_UPLOAD_TOOLTIP)
+  })
+
+  it('is off for a reader', async () => {
+    await renderLoaded({ writer: false })
+    expect(screen.getByRole('button', { name: 'Import SMART PIR' })).toBeDisabled()
+  })
+
+  it('imports a file, reads the drawings again and has the page read its pages when the file set any', async () => {
+    api.importSmartPir.mockResolvedValue(RESULT)
+    const onPagesChanged = vi.fn()
+    await renderLoaded({ onPagesChanged })
+    expect(api.listFlags).toHaveBeenCalledTimes(1)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Import SMART PIR' }))
+    const dialog = screen.getByRole('dialog', { name: 'Import SMART PIR' })
+    const file = new File([JSON.stringify({ schema_version: '1.0', pir_id: PIR.id, pages: [] })], 'pir.json', { type: 'application/json' })
+    await user.upload(within(dialog).getByLabelText('Smart PIR file (.json)'), file)
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }))
+
+    expect(await within(dialog).findByText(/Imported 1 flag\./)).toBeInTheDocument()
+    expect(api.importSmartPir).toHaveBeenCalledWith(PIR.id, { schema_version: '1.0', pir_id: PIR.id, pages: [] })
+    await waitFor(() => expect(api.listFlags).toHaveBeenCalledTimes(2))
+    expect(api.listPirFeatures).toHaveBeenCalledTimes(2)
+    expect(onPagesChanged).toHaveBeenCalledTimes(1)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   changeProjectRole, createAdminProject, getProjectRoles, getProjectsForUser, getProjectById, listAdminProjects,
+  setAssessmentRates,
 } from '../projects'
 import { mockFetch, mockFetchFailure, fetchUrl, fetchInit } from '../../test/mockFetch'
 
@@ -198,5 +199,22 @@ describe('changeProjectRole', () => {
     const error = await changeProjectRole('HWS0023', { userUuid: OLIVE, role: 're', action: 'grant' }).catch(err => err)
     expect(error.message).toBe('Network error')
     expect(error.status).toBeUndefined()
+  })
+})
+
+describe('setAssessmentRates', () => {
+  it('PATCHes the rates given and returns the project', async () => {
+    const project = { project_id: 'HWS0023', cost_per_sf_4in: 12.5, cost_per_sf_7in: null }
+    mockFetch(200, { data: project })
+    expect(await setAssessmentRates('HWS0023', { cost_per_sf_4in: 12.5, cost_per_sf_7in: null })).toEqual(project)
+    expect(fetchUrl().pathname).toBe('/v1/admin/projects/HWS0023/assessment-rates')
+    expect(fetchInit().method).toBe('PATCH')
+    expect(JSON.parse(fetchInit().body)).toEqual({ cost_per_sf_4in: 12.5, cost_per_sf_7in: null })
+  })
+
+  it("throws the backend's 400 as worded", async () => {
+    mockFetch(400, { detail: 'A rate has at most 4 decimal places' })
+    await expect(setAssessmentRates('HWS0023', { cost_per_sf_4in: 1.23456 }))
+      .rejects.toMatchObject({ status: 400, message: 'A rate has at most 4 decimal places' })
   })
 })

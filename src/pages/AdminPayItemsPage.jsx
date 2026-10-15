@@ -6,8 +6,9 @@
  * a row shows what the backend wrote and sits where the backend sorts it. Delete and Clear all are confirmed
  * first. Import CSV opens a dialog that previews a file and then imports it, after which the list is read again.
  * A cleared list and an import are each announced once, in a banner that goes when dismissed or when a dialog is
- * opened. The project's name, for the heading, comes from the admin project list. Anyone who isn't an admin is
- * told so instead.
+ * opened. The project's name, for the heading, and its assessment rates come from the admin project list; an
+ * "Assessment rates" section (AssessmentRatesCard) above the table sets the 4" and 7" cost per square foot. Anyone
+ * who isn't an admin is told so instead.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -19,6 +20,7 @@ import {
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { formatPayItemQuantity, formatUnitPrice } from '../lib/payItemFormat'
+import AssessmentRatesCard from '../components/AssessmentRatesCard'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PayItemFormModal from '../components/PayItemFormModal'
 import PayItemImportModal from '../components/PayItemImportModal'
@@ -49,7 +51,7 @@ export default function AdminPayItemsPage() {
   const admin = isAdmin(user)
 
   const [items, setItems] = useState([])
-  const [projectName, setProjectName] = useState(null)
+  const [project, setProject] = useState(null) // the admin project list's row: its name and assessment rates
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
@@ -73,7 +75,7 @@ export default function AdminPayItemsPage() {
       .then(([found, projects]) => {
         if (ignore) return
         setItems(found)
-        setProjectName(projects.find(project => project.project_id === projectId)?.project_name ?? null)
+        setProject(projects.find(found => found.project_id === projectId) ?? null)
       })
       .catch(err => { if (!ignore) setLoadError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
@@ -181,7 +183,7 @@ export default function AdminPayItemsPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h2 className="text-2xl font-bold text-gray-900">
-            Pay Items — {projectId}{projectName ? ` ${projectName}` : ''}
+            Pay Items — {projectId}{project?.project_name ? ` ${project.project_name}` : ''}
           </h2>
           <div className="flex flex-wrap gap-3">
             <button
@@ -238,6 +240,8 @@ export default function AdminPayItemsPage() {
                 <button type="button" onClick={() => setAttempt(a => a + 1)} className="underline font-medium">Retry</button>
               </p>
             )}
+
+            {project && <AssessmentRatesCard project={project} onSaved={setProject} />}
 
             {items.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">

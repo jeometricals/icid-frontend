@@ -49,7 +49,12 @@ describe('flag enum labels', () => {
   it('lists the backend\'s values', () => {
     expect(FLAG_SHAPES.map(entry => entry.value)).toEqual(['rectangle', 'trapezoid', 'triangle', 'polygon', 'arc'])
     expect(FLAG_MARKS.map(entry => entry.value)).toEqual(['number_only', 'cross', 'cross_with_number', 'tick', 'none'])
-    expect(FLAG_NON_ASSESSABLE_REASONS).toHaveLength(9)
+    // R1b's nine, then the thirteen migration 034 added for the Smart PIR survey
+    expect(FLAG_NON_ASSESSABLE_REASONS).toHaveLength(22)
+    expect(FLAG_NON_ASSESSABLE_REASONS.slice(9).map(entry => entry.value)).toEqual([
+      'tree', 'driveway', 'grass', 'dirt', 'existing_sidewalk', 'asphalt', 'tree_pit', 'landmark', 'vault', 'subway',
+      'scaffolding', 'other_perm_obstruction', 'other_temp_obstruction',
+    ])
     expect(FLAG_THICKNESSES.map(entry => entry.value)).toEqual(['4in', '7in_as_4in', '7in'])
   })
 

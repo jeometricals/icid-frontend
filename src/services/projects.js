@@ -10,7 +10,8 @@ export async function getProjectsForUser() {
 }
 
 /**
- * Fetches one project's details ({project_id, project_name, project_description, registration_code, borough, status}).
+ * Fetches one project's details ({project_id, project_name, project_description, registration_code, borough, status,
+ * cost_per_sf_4in, cost_per_sf_7in}).
  * Throws with error.status 404 when the project doesn't exist.
  */
 export async function getProjectById(projectId) {
@@ -19,8 +20,8 @@ export async function getProjectById(projectId) {
 }
 
 /**
- * Admin only: lists every project, whoever is assigned to it, by project id, each as getProjectById returns one
- * ({project_id, project_name, project_description, registration_code, borough, status}). Anyone else gets a 403.
+ * Admin only: lists every project, whoever is assigned to it, by project id, each as getProjectById returns one.
+ * Anyone else gets a 403.
  */
 export async function listAdminProjects() {
   const json = await apiFetch('/v1/admin/projects')
@@ -38,6 +39,16 @@ export async function createAdminProject({ project_id, project_name, project_des
     method: 'POST',
     body: { project_id, project_name, project_description, borough, registration_code: registration_code || null },
   })
+  return json.data
+}
+
+/**
+ * Admin only: sets a project's DOT assessment rates per square foot and returns the project. Takes any of
+ * {cost_per_sf_4in, cost_per_sf_7in}: one left out keeps its value, a null clears it. The backend answers 400 when
+ * nothing is sent or a rate is negative, a million or more, or past 4 decimal places, and 404 for an unknown project.
+ */
+export async function setAssessmentRates(projectId, rates) {
+  const json = await apiFetch(`/v1/admin/projects/${projectId}/assessment-rates`, { method: 'PATCH', body: rates })
   return json.data
 }
 

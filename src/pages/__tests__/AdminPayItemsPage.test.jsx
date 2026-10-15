@@ -34,7 +34,7 @@ const byBudgetCodeThenRef = (a, b) => a.budget_code.localeCompare(b.budget_code)
 vi.mock('../../services/api', () => ({
   listProjectPayItems: vi.fn(), listAdminProjects: vi.fn(), createProjectPayItem: vi.fn(),
   updateProjectPayItem: vi.fn(), deleteProjectPayItem: vi.fn(), clearProjectPayItems: vi.fn(),
-  previewPayItemImport: vi.fn(), commitPayItemImport: vi.fn(),
+  previewPayItemImport: vi.fn(), commitPayItemImport: vi.fn(), setAssessmentRates: vi.fn(),
 }))
 
 let server
@@ -569,5 +569,74 @@ describe('AdminPayItemsPage — admins only', () => {
     expect(api.listAdminProjects).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Back to All Projects (Admin)' }))
     expect(screen.getByTestId('url')).toHaveTextContent(/^\/admin\/projects$/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Assessment rates
+// ---------------------------------------------------------------------------
+
+describe('AdminPayItemsPage — assessment rates', () => {
+  const rates = () => screen.getByRole('region', { name: 'Assessment rates' })
+  const box4 = () => within(rates()).getByLabelText('4" cost / SF')
+  const box7 = () => within(rates()).getByLabelText('7" cost / SF')
+  const saveRates = () => within(rates()).getByRole('button', { name: 'Save' })
+
+  beforeEach(() => {
+    api.listAdminProjects.mockResolvedValue([
+      { ...PROJECTS[0], cost_per_sf_4in: 12.5, cost_per_sf_7in: null },
+      PROJECTS[1],
+    ])
+    api.setAssessmentRates.mockImplementation(async (projectId, body) => ({
+      ...PROJECTS[0], cost_per_sf_4in: 12.5, cost_per_sf_7in: null, ...body,
+    }))
+  })
+
+  it("shows the project's rates from the admin project list, with Save off until one changes", async () => {
+    renderPage()
+    await ready()
+    expect(box4()).toHaveValue(12.5)
+    expect(box7()).toHaveValue(null)
+    expect(saveRates()).toBeDisabled()
+  })
+
+  it('PATCHes only the rate that changed, then says so and keeps the saved values', async () => {
+    renderPage()
+    await ready()
+    await userEvent.type(box7(), '18.75')
+    await userEvent.click(saveRates())
+    expect(api.setAssessmentRates).toHaveBeenCalledWith('HWS0023', { cost_per_sf_7in: 18.75 })
+    expect(await within(rates()).findByText('Assessment rates saved.')).toBeInTheDocument()
+    expect(box7()).toHaveValue(18.75)
+    expect(saveRates()).toBeDisabled()
+  })
+
+  it('clears a rate when its box is emptied', async () => {
+    renderPage()
+    await ready()
+    await userEvent.clear(box4())
+    await userEvent.click(saveRates())
+    expect(api.setAssessmentRates).toHaveBeenCalledWith('HWS0023', { cost_per_sf_4in: null })
+  })
+
+  it('refuses a rate with more than 4 decimal places, sending nothing', async () => {
+    renderPage()
+    await ready()
+    await userEvent.clear(box4())
+    await userEvent.type(box4(), '1.23456')
+    expect(saveRates()).toBeDisabled()
+    expect(within(rates()).getByRole('alert')).toHaveTextContent('at most 4 decimal places')
+    expect(api.setAssessmentRates).not.toHaveBeenCalled()
+  })
+
+  it("shows the backend's refusal inline and keeps what was typed", async () => {
+    api.setAssessmentRates.mockRejectedValueOnce(Object.assign(new Error('A rate is under 1,000,000'), { status: 400 }))
+    renderPage()
+    await ready()
+    await userEvent.type(box7(), '9')
+    await userEvent.click(saveRates())
+    expect(await within(rates()).findByRole('alert')).toHaveTextContent("Couldn't save the rates: A rate is under 1,000,000")
+    expect(box7()).toHaveValue(9)
+    expect(saveRates()).toBeEnabled()
   })
 })

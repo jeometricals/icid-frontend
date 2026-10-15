@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createPir, getPir, getPirByProperty, listPirs, softDeletePir, undeletePir, updatePir } from '../pirs'
+import { createPir, getPir, getPirByProperty, importSmartPir, listPirs, softDeletePir, undeletePir, updatePir } from '../pirs'
 import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
@@ -89,5 +89,28 @@ describe('softDeletePir and undeletePir', () => {
     expect(await call(PIR_ID)).toEqual(PIR)
     expect(fetchUrl().pathname).toBe(`/v1/pirs/${PIR_ID}/admin/${action}`)
     expect(fetchInit().method).toBe('POST')
+  })
+})
+
+describe('importSmartPir', () => {
+  const FILE = { schema_version: '1.0', pir_id: 'pir-1', pages: [{ page_number: 1, flags: [], features: [], segments: [] }] }
+  const RESULT = {
+    inserted: { flags: 2, non_assessable_areas: 1, features: 0, segments: 1, annotations: 0 },
+    dropped: { flags: 1, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
+    dropped_items: [{ kind: 'flag', page_number: 1, index: 2, flag_index: null, reason: 'L must be above 0' }],
+    pages_updated: 1,
+  }
+
+  it('POSTs the parsed file as the body and returns the counts', async () => {
+    mockFetch(200, { data: RESULT })
+    expect(await importSmartPir('pir-1', FILE)).toEqual(RESULT)
+    expect(fetchUrl().pathname).toBe('/v1/pirs/pir-1/import')
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual(FILE)
+  })
+
+  it("throws a 422's messages", async () => {
+    mockFetch(422, { detail: [{ msg: "Input should be '1.0'" }] })
+    await expect(importSmartPir('pir-1', { ...FILE, schema_version: '2' })).rejects.toMatchObject({ status: 422 })
   })
 })

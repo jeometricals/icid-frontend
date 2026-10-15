@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
-import { createFlagOnPage, deleteFlag, getContractItems, listFlags, updateFlag } from '../../services/api'
+import { FileJson, Files, Sparkles } from 'lucide-react'
+import {
+  createFlagOnPage, deleteFlag, getContractItems, listFlagNonAssessableAreas, listFlags, listPirFeatures,
+  listPirSegments, updateFlag,
+} from '../../services/api'
 import { newFlagValues } from '../../lib/flags'
 import CalibrateControl from './CalibrateControl'
 import FlagPanel from './FlagPanel'
 import FlagsFallbackList from './FlagsFallbackList'
+import PirImportModal from './PirImportModal'
 import ShapeToolbar from './ShapeToolbar'
 import SketchCanvas from './SketchCanvas'
 import Toast from '../Toast'
@@ -11,6 +16,24 @@ import Toast from '../Toast'
 export const NO_SCALE_REASON = "Set this page's scale (or calibrate) to draw flags."
 export const PANEL_EMPTY_TEXT = 'Select a flag to see its details.'
 export const PANEL_EMPTY_WRITER_TEXT = 'Pick a shape and click the page to add a flag, or select one to edit it.'
+export const AI_DETECT_TOOLTIP = 'Available when Vercel Pro is enabled (R1k).'
+export const BULK_UPLOAD_TOOLTIP = 'Coming in R1m — upload a batch of signed PIRs and AI will identify each site.'
+
+const TOOL_BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm '
+  + 'font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
+
+// A button for a feature still to come: always disabled, its tooltip saying when it comes (on a wrapper too, since a
+// disabled button shows no tooltip in every browser)
+function ComingButton({ icon: Icon, label, tooltip }) {
+  return (
+    <span title={tooltip} className="inline-flex">
+      <button type="button" disabled title={tooltip} className={TOOL_BUTTON}>
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </button>
+    </span>
+  )
+}
 
 // Whether a key press belongs to a form control (or a modifier shortcut), not to the sketch
 const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
@@ -26,10 +49,19 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * Delete key or the panel's button, and calibrates the page's scale. Without a scale nothing can be drawn (the
  * toolbar says why). A reader (a demo user, or anyone but an admin on a deleted site) gets the same views with the
  * toolbar, Calibrate and the panel disabled. Clicking a list row goes to its page (onJump) and selects the flag.
- * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onJump(pageNumber), onImageError.
+ * It also reads the PIR's features and segments and the non-assessable areas of every flag that has some
+ * (non_assessable_areas_count), and draws them (rendering only: there is no editor for them yet). "Import SMART
+ * PIR" (a writer's) opens PirImportModal; after an import the drawings are read again, and onPagesChanged is called
+ * when the file set a page's scale, rotation or title block. "Auto-detect with AI" and "Bulk upload PIRs" are
+ * disabled stubs whose tooltips say when they come.
+ * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onPagesChanged(), onJump(pageNumber),
+ * onImageError.
  */
-export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved, onJump, onImageError }) {
+export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved, onPagesChanged, onJump, onImageError }) {
   const [flags, setFlags] = useState([])
+  const [areas, setAreas] = useState([])
+  const [features, setFeatures] = useState([])
+  const [segments, setSegments] = useState([])
   const [contractItems, setContractItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -41,16 +73,23 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
   const [calibratePoints, setCalibratePoints] = useState([])
   const [actionError, setActionError] = useState(null)
   const [toast, setToast] = useState(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     let ignore = false
     setLoading(true)
     setLoadError(null)
-    Promise.all([listFlags(pir.id), getContractItems(pir.project_id)])
-      .then(([foundFlags, foundItems]) => {
+    Promise.all([listFlags(pir.id), getContractItems(pir.project_id), listPirFeatures(pir.id), listPirSegments(pir.id)])
+      .then(async ([foundFlags, foundItems, foundFeatures, foundSegments]) => {
+        // There is no list of areas per PIR: ask each flag that has some
+        const withAreas = foundFlags.filter(flag => flag.non_assessable_areas_count > 0)
+        const foundAreas = (await Promise.all(withAreas.map(flag => listFlagNonAssessableAreas(flag.id)))).flat()
         if (ignore) return
         setFlags(foundFlags)
         setContractItems(foundItems)
+        setFeatures(foundFeatures)
+        setSegments(foundSegments)
+        setAreas(foundAreas)
       })
       .catch(err => { if (!ignore) setLoadError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
@@ -60,6 +99,7 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
   const scaled = page.scale_px_per_ft != null
   const canDraw = writer && scaled
   const pageFlags = flags.filter(flag => flag.pir_page_id === page.pir_page_id)
+  const onPage = (item) => item.pir_page_id === page.pir_page_id
   const selected = pageFlags.find(flag => flag.id === selectedId) ?? null
 
   const stopCalibrating = () => {
@@ -122,6 +162,13 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
     return () => document.removeEventListener('keydown', onKeyDown)
   })
 
+  // The import went in (the dialog stays open on its counts): read the drawings again, and the pages when it set any
+  const imported = (result) => {
+    setSelectedId(null)
+    setAttempt(a => a + 1)
+    if (result.pages_updated > 0) onPagesChanged?.()
+  }
+
   const pick = (flag, pageNumber) => {
     if (pageNumber) onJump(pageNumber)
     setSelectedId(flag.id)
@@ -156,6 +203,19 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
             }}
           />
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { stopCalibrating(); setActiveShape(null); setImporting(true) }}
+            disabled={!writer}
+            className={TOOL_BUTTON}
+          >
+            <FileJson className="h-4 w-4" />
+            <span>Import SMART PIR</span>
+          </button>
+          <ComingButton icon={Sparkles} label="Auto-detect with AI" tooltip={AI_DETECT_TOOLTIP} />
+          <ComingButton icon={Files} label="Bulk upload PIRs" tooltip={BULK_UPLOAD_TOOLTIP} />
+        </div>
       </div>
 
       {actionError && <p role="alert" className="text-sm text-red-600 mb-4">{actionError}</p>}
@@ -164,6 +224,9 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
         <SketchCanvas
           page={page}
           flags={pageFlags}
+          areas={areas}
+          features={features.filter(onPage)}
+          segments={segments.filter(onPage)}
           selectedId={selected?.id ?? null}
           activeShape={canDraw ? activeShape : null}
           calibrating={calibrating}
@@ -203,6 +266,8 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
       {!loading && !loadError && (
         <FlagsFallbackList flags={flags} pages={pages} contractItems={contractItems} selectedId={selected?.id ?? null} onPick={pick} />
       )}
+
+      {importing && <PirImportModal pirId={pir.id} onImported={imported} onClose={() => setImporting(false)} />}
 
       <Toast message={toast} onDone={() => setToast(null)} />
     </>

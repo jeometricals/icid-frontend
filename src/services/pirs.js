@@ -74,3 +74,16 @@ export async function undeletePir(pirId) {
   const json = await apiFetch(`/v1/pirs/${pirId}/admin/undelete`, { method: 'POST' })
   return json.data
 }
+
+/**
+ * Imports a Smart PIR file (the parsed JSON: {schema_version: '1.0', pir_id, annotations?, pages: [...]}) into a
+ * PIR: its flags with their non-assessable areas, features, segments, title blocks and page scales and rotations
+ * are added to the PIR's live pages, item by item; nothing already drawn changes. Returns {inserted, dropped}
+ * (each {flags, non_assessable_areas, features, segments, annotations}), dropped_items ([{kind, page_number, index,
+ * flag_index, reason}]) and pages_updated. The backend answers 400 when the file's pir_id isn't this PIR's, 403 for
+ * a demo user or a user not on the project, and 422 for a file that isn't a Smart PIR import.
+ */
+export async function importSmartPir(pirId, file) {
+  const json = await apiFetch(`/v1/pirs/${pirId}/import`, { method: 'POST', body: file })
+  return json.data
+}

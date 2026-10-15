@@ -27,6 +27,63 @@ export const FLAG_NON_ASSESSABLE_REASONS = [
   { value: 'utility', label: 'Utility' },
   { value: 'settlement', label: 'Settlement' },
   { value: 'other', label: 'Other' },
+  // The Smart PIR survey's reasons (migration 034 added them; every older one stays)
+  { value: 'tree', label: 'Tree' },
+  { value: 'driveway', label: 'Driveway' },
+  { value: 'grass', label: 'Grass' },
+  { value: 'dirt', label: 'Dirt' },
+  { value: 'existing_sidewalk', label: 'Existing sidewalk' },
+  { value: 'asphalt', label: 'Asphalt' },
+  { value: 'tree_pit', label: 'Tree pit' },
+  { value: 'landmark', label: 'Landmark' },
+  { value: 'vault', label: 'Vault' },
+  { value: 'subway', label: 'Subway' },
+  { value: 'scaffolding', label: 'Scaffolding' },
+  { value: 'other_perm_obstruction', label: 'Other permanent obstruction' },
+  { value: 'other_temp_obstruction', label: 'Other temporary obstruction' },
+]
+
+// A flag's DOT defect codes, in the order the backend stores them
+export const DEFECT_CODES = ['1', '2', '3', '4', '5', '6A', '6B', '6C']
+
+// What a non-assessable area (a part of a flag that isn't assessed) can be
+export const AREA_REASONS = [
+  { value: 'driveway', label: 'Driveway' },
+  { value: 'grass', label: 'Grass' },
+  { value: 'dirt', label: 'Dirt' },
+  { value: 'existing_sidewalk', label: 'Existing sidewalk' },
+  { value: 'asphalt', label: 'Asphalt' },
+  { value: 'tree_pit', label: 'Tree pit' },
+  { value: 'landmark', label: 'Landmark' },
+  { value: 'other', label: 'Other' },
+]
+
+// A feature's type (a point obstruction or a sized feature on the page), as the backend spells it
+export const FEATURE_TYPES = [
+  { value: 'manhole', label: 'Manhole' },
+  { value: 'grate', label: 'Grate' },
+  { value: 'utility_cover', label: 'Utility cover' },
+  { value: 'hydrant', label: 'Hydrant' },
+  { value: 'fire_alarm', label: 'Fire alarm' },
+  { value: 'tree_pit', label: 'Tree pit' },
+  { value: 'meter', label: 'Meter' },
+  { value: 'sign_or_meter', label: 'Sign or meter' },
+  { value: 'mail_box', label: 'Mail box' },
+  { value: 'telephone', label: 'Telephone' },
+  { value: 'cellar_door', label: 'Cellar door' },
+  { value: 'pole', label: 'Pole' },
+  { value: 'detectable_warning', label: 'Detectable warning unit' },
+  { value: 'other', label: 'Other' },
+]
+
+// A segment's type (a curb run)
+export const SEGMENT_TYPES = [
+  { value: 'curb_concrete', label: 'Concrete curb' },
+  { value: 'curb_concrete_depressed', label: 'Depressed concrete curb' },
+  { value: 'curb_steel_faced', label: 'Steel-faced curb' },
+  { value: 'curb_steel_faced_corner', label: 'Steel-faced corner curb' },
+  { value: 'curb_granite', label: 'Granite curb' },
+  { value: 'other', label: 'Other' },
 ]
 
 export const FLAG_THICKNESSES = [
@@ -42,3 +99,6 @@ export const shapeLabel = labelIn(FLAG_SHAPES)
 export const markLabel = labelIn(FLAG_MARKS)
 export const nonAssessableReasonLabel = labelIn(FLAG_NON_ASSESSABLE_REASONS)
 export const thicknessLabel = labelIn(FLAG_THICKNESSES)
+export const areaReasonLabel = labelIn(AREA_REASONS)
+export const featureTypeLabel = labelIn(FEATURE_TYPES)
+export const segmentTypeLabel = labelIn(SEGMENT_TYPES)

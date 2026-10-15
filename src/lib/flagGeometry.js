@@ -12,6 +12,7 @@ const ARC_STEPS = 32
  * - triangle {a, b}: a right triangle, the right angle at the bottom left, legs a (along the bottom) and b (up)
  * - polygon {vertices}: its vertices as given
  * - arc {r, theta}: a circular segment, the chord at the bottom and the curve above it (theta in radians)
+ * - circle {r} (a feature's only): the circle about its centre
  * Returns [{x, y}, ...], or [] for an unknown shape or missing dimensions.
  */
 export function shapeOutline(shape, dimensions) {
@@ -38,6 +39,13 @@ export function shapeOutline(shape, dimensions) {
       return Array.from({ length: ARC_STEPS + 1 }, (_, step) => {
         const angle = -theta / 2 + (theta * step) / ARC_STEPS
         return { x: r * Math.sin(angle), y: -r * Math.cos(angle) }
+      })
+    }
+    case 'circle': {
+      const { r } = dimensions
+      return Array.from({ length: ARC_STEPS }, (_, step) => {
+        const angle = (2 * Math.PI * step) / ARC_STEPS
+        return { x: r * Math.cos(angle), y: r * Math.sin(angle) }
       })
     }
     default:
@@ -78,6 +86,12 @@ export function flagOutline(flag, scale, at = null) {
     const dy = (point.y - cy) * scale
     return { x: x + dx * cos - dy * sin, y: y + dx * sin + dy * cos }
   })
+}
+
+/** The middle of some points' bounding box: {x, y}. */
+export function centreOf(points) {
+  const box = boundsOf(points)
+  return { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 }
 }
 
 /** Points as an SVG polygon's `points` attribute. */

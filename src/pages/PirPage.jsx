@@ -6,7 +6,8 @@
  * toolbar, the page's flags drawn over it, the selected flag's panel, Calibrate, and every flag listed below). A
  * writer (a member who isn't a demo user; while the site is deleted only an admin) can use Rotate (a quarter turn
  * clockwise, saved on that page), Set scale (that page only), Replace PIR (a new upload replaces every page) and
- * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
+ * Remove pages, and draw, and import a Smart PIR file (after which the pages are read again if it set any page's
+ * scale, rotation or title block); for a reader they are there but disabled. With no pages the card prompts an upload. The
  * backend refuses anyone not on the project (403), which shows as the load error.
  */
 import { useCallback, useEffect, useState } from 'react'
@@ -138,6 +139,15 @@ export default function PirPage() {
     setDialog(null)
     goTo(1)
     setToast(`PIR ${replacing ? 'replaced' : 'uploaded'}: ${pagesText(saved.pages?.length ?? 0)}.`)
+  }
+
+  // An import set some pages' scale or rotation: read them again, quietly (the same pages, so the workspace stays)
+  const rereadPages = async () => {
+    try {
+      setPages(await listPirPages(pir.id))
+    } catch (err) {
+      setActionError(`The import went in, but the pages couldn't be read again: ${err.message}`)
+    }
   }
 
   const header = (
@@ -283,6 +293,7 @@ export default function PirPage() {
                 replacePage(saved)
                 setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)
               }}
+              onPagesChanged={rereadPages}
               onJump={goTo}
               onImageError={() => setImageFailed(true)}
             />

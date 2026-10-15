@@ -16,6 +16,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     getProperty: vi.fn(), getPirByProperty: vi.fn(), listPirPages: vi.fn(), deletePirPages: vi.fn(),
     setPirPageRotation: vi.fn(), setPirPageScale: vi.fn(),
     listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
+    listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(), importSmartPir: vi.fn(),
   }
 })
 vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
@@ -53,6 +54,8 @@ beforeEach(() => {
   api.deletePirPages.mockResolvedValue(undefined)
   api.listFlags.mockResolvedValue([])
   api.getContractItems.mockResolvedValue([])
+  api.listPirFeatures.mockResolvedValue([])
+  api.listPirSegments.mockResolvedValue([])
 })
 
 function CurrentUrl() {
@@ -310,5 +313,32 @@ describe('PirPage — the sketch workspace', () => {
     await renderLoaded({ search: '?page=2' })
     expect(screen.getByText('Scale: not set')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeDisabled()
+  })
+})
+
+describe('PirPage — a Smart PIR import', () => {
+  it("reads the pages again, quietly, after an import that set a page's scale", async () => {
+    api.importSmartPir.mockImplementation(async () => {
+      pages = pages.map(found => (found.page_number === 2 ? { ...found, scale_px_per_ft: 20 } : found))
+      return {
+        inserted: { flags: 0, non_assessable_areas: 0, features: 0, segments: 1, annotations: 0 },
+        dropped: { flags: 0, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
+        dropped_items: [],
+        pages_updated: 1,
+      }
+    })
+    await renderLoaded({ search: '?page=2' })
+    expect(screen.getByText('Scale: not set')).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Import SMART PIR' }))
+    const file = new File([JSON.stringify({ schema_version: '1.0', pir_id: PIR.id, pages: [] })], 'pir.json', { type: 'application/json' })
+    await user.upload(screen.getByLabelText('Smart PIR file (.json)'), file)
+    await user.click(screen.getByRole('button', { name: 'Import' }))
+
+    expect(await screen.findByText('Scale: 20 px/ft')).toBeInTheDocument()
+    expect(api.listPirPages).toHaveBeenCalledTimes(2)
+    // The same pages, so the page stays where it was and the dialog stays open on its counts
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    expect(screen.getByText(/Imported 1 curb segment\./)).toBeInTheDocument()
   })
 })

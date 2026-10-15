@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { boundsOf, flagOutline, shapeOutline, svgPoints } from '../flagGeometry'
+import { boundsOf, centreOf, flagOutline, shapeOutline, svgPoints } from '../flagGeometry'
 import { distanceBetween, toNativeCoords } from '../pageGeometry'
 import { DEFAULT_DIMENSIONS, newFlagValues, nextDisplayOrder, thicknessColor } from '../flags'
 import { computeArea, polygonArea } from '../flagArea'
@@ -49,6 +49,14 @@ describe('shape outlines', () => {
 
   it('draws a trapezoid with a on top and b on the bottom, centred', () => {
     expect(shapeOutline('trapezoid', { a: 2, b: 6, w: 3 })).toEqual([{ x: 2, y: 0 }, { x: 4, y: 0 }, { x: 6, y: 3 }, { x: 0, y: 3 }])
+  })
+
+  it("draws a feature's circle about its centre, enclosing about π r²", () => {
+    const outline = shapeOutline('circle', { r: 2 })
+    expect(outline.every(({ x, y }) => Math.abs(Math.hypot(x, y) - 2) < 1e-9)).toBe(true)
+    expect(boundsOf(outline)).toMatchObject({ minX: -2, maxX: 2 })
+    expect(polygonArea(outline)).toBeCloseTo(Math.PI * 4, 0)
+    close(centreOf(flagOutline({ shape: 'circle', dimensions: { r: 1 }, sketch_x: 40, sketch_y: 30 }, 10)), 40, 30)
   })
 
   it('gives nothing for an unknown shape or no dimensions', () => {
