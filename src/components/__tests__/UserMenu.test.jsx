@@ -375,7 +375,14 @@ describe('UserMenu — All IDRs (Admin)', () => {
     renderMenu(ADMIN)
     await open()
     expect(itemNames()).toEqual(['My Tasks', 'Update signature', 'Change password', 'All IDRs (Admin)',
-      'All Users (Admin)', 'All Projects (Admin)', 'Sign Out'])
+      'All Users (Admin)', 'All Projects (Admin)', 'Import Smart PIRs (Admin)', 'Sign Out'])
+  })
+
+  it('opens the Smart PIR import for an admin', async () => {
+    renderMenu(ADMIN)
+    await open()
+    await userEvent.click(item('Import Smart PIRs (Admin)'))
+    expect(screen.getByTestId('url')).toHaveTextContent('/admin/import-smart-pirs')
   })
 
   it.each([
@@ -386,6 +393,7 @@ describe('UserMenu — All IDRs (Admin)', () => {
     renderMenu(user, roles)
     await open()
     expect(itemNames()).not.toContain('All IDRs (Admin)')
+    expect(itemNames()).not.toContain('Import Smart PIRs (Admin)')
   })
 
   it('opens the admin list and closes the menu', async () => {

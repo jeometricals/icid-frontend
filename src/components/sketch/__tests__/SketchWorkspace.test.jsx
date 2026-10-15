@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SketchWorkspace, {
-  AI_DETECT_TOOLTIP, BULK_UPLOAD_TOOLTIP, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
+  AI_DETECT_TOOLTIP, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
 } from '../SketchWorkspace'
 import { EMPTY_TEXT } from '../FlagsFallbackList'
 import * as api from '../../../services/api'
@@ -11,7 +11,6 @@ import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
-  importSmartPir: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -397,50 +396,15 @@ describe('SketchWorkspace — features, segments and non-assessable areas', () =
   })
 })
 
-describe('SketchWorkspace — Import SMART PIR and the coming tools', () => {
-  const RESULT = {
-    inserted: { flags: 1, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
-    dropped: { flags: 0, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 },
-    dropped_items: [],
-    pages_updated: 1,
-  }
-
-  it('has the two coming tools disabled, their tooltips saying when they come', async () => {
+describe('SketchWorkspace — the coming tool', () => {
+  it('has Auto-detect with AI disabled, its tooltip saying when it comes, and no import or bulk upload', async () => {
     await renderLoaded()
     const ai = screen.getByRole('button', { name: 'Auto-detect with AI' })
-    const bulk = screen.getByRole('button', { name: 'Bulk upload PIRs' })
     expect(ai).toBeDisabled()
-    expect(bulk).toBeDisabled()
     expect(ai).toHaveAttribute('title', AI_DETECT_TOOLTIP)
     expect(ai.parentElement).toHaveAttribute('title', 'Available when Vercel Pro is enabled (R1k).')
-    expect(bulk.parentElement).toHaveAttribute('title', 'Coming in R1m — upload a batch of signed PIRs and AI will identify each site.')
-    expect(bulk).toHaveAttribute('title', BULK_UPLOAD_TOOLTIP)
-  })
-
-  it('is off for a reader', async () => {
-    await renderLoaded({ writer: false })
-    expect(screen.getByRole('button', { name: 'Import SMART PIR' })).toBeDisabled()
-  })
-
-  it('imports a file, reads the drawings again and has the page read its pages when the file set any', async () => {
-    api.importSmartPir.mockResolvedValue(RESULT)
-    const onPagesChanged = vi.fn()
-    await renderLoaded({ onPagesChanged })
-    expect(api.listFlags).toHaveBeenCalledTimes(1)
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Import SMART PIR' }))
-    const dialog = screen.getByRole('dialog', { name: 'Import SMART PIR' })
-    const file = new File([JSON.stringify({ schema_version: '1.0', pir_id: PIR.id, pages: [] })], 'pir.json', { type: 'application/json' })
-    await user.upload(within(dialog).getByLabelText('Smart PIR file (.json)'), file)
-    await user.click(within(dialog).getByRole('button', { name: 'Import' }))
-
-    expect(await within(dialog).findByText(/Imported 1 flag\./)).toBeInTheDocument()
-    expect(api.importSmartPir).toHaveBeenCalledWith(PIR.id, { schema_version: '1.0', pir_id: PIR.id, pages: [] })
-    await waitFor(() => expect(api.listFlags).toHaveBeenCalledTimes(2))
-    expect(api.listPirFeatures).toHaveBeenCalledTimes(2)
-    expect(onPagesChanged).toHaveBeenCalledTimes(1)
-
-    await user.click(within(dialog).getByRole('button', { name: 'Done' }))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // The JSON importer is the admin's page now, and bulk upload sits on Site Info
+    expect(screen.queryByRole('button', { name: 'Import SMART PIR' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Bulk upload PIRs' })).not.toBeInTheDocument()
   })
 })

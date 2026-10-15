@@ -7,7 +7,8 @@ import * as api from '../../services/api'
 vi.mock('../../services/api', () => ({ listProperties: vi.fn(), bundleProperty: vi.fn() }))
 
 const property = (number, bbl, address, property_type = '1_3_family') => ({
-  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', bbl, address, property_type,
+  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', kind: 'sidewalk', bbl, address,
+  display_address: address, property_type,
   notes: null, created_at: '2026-09-14T12:00:00Z', deleted_at: null,
 })
 const ELM = property(1, '4001110001', '7 Elm Pl')
@@ -56,6 +57,17 @@ describe('PropertyPickerModal', () => {
     await userEvent.clear(search())
     await userEvent.type(search(), 'nowhere')
     expect(screen.getByText('No sites match "nowhere".')).toBeInTheDocument()
+  })
+
+  it('lists a ped ramp by its intersection and ramp type, and finds it by a street', async () => {
+    const RAMP = { ...property(5, null, null, null), kind: 'ped_ramp', ramp_type: 'PARALLEL',
+      display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)' }
+    api.listProperties.mockResolvedValue([ELM, RAMP])
+    await renderPicker()
+    await userEvent.type(search(), 'court')
+    const shown = screen.getAllByRole('checkbox')
+    expect(shown).toHaveLength(1)
+    expect(shown[0].closest('label')).toHaveTextContent('Ped rampAtlantic Ave & Court St — NE Quadrant (Facing Court St)Parallel')
   })
 
   it('selects several, and "Select all shown" ticks only the rows the search shows', async () => {

@@ -1,10 +1,12 @@
 /**
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
- * on the project: a card with its BBL, address, type, notes and when it was added; then its PIR card. With a live
+ * on the project: a card with the site's details (a sidewalk's borough, BBL, address, violation no. and property
+ * type; a ped ramp's borough, intersection, quadrant, the street it faces and ramp type; then notes and when it was
+ * added), headed by its display_address; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
  * as-built is signed, under the way into its sketch workspace (PirWorkspaceLink: its page count and "Open sketch
  * workspace", PirPage); without one it reads "No PIR yet.". A member who isn't a demo user also gets
- * Edit on the property, and Add PIR or Edit PIR. The destructive controls are an admin's alone: Delete and Delete
+ * Edit on the site, and Add PIR or Edit PIR. The destructive controls are an admin's alone: Delete and Delete
  * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
  * A deleted property reads Deleted and takes no new PIR (the backend refuses one); only an admin can change it, or
@@ -24,6 +26,7 @@ import { PIR_ACTIONS, PIR_DEMO_NOTE } from '../lib/pirs'
 import { PROPERTY_ACTIONS } from '../lib/properties'
 import { useUserNames } from '../lib/useUserNames'
 import { propertyTypeLabel } from '../data/propertyTypes'
+import { facingStreetName, rampTypeLabel } from '../data/propertyKinds'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
@@ -186,7 +189,7 @@ export default function PropertyPage() {
   return page(
     <>
       <h2 className="text-2xl font-bold text-gray-900 mb-6 inline-flex flex-wrap items-center gap-3">
-        <span className={deleted ? 'line-through text-gray-400' : ''}>{property.project_id} · {property.address}</span>
+        <span className={deleted ? 'line-through text-gray-400' : ''}>{property.project_id} · {property.display_address}</span>
         {deleted && (
           <span title={`Deleted ${format(parseISO(property.deleted_at), 'MMM d, yyyy')}`}>
             <StatusBadge status="deleted" />
@@ -242,9 +245,22 @@ export default function PropertyPage() {
           </div>
         </div>
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
-          <Detail term="BBL">{property.bbl}</Detail>
-          <Detail term="Address">{property.address}</Detail>
-          <Detail term="Type">{propertyTypeLabel(property.property_type)}</Detail>
+          <Detail term="Borough">{property.boro}</Detail>
+          {property.kind === 'ped_ramp' ? (
+            <>
+              <Detail term="Intersection">{property.intersection_street_1} & {property.intersection_street_2}</Detail>
+              <Detail term="Quadrant">{property.quadrant}</Detail>
+              <Detail term="Facing">{facingStreetName(property) || '—'}</Detail>
+              <Detail term="Ramp type">{rampTypeLabel(property.ramp_type)}</Detail>
+            </>
+          ) : (
+            <>
+              <Detail term="BBL">{property.bbl}</Detail>
+              <Detail term="Address">{property.address}</Detail>
+              <Detail term="Violation No.">{property.violation_no || '—'}</Detail>
+              <Detail term="Type">{propertyTypeLabel(property.property_type)}</Detail>
+            </>
+          )}
           <Detail term="Notes" wide><span className="whitespace-pre-line">{property.notes || '—'}</span></Detail>
           <Detail term="Added">{shortDate(property.created_at)}</Detail>
         </dl>

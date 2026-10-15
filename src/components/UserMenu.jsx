@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, CircleUserRound, ClipboardCheck, FolderKanban, KeyRound, LogOut, PenLine, ShieldCheck, Users } from 'lucide-react'
+import { ChevronDown, CircleUserRound, ClipboardCheck, FileJson, FolderKanban, KeyRound, LogOut, PenLine, ShieldCheck, Users } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useGuardedLeave } from '../contexts/LeaveGuardContext'
@@ -16,7 +16,7 @@ import SignatureSetupModal from './SignatureSetupModal'
  * user, opening a dropdown with My Tasks (only for someone who reviews IDRs: an OE or RE on some project, or an
  * admin; it carries the number of IDRs waiting on them, and the name gets a red dot while there are any), their
  * signature (set up or update; not for demo users, who can't submit), Change password (not for demo users; a
- * change is announced once in a green banner under the header, until dismissed), "All IDRs (Admin)", "All Users (Admin)" and "All Projects (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
+ * change is announced once in a green banner under the header, until dismissed), "All IDRs (Admin)", "All Users (Admin)", "All Projects (Admin)" and "Import Smart PIRs (Admin)" for an admin, and Sign Out. A demo user is asked to confirm signing out, since it deletes their test data; signing out goes through
  * the page's leave guard, so a report form saves unsaved edits first.
  * Opens on click; closes on a pick, Escape or a click elsewhere. Arrow keys, Home and End move between items.
  * Takes no props; reads the user from AuthContext.
@@ -102,6 +102,12 @@ export default function UserMenu() {
       label: 'All Projects (Admin)',
       icon: FolderKanban,
       onSelect: () => leave(() => navigate('/admin/projects')),
+    },
+    isAdmin(user) && {
+      id: 'admin-import-smart-pirs',
+      label: 'Import Smart PIRs (Admin)',
+      icon: FileJson,
+      onSelect: () => leave(() => navigate('/admin/import-smart-pirs')),
     },
     {
       id: 'sign-out',

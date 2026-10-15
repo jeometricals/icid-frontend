@@ -17,7 +17,8 @@ const TASK_ORDER_ID = 'd0000000-0000-4000-8000-000000000001'
 const YEAR = new Date().getFullYear()
 
 const property = (number, bbl, address, property_type = '1_3_family', extra = {}) => ({
-  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', bbl, address, property_type,
+  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', kind: 'sidewalk', bbl, address,
+  display_address: address, property_type,
   notes: null, created_at: `${YEAR}-09-14T12:00:00`, deleted_at: null, ...extra,
 })
 const MAIN = property(1, '4001230045', '12 Main St', '4_plus_family')

@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import PirImportModal, { countsText, droppedPlace } from '../PirImportModal'
-import * as api from '../../../services/api'
+import SmartPirImportForm, { PIR_ID_HINT, countsText, droppedPlace } from '../SmartPirImportForm'
+import * as api from '../../services/api'
 
-vi.mock('../../../services/api', () => ({ importSmartPir: vi.fn() }))
+vi.mock('../../services/api', () => ({ importSmartPir: vi.fn() }))
 
+const PIR_ID = 'e0000000-0000-4000-8000-000000000001'
 const SMART_PIR = {
   schema_version: '1.0',
-  pir_id: 'pir-1',
+  pir_id: PIR_ID,
   pages: [{ page_number: 1, scale_px_per_ft: 15, flags: [], features: [], segments: [] }],
 }
 const RESULT = {
@@ -22,17 +23,15 @@ const RESULT = {
 }
 
 const jsonFile = (text, name = 'smart-pir.json') => new File([text], name, { type: 'application/json' })
+const pirIdBox = () => screen.getByLabelText('PIR id')
+const fileInput = () => screen.getByLabelText('Smart PIR file (.json)')
+const importButton = () => screen.getByRole('button', { name: 'Import' })
 
-function renderModal() {
-  const handlers = { onImported: vi.fn(), onClose: vi.fn() }
-  render(<PirImportModal pirId="pir-1" {...handlers} />)
-  return handlers
-}
-
-async function importFile(file) {
+async function importFile(file, id = PIR_ID) {
   const user = userEvent.setup()
-  await user.upload(screen.getByLabelText('Smart PIR file (.json)'), file)
-  await user.click(screen.getByRole('button', { name: 'Import' }))
+  if (id) await user.type(pirIdBox(), id)
+  await user.upload(fileInput(), file)
+  await user.click(importButton())
   return user
 }
 
@@ -40,23 +39,37 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('PirImportModal — importing', () => {
-  it('keeps Import off until a file is picked', () => {
-    renderModal()
-    expect(screen.getByRole('dialog', { name: 'Import SMART PIR' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled()
-    expect(screen.getByLabelText('Smart PIR file (.json)')).toHaveAttribute('accept', '.json,application/json')
+describe('SmartPirImportForm — importing', () => {
+  it('keeps Import off until a PIR id and a file are in', async () => {
+    render(<SmartPirImportForm />)
+    expect(importButton()).toBeDisabled()
+    expect(fileInput()).toHaveAttribute('accept', '.json,application/json')
+    const user = userEvent.setup()
+    await user.upload(fileInput(), jsonFile(JSON.stringify(SMART_PIR)))
+    expect(importButton()).toBeDisabled()
+    await user.type(pirIdBox(), PIR_ID)
+    expect(importButton()).toBeEnabled()
   })
 
-  it('posts the parsed file, then shows what went in and every dropped item with where it was and why', async () => {
-    api.importSmartPir.mockResolvedValue(RESULT)
-    const { onImported, onClose } = renderModal()
-    const user = await importFile(jsonFile(JSON.stringify(SMART_PIR)))
+  it('refuses a PIR id that is not a UUID, sending nothing', async () => {
+    render(<SmartPirImportForm />)
+    const user = userEvent.setup()
+    await user.type(pirIdBox(), 'not-a-pir')
+    await user.upload(fileInput(), jsonFile(JSON.stringify(SMART_PIR)))
+    expect(screen.getByText(PIR_ID_HINT)).toBeInTheDocument()
+    expect(pirIdBox()).toHaveAttribute('aria-invalid', 'true')
+    expect(importButton()).toBeDisabled()
+  })
 
-    expect(await screen.findByText(/Imported 4 flags, 2 non-assessable areas, 3 features, 2 curb segments and 1 title block\./))
-      .toBeInTheDocument()
-    expect(api.importSmartPir).toHaveBeenCalledWith('pir-1', SMART_PIR)
-    expect(onImported).toHaveBeenCalledWith(RESULT)
+  it('posts the parsed file to the PIR, then shows what went in and every dropped item with where it was and why', async () => {
+    api.importSmartPir.mockResolvedValue(RESULT)
+    render(<SmartPirImportForm />)
+    const user = await importFile(jsonFile(JSON.stringify(SMART_PIR)), ` ${PIR_ID} `)
+
+    expect(await screen.findByText(
+      `Imported 4 flags, 2 non-assessable areas, 3 features, 2 curb segments and 1 title block into PIR ${PIR_ID}.`, { exact: false },
+    )).toBeInTheDocument()
+    expect(api.importSmartPir).toHaveBeenCalledWith(PIR_ID, SMART_PIR)
     expect(screen.getByText(/Set the scale, rotation or title block of 1 page\./)).toBeInTheDocument()
     expect(screen.getByText('Dropped 1 flag and 1 non-assessable area.')).toBeInTheDocument()
     const dropped = within(screen.getByRole('list', { name: 'Dropped items' })).getAllByRole('listitem')
@@ -65,43 +78,43 @@ describe('PirImportModal — importing', () => {
       'Page 1, flag 1, non-assessable area 2: reason: not a non-assessable reason',
     ])
 
-    await user.click(screen.getByRole('button', { name: 'Done' }))
-    expect(onClose).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Import another file' }))
+    expect(pirIdBox()).toHaveDisplayValue('')
+    expect(importButton()).toBeDisabled()
   })
 
   it('says nothing was dropped when nothing was', async () => {
     api.importSmartPir.mockResolvedValue({
       ...RESULT, dropped: { flags: 0, non_assessable_areas: 0, features: 0, segments: 0, annotations: 0 }, dropped_items: [], pages_updated: 0,
     })
-    renderModal()
+    render(<SmartPirImportForm />)
     await importFile(jsonFile(JSON.stringify(SMART_PIR)))
     expect(await screen.findByText('Nothing was dropped.')).toBeInTheDocument()
     expect(screen.queryByText(/Set the scale/)).not.toBeInTheDocument()
   })
 
-  it('refuses a file that is not JSON, sends nothing and keeps the dialog open', async () => {
-    const { onImported } = renderModal()
+  it('refuses a file that is not JSON and sends nothing', async () => {
+    render(<SmartPirImportForm />)
     await importFile(jsonFile('{ "schema_version": "1.0", '))
     expect(await screen.findByRole('alert')).toHaveTextContent(/^This file isn't valid JSON: /)
     expect(api.importSmartPir).not.toHaveBeenCalled()
-    expect(onImported).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Import' })).toBeEnabled()
+    expect(importButton()).toBeEnabled()
   })
 
-  it("shows the backend's refusal as worded and keeps the file for another try", async () => {
-    api.importSmartPir.mockRejectedValueOnce(Object.assign(new Error("The file's pir_id is not this PIR"), { status: 400 }))
-    const { onImported } = renderModal()
+  it("shows the backend's refusal as worded and keeps the id and file for another try", async () => {
+    api.importSmartPir.mockRejectedValueOnce(Object.assign(new Error('PIR not found'), { status: 404 }))
+    render(<SmartPirImportForm />)
     const user = await importFile(jsonFile(JSON.stringify(SMART_PIR)))
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't import the file: The file's pir_id is not this PIR")
-    expect(onImported).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't import the file: PIR not found")
+    expect(pirIdBox()).toHaveDisplayValue(PIR_ID)
 
     api.importSmartPir.mockResolvedValueOnce(RESULT)
-    await user.click(screen.getByRole('button', { name: 'Import' }))
+    await user.click(importButton())
     expect(await screen.findByText(/Imported 4 flags/)).toBeInTheDocument()
   })
 })
 
-describe('PirImportModal — wording', () => {
+describe('SmartPirImportForm — wording', () => {
   it('lists the kinds with a count', () => {
     expect(countsText({ flags: 1 })).toBe('1 flag')
     expect(countsText({ flags: 0, segments: 2 })).toBe('2 curb segments')

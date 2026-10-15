@@ -3,12 +3,13 @@ import { Search } from 'lucide-react'
 import Modal from './Modal'
 import { bundleProperty, listProperties } from '../services/api'
 import { propertyTypeLabel } from '../data/propertyTypes'
+import { rampTypeLabel } from '../data/propertyKinds'
 import { propertyCount } from '../lib/taskOrders'
 
-// Whether a property matches the search: its BBL or its address holds the text, any case
+// Whether a property matches the search: its BBL or its display_address (a ped ramp's intersection) holds the text, any case
 const matches = (property, text) => {
   const needle = text.trim().toLowerCase()
-  return !needle || property.bbl.toLowerCase().includes(needle) || property.address.toLowerCase().includes(needle)
+  return !needle || [property.bbl, property.display_address].some(text => text?.toLowerCase().includes(needle))
 }
 
 /**
@@ -150,9 +151,9 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
                       disabled={busy}
                       onChange={() => toggle(property.id)}
                     />
-                    <span className="font-medium text-gray-900 whitespace-nowrap">{property.bbl}</span>
-                    <span className="flex-1 text-gray-700">{property.address}</span>
-                    <span className="text-gray-500 whitespace-nowrap">{propertyTypeLabel(property.property_type)}</span>
+                    <span className="font-medium text-gray-900 whitespace-nowrap">{property.kind === 'ped_ramp' ? 'Ped ramp' : property.bbl}</span>
+                    <span className="flex-1 text-gray-700">{property.display_address}</span>
+                    <span className="text-gray-500 whitespace-nowrap">{property.kind === 'ped_ramp' ? rampTypeLabel(property.ramp_type) : propertyTypeLabel(property.property_type)}</span>
                   </label>
                 </li>
               ))}

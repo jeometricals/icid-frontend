@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileJson, Files, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import {
   createFlagOnPage, deleteFlag, getContractItems, listFlagNonAssessableAreas, listFlags, listPirFeatures,
   listPirSegments, updateFlag,
@@ -8,7 +8,6 @@ import { newFlagValues } from '../../lib/flags'
 import CalibrateControl from './CalibrateControl'
 import FlagPanel from './FlagPanel'
 import FlagsFallbackList from './FlagsFallbackList'
-import PirImportModal from './PirImportModal'
 import ShapeToolbar from './ShapeToolbar'
 import SketchCanvas from './SketchCanvas'
 import Toast from '../Toast'
@@ -17,7 +16,6 @@ export const NO_SCALE_REASON = "Set this page's scale (or calibrate) to draw fla
 export const PANEL_EMPTY_TEXT = 'Select a flag to see its details.'
 export const PANEL_EMPTY_WRITER_TEXT = 'Pick a shape and click the page to add a flag, or select one to edit it.'
 export const AI_DETECT_TOOLTIP = 'Available when Vercel Pro is enabled (R1k).'
-export const BULK_UPLOAD_TOOLTIP = 'Coming in R1m — upload a batch of signed PIRs and AI will identify each site.'
 
 const TOOL_BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm '
   + 'font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
@@ -50,14 +48,12 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * toolbar says why). A reader (a demo user, or anyone but an admin on a deleted site) gets the same views with the
  * toolbar, Calibrate and the panel disabled. Clicking a list row goes to its page (onJump) and selects the flag.
  * It also reads the PIR's features and segments and the non-assessable areas of every flag that has some
- * (non_assessable_areas_count), and draws them (rendering only: there is no editor for them yet). "Import SMART
- * PIR" (a writer's) opens PirImportModal; after an import the drawings are read again, and onPagesChanged is called
- * when the file set a page's scale, rotation or title block. "Auto-detect with AI" and "Bulk upload PIRs" are
- * disabled stubs whose tooltips say when they come.
- * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onPagesChanged(), onJump(pageNumber),
- * onImageError.
+ * (non_assessable_areas_count), and draws them (rendering only: there is no editor for them yet; a Smart PIR file
+ * is imported on the admin's /admin/import-smart-pirs). "Auto-detect with AI" is a disabled stub whose tooltip says
+ * when it comes.
+ * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onJump(pageNumber), onImageError.
  */
-export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved, onPagesChanged, onJump, onImageError }) {
+export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved, onJump, onImageError }) {
   const [flags, setFlags] = useState([])
   const [areas, setAreas] = useState([])
   const [features, setFeatures] = useState([])
@@ -73,7 +69,6 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
   const [calibratePoints, setCalibratePoints] = useState([])
   const [actionError, setActionError] = useState(null)
   const [toast, setToast] = useState(null)
-  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -162,13 +157,6 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
     return () => document.removeEventListener('keydown', onKeyDown)
   })
 
-  // The import went in (the dialog stays open on its counts): read the drawings again, and the pages when it set any
-  const imported = (result) => {
-    setSelectedId(null)
-    setAttempt(a => a + 1)
-    if (result.pages_updated > 0) onPagesChanged?.()
-  }
-
   const pick = (flag, pageNumber) => {
     if (pageNumber) onJump(pageNumber)
     setSelectedId(flag.id)
@@ -203,19 +191,7 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
             }}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => { stopCalibrating(); setActiveShape(null); setImporting(true) }}
-            disabled={!writer}
-            className={TOOL_BUTTON}
-          >
-            <FileJson className="h-4 w-4" />
-            <span>Import SMART PIR</span>
-          </button>
-          <ComingButton icon={Sparkles} label="Auto-detect with AI" tooltip={AI_DETECT_TOOLTIP} />
-          <ComingButton icon={Files} label="Bulk upload PIRs" tooltip={BULK_UPLOAD_TOOLTIP} />
-        </div>
+        <ComingButton icon={Sparkles} label="Auto-detect with AI" tooltip={AI_DETECT_TOOLTIP} />
       </div>
 
       {actionError && <p role="alert" className="text-sm text-red-600 mb-4">{actionError}</p>}
@@ -266,8 +242,6 @@ export default function SketchWorkspace({ pir, page, pages, writer, onPageSaved,
       {!loading && !loadError && (
         <FlagsFallbackList flags={flags} pages={pages} contractItems={contractItems} selectedId={selected?.id ?? null} onPick={pick} />
       )}
-
-      {importing && <PirImportModal pirId={pir.id} onImported={imported} onClose={() => setImporting(false)} />}
 
       <Toast message={toast} onDone={() => setToast(null)} />
     </>

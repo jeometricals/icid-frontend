@@ -19,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getTaskOrder, unbundleProperty, updateTaskOrder } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
+import { siteName } from '../lib/properties'
 import { TASK_ORDER_ACTIONS, propertyCount } from '../lib/taskOrders'
 import { useUserNames } from '../lib/useUserNames'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -35,15 +36,15 @@ export const EMPTY_TEXT = "No sites bundled yet. Click 'Add sites' to pick from 
 export function addedMessage({ added, failed }) {
   const done = added > 0 ? `Added ${propertyCount(added)}.` : 'No sites were added.'
   if (!failed) return done
-  return `${done} Couldn't add ${failed.property.bbl}: ${failed.message} The rest weren't tried.`
+  return `${done} Couldn't add ${siteName(failed.property)}: ${failed.message} The rest weren't tried.`
 }
 
 const unbundleAction = {
-  title: row => `Unbundle site ${row.bbl}?`,
-  message: row => `${row.address} leaves this task order. It stays on the project and can be added again.`,
+  title: row => `Unbundle site ${siteName(row)}?`,
+  message: row => `${row.display_address} leaves this task order. It stays on the project and can be added again.`,
   confirmLabel: 'Unbundle',
   confirmClassName: 'btn-danger',
-  done: row => `Site ${row.bbl} unbundled.`,
+  done: row => `Site ${siteName(row)} unbundled.`,
 }
 
 export const DEMO_NOTE = 'Demo mode: task orders are read-only.'

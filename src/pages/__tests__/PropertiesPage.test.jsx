@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import PropertiesPage, { DEMO_NOTE, EMPTY_TEXT, EMPTY_TEXT_READ_ONLY } from '../PropertiesPage'
+import PropertiesPage, { DEMO_NOTE } from '../PropertiesPage'
 import { BBL_TAKEN } from '../../components/PropertyFormModal'
+import { BULK_UPLOAD_TOOLTIP } from '../../components/SiteSection'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
@@ -14,17 +15,38 @@ import { DEMO_USER, TEST_USER } from '../../test/users'
 
 const ADMIN = { ...TEST_USER, role: 'admin' }
 const YEAR = new Date().getFullYear()
+const BOROUGH_BY_DIGIT = { 1: 'Manhattan', 2: 'Bronx', 3: 'Brooklyn', 4: 'Queens', 5: 'Staten Island' }
 
-const property = (number, bbl, address, property_type, extra = {}) => ({
-  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', bbl, address, property_type,
-  notes: null, created_at: `${YEAR}-09-14T12:00:00`, updated_at: `${YEAR}-09-14T12:00:00`, created_by: ADMIN.uuid,
-  deleted_at: null, deleted_by: null, pir_status: 'none', ...extra,
+const base = (number, extra) => ({
+  id: `c0000000-0000-4000-8000-00000000000${number}`, project_id: 'HWS0023', notes: null,
+  created_at: `${YEAR}-09-14T12:00:00`, updated_at: `${YEAR}-09-14T12:00:00`, created_by: ADMIN.uuid,
+  deleted_at: null, deleted_by: null, pir_status: 'none', status: { state: 'none', date: null }, task_order_no: null,
+  ...extra,
 })
+// What the backend works out from a sidewalk's or a ped ramp's fields
+const withDisplay = (row) => {
+  if (row.kind === 'ped_ramp') {
+    const facing = row.facing_street === 'street_1' ? row.intersection_street_1 : row.intersection_street_2
+    return { ...row, display_address: `${row.intersection_street_1} & ${row.intersection_street_2} — ${row.quadrant} Quadrant (Facing ${facing})`,
+      block_display: null, lot_display: null }
+  }
+  return { ...row, boro: BOROUGH_BY_DIGIT[row.bbl[0]], display_address: row.address,
+    block_display: row.bbl.slice(1, 6).replace(/^0+/, ''), lot_display: row.bbl.slice(6).replace(/^0+/, '') }
+}
+const sidewalk = (number, bbl, address, extra = {}) => withDisplay(base(number, {
+  kind: 'sidewalk', bbl, address, property_type: '1_3_family', violation_no: null,
+  intersection_street_1: null, intersection_street_2: null, quadrant: null, facing_street: null, ramp_type: null, ...extra,
+}))
+const pedRamp = (number, street1, street2, extra = {}) => withDisplay(base(number, {
+  kind: 'ped_ramp', boro: 'Brooklyn', bbl: null, address: null, property_type: null, violation_no: null,
+  intersection_street_1: street1, intersection_street_2: street2, quadrant: 'NE', facing_street: 'street_2',
+  ramp_type: 'PERPENDICULAR', ...extra,
+}))
 const LISTED = [
-  property(1, '4001230045', '12 Main St', '1_3_family'),
-  property(2, '4001230099', '40 Oak Ave', '4_plus_family', { pir_status: 'dot_signed' }),
+  sidewalk(1, '4001230045', '12 Main St', { violation_no: 'V-100', status: { state: 'task_ordered', date: null }, task_order_no: 'TO-7' }),
+  sidewalk(2, '4001230099', '40 Oak Ave', { property_type: '4_plus_family', status: { state: 'constructed_on', date: `${YEAR}-10-02` } }),
+  pedRamp(3, 'Atlantic Ave', 'Court St'),
 ]
-const byAddress = (a, b) => a.address.localeCompare(b.address)
 
 vi.mock('../../services/api', () => ({
   listProperties: vi.fn(), createProperty: vi.fn(), updateProperty: vi.fn(),
@@ -44,15 +66,17 @@ beforeEach(() => {
   api.listProperties.mockImplementation(async (projectId, { includeDeleted = false } = {}) => (
     structuredClone(server.filter(row => includeDeleted || live(row)))
   ))
-  api.createProperty.mockImplementation(async (projectId, values) => {
-    if (server.some(row => live(row) && row.bbl === values.bbl)) throw conflict()
-    const created = property(9, values.bbl, values.address, values.property_type, { notes: values.notes })
-    server = [...server, created].sort(byAddress)
+  api.createProperty.mockImplementation(async (projectId, { kind, ...values }) => {
+    if (values.bbl && server.some(row => live(row) && row.bbl === values.bbl)) throw conflict()
+    const created = kind === 'ped_ramp'
+      ? pedRamp(9, values.intersection_street_1, values.intersection_street_2, values)
+      : sidewalk(9, values.bbl, values.address, values)
+    server = [...server, created]
     return created
   })
   api.updateProperty.mockImplementation(async (id, values) => {
-    if (values.bbl && server.some(row => live(row) && row.id !== id && row.bbl === values.bbl)) throw conflict()
-    server = server.map(row => (row.id === id ? { ...row, ...values } : row)).sort(byAddress)
+    if (values.kind) throw Object.assign(new Error('Property kind cannot be changed. Delete and recreate.'), { status: 400 })
+    server = server.map(row => (row.id === id ? withDisplay({ ...row, ...values }) : row))
     return server.find(row => row.id === id)
   })
   api.softDeleteProperty.mockImplementation(async (id) => {
@@ -81,52 +105,99 @@ function renderPage(user = ADMIN) {
   )
 }
 
-const table = () => screen.getByRole('table')
-const rowOf = (bbl) => within(table()).getByText(bbl).closest('tr')
-const queryRowOf = (bbl) => within(table()).queryByText(bbl)?.closest('tr') ?? null
+const sidewalks = () => screen.getByRole('region', { name: 'Prior Notice Violation Sidewalks' })
+const ramps = () => screen.getByRole('region', { name: 'Pedestrian Ramps' })
+const rowOf = (text) => screen.getByText(text).closest('tr')
+const queryRowOf = (text) => screen.queryByText(text)?.closest('tr') ?? null
+const headings = (section) => within(section).getAllByRole('columnheader').map(th => th.textContent)
 const dialog = () => screen.getByRole('dialog')
 const showDeleted = () => screen.getByRole('checkbox', { name: 'Show deleted' })
 
 async function renderListed(user) {
   renderPage(user)
-  await screen.findByRole('table')
+  await screen.findAllByRole('table')
 }
 
-describe('PropertiesPage — who can do what', () => {
-  it("lets a project member who isn't an admin add and edit, but not delete or see deleted ones", async () => {
-    await renderListed(TEST_USER)
+describe('PropertiesPage — the two sections', () => {
+  it('lists sidewalks and ped ramps in their own sections, with their counts and columns', async () => {
+    await renderListed()
+    expect(screen.getByRole('heading', { name: 'Site Info — HWS0023' })).toBeInTheDocument()
     expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
-    expect(screen.getByRole('button', { name: 'Add site' })).toBeInTheDocument()
-    expect(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
-    expect(within(table()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: 'Show deleted' })).not.toBeInTheDocument()
-
-    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' }))
-    await userEvent.clear(screen.getByLabelText('Address'))
-    await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(rowOf('4001230045')).toHaveTextContent('14 Main St'))
+    expect(within(sidewalks()).getByRole('button', { name: 'Prior Notice Violation Sidewalks (2)' })).toBeInTheDocument()
+    expect(within(ramps()).getByRole('button', { name: 'Pedestrian Ramps (1)' })).toBeInTheDocument()
+    expect(headings(sidewalks())).toEqual(
+      ['Borough', 'Block', 'Lot', 'Address', 'Violation No.', 'Status', 'Added', 'Task Order No.', 'Actions'],
+    )
+    expect(headings(ramps())).toEqual([
+      'Borough', 'Intersection 1st Street', 'Intersection 2nd Street', 'Quadrant', 'Facing', 'Type', 'Status', 'Added',
+      'Task Order No.', 'Actions',
+    ])
+    expect(within(sidewalks()).queryByText('Atlantic Ave')).not.toBeInTheDocument()
+    expect(within(ramps()).queryByText('12 Main St')).not.toBeInTheDocument()
   })
 
-  it('gives a demo user the list read-only: no Add, no Actions column, and a note saying so', async () => {
+  it("shows a sidewalk's borough, block and lot as the backend sends them, its violation, status and task order", async () => {
+    await renderListed()
+    const cells = within(rowOf('12 Main St')).getAllByRole('cell').map(td => td.textContent)
+    expect(cells.slice(0, 8)).toEqual(['Queens', '123', '45', '12 Main St', 'V-100', 'Task Ordered', 'Sep 14', 'TO-7'])
+    const other = within(rowOf('40 Oak Ave')).getAllByRole('cell').map(td => td.textContent)
+    expect(other.slice(4, 8)).toEqual(['—', `Constructed ${YEAR}-10-02`, 'Sep 14', '—'])
+  })
+
+  it("shows a ped ramp's streets, quadrant, the street it faces by name, its type, and a dash for no status", async () => {
+    await renderListed()
+    const cells = within(rowOf('Atlantic Ave')).getAllByRole('cell').map(td => td.textContent)
+    expect(cells.slice(0, 9)).toEqual(['Brooklyn', 'Atlantic Ave', 'Court St', 'NE', 'Court St', 'Perpendicular', '—', 'Sep 14', '—'])
+  })
+
+  it('opens both sections, and folds and unfolds each by its header', async () => {
+    await renderListed()
+    const toggle = within(ramps()).getByRole('button', { name: /Pedestrian Ramps/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(within(sidewalks()).getByRole('button', { name: /Prior Notice/ })).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(within(ramps()).queryByRole('table')).not.toBeInTheDocument()
+    expect(within(sidewalks()).getByRole('table')).toBeInTheDocument()
+    await userEvent.click(toggle)
+    expect(within(ramps()).getByRole('table')).toBeInTheDocument()
+  })
+
+  it('has a disabled Bulk Upload button in each section, its tooltip saying AI import is coming', async () => {
     await renderListed(DEMO_USER)
-    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add site' })).not.toBeInTheDocument()
-    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
-      .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added'])
-    expect(within(table()).queryByRole('button')).not.toBeInTheDocument()
+    for (const [section, label] of [[sidewalks(), 'Bulk Upload Sidewalks'], [ramps(), 'Bulk Upload Ped Ramps']]) {
+      const button = within(section).getByRole('button', { name: label })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', BULK_UPLOAD_TOOLTIP)
+      expect(button.parentElement).toHaveAttribute('title', 'AI import — coming soon')
+    }
   })
 
-  it("tells a demo user with no properties only that there are none", async () => {
-    server = []
-    renderPage(DEMO_USER)
-    expect(await screen.findByText(EMPTY_TEXT_READ_ONLY)).toBeInTheDocument()
+  it('shows each section empty with its message and a prominent Add for an admin', async () => {
+    server = server.filter(row => row.kind === 'sidewalk')
+    await renderListed()
+    expect(within(ramps()).getByText('No pedestrian ramps added yet.')).toBeInTheDocument()
+    expect(within(ramps()).getAllByRole('button', { name: 'Add Ped Ramp' })).toHaveLength(2)
   })
 
-  it("shows the backend's refusal of someone not on the project as the load error", async () => {
-    api.listProperties.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
-    renderPage(TEST_USER)
-    expect(await screen.findByText("Couldn't load the sites: Project access required")).toBeInTheDocument()
+  it("opens a site's sketch workspace from View", async () => {
+    await renderListed()
+    await userEvent.click(within(rowOf('Atlantic Ave')).getByRole('link', { name: 'View' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${LISTED[2].id}/pir`)
+  })
+
+  it('links a sidewalk address to its site page', async () => {
+    await renderListed()
+    await userEvent.click(within(sidewalks()).getByRole('link', { name: '12 Main St' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${LISTED[0].id}`)
+  })
+
+  it('shows a load failure with Retry', async () => {
+    api.listProperties.mockRejectedValueOnce(new Error('Project not found'))
+    renderPage()
+    expect(await screen.findByText("Couldn't load the sites: Project not found")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findAllByRole('table')).toHaveLength(2)
   })
 
   it('goes back to the project page', async () => {
@@ -136,144 +207,180 @@ describe('PropertiesPage — who can do what', () => {
   })
 })
 
-describe('PropertiesPage — the list', () => {
-  it('heads the page with the project and lists BBL, address, type label, PIR status and added date', async () => {
-    await renderListed()
-    expect(screen.getByRole('heading', { name: 'Site Info — HWS0023' })).toBeInTheDocument()
-    expect(api.listProperties).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
-    expect(within(table()).getAllByRole('columnheader').map(th => th.textContent))
-      .toEqual(['BBL', 'Address', 'Type', 'PIR', 'Added', 'Actions'])
-    const cells = within(rowOf('4001230045')).getAllByRole('cell').map(td => td.textContent)
-    expect(cells.slice(0, 5)).toEqual(['4001230045', '12 Main St', '1-3 family', '—', 'Sep 14'])
-    expect(rowOf('4001230099')).toHaveTextContent('4+ family / commercial')
+describe('PropertiesPage — who can do what', () => {
+  it("lets a project member who isn't an admin add and edit, but not delete or see deleted ones", async () => {
+    await renderListed(TEST_USER)
+    expect(screen.queryByText(DEMO_NOTE)).not.toBeInTheDocument()
+    expect(within(sidewalks()).getByRole('button', { name: 'Add Sidewalk' })).toBeInTheDocument()
+    expect(within(ramps()).getByRole('button', { name: 'Add Ped Ramp' })).toBeInTheDocument()
+    expect(within(rowOf('12 Main St')).getByRole('link', { name: 'View' })).toBeInTheDocument()
+    expect(within(rowOf('12 Main St')).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Show deleted' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(rowOf('12 Main St')).getByRole('button', { name: 'Edit' }))
+    await userEvent.clear(screen.getByLabelText('Address'))
+    await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.updateProperty).toHaveBeenCalledWith(LISTED[0].id, { address: '14 Main St' }))
+    expect(await screen.findByText('14 Main St')).toBeInTheDocument()
   })
 
-  it.each([
-    ['no live PIR', 'none', '—'],
-    ['a PIR signed by DOT', 'dot_signed', 'Signed by DOT'],
-    ['a PIR with the as-built signed', 'as_built_signed', 'As-built signed'],
-  ])("shows a row with %s by its list's pir_status", async (_, status, label) => {
-    const bbl = server[1].bbl
-    server[1].pir_status = status
-    await renderListed()
-    const pirCell = within(rowOf(bbl)).getAllByRole('cell')[3]
-    expect(pirCell).toHaveTextContent(label)
+  it('gives a demo user the list read-only: the note, and no Add, Edit or Delete', async () => {
+    await renderListed(DEMO_USER)
+    expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(within(rowOf('Atlantic Ave')).getByRole('link', { name: 'View' })).toBeInTheDocument()
   })
 
-  it("links each BBL to the property's page", async () => {
-    await renderListed()
-    await userEvent.click(within(table()).getByRole('link', { name: '4001230045' }))
-    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${LISTED[0].id}`)
-  })
-
-  it('shows the empty state when the project has none', async () => {
+  it('tells a demo user with no sites only that there are none', async () => {
     server = []
-    renderPage()
-    expect(await screen.findByText(EMPTY_TEXT)).toBeInTheDocument()
+    renderPage(DEMO_USER)
+    expect(await screen.findByText('No sidewalks added yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add/ })).not.toBeInTheDocument()
   })
 
-  it('shows a load failure with Retry', async () => {
-    api.listProperties.mockRejectedValueOnce(new Error('Project not found'))
-    renderPage()
-    expect(await screen.findByText("Couldn't load the sites: Project not found")).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByRole('table')).toBeInTheDocument()
+  it("shows the backend's refusal of someone not on the project as the load error", async () => {
+    api.listProperties.mockRejectedValueOnce(Object.assign(new Error('Project access required'), { status: 403 }))
+    renderPage(TEST_USER)
+    expect(await screen.findByText("Couldn't load the sites: Project access required")).toBeInTheDocument()
   })
 })
 
 describe('PropertiesPage — adding and editing', () => {
-  it('adds a property, and the list read again shows it with its type label', async () => {
+  it('adds a sidewalk from its section, and it shows in the sidewalks table', async () => {
     await renderListed()
-    await userEvent.click(screen.getByRole('button', { name: 'Add site' }))
-    expect(dialog()).toHaveAccessibleName('Add site')
-    await userEvent.type(screen.getByLabelText('BBL'), '4005550001')
+    await userEvent.click(within(sidewalks()).getByRole('button', { name: 'Add Sidewalk' }))
+    expect(dialog()).toHaveAccessibleName('Add sidewalk')
+    await userEvent.type(screen.getByLabelText('BBL'), '3005550001')
     await userEvent.type(screen.getByLabelText('Address'), '7 Elm Pl')
-    await userEvent.selectOptions(screen.getByLabelText('Site type'), 'expedited')
+    await userEvent.type(screen.getByLabelText(/Violation No\./), 'V-9')
+    await userEvent.selectOptions(screen.getByLabelText('Property type'), 'expedited')
+    await userEvent.type(screen.getByLabelText(/Notes/), 'Corner lot')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.createProperty).toHaveBeenCalledWith('HWS0023', {
-      bbl: '4005550001', address: '7 Elm Pl', property_type: 'expedited', notes: null,
+      kind: 'sidewalk', boro: 'Brooklyn', bbl: '3005550001', address: '7 Elm Pl', violation_no: 'V-9', property_type: 'expedited',
+      notes: 'Corner lot',
     })
-    expect(rowOf('4005550001')).toHaveTextContent('7 Elm Pl')
-    expect(rowOf('4005550001')).toHaveTextContent('Expedited')
+    expect(within(sidewalks()).getByText('7 Elm Pl')).toBeInTheDocument()
+    expect(within(sidewalks()).getByRole('button', { name: 'Prior Notice Violation Sidewalks (3)' })).toBeInTheDocument()
+  })
+
+  it('adds a ped ramp from its section, and it shows in the ped ramps table', async () => {
+    await renderListed()
+    await userEvent.click(within(ramps()).getByRole('button', { name: 'Add Ped Ramp' }))
+    expect(dialog()).toHaveAccessibleName('Add ped ramp')
+    await userEvent.selectOptions(screen.getByLabelText('Borough'), 'Queens')
+    await userEvent.type(screen.getByLabelText('Intersection 1st Street'), 'Main St')
+    await userEvent.type(screen.getByLabelText('Intersection 2nd Street'), '37th Ave')
+    await userEvent.selectOptions(screen.getByLabelText('Quadrant'), 'SW')
+    await userEvent.selectOptions(screen.getByLabelText('Facing'), 'street_1')
+    await userEvent.selectOptions(screen.getByLabelText('Type'), 'PARALLEL')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.createProperty).toHaveBeenCalledWith('HWS0023', {
+      kind: 'ped_ramp', boro: 'Queens', intersection_street_1: 'Main St', intersection_street_2: '37th Ave',
+      quadrant: 'SW', facing_street: 'street_1', ramp_type: 'PARALLEL', notes: null,
+    })
+    const cells = within(within(ramps()).getByText('37th Ave').closest('tr')).getAllByRole('cell').map(td => td.textContent)
+    expect(cells.slice(0, 6)).toEqual(['Queens', 'Main St', '37th Ave', 'SW', 'Main St', 'Parallel'])
   })
 
   it('shows a duplicate BBL in the dialog and adds no row', async () => {
     await renderListed()
-    await userEvent.click(screen.getByRole('button', { name: 'Add site' }))
+    await userEvent.click(within(sidewalks()).getByRole('button', { name: 'Add Sidewalk' }))
     await userEvent.type(screen.getByLabelText('BBL'), '4001230045')
     await userEvent.type(screen.getByLabelText('Address'), '99 Other St')
-    await userEvent.selectOptions(screen.getByLabelText('Site type'), '1_3_family')
+    await userEvent.selectOptions(screen.getByLabelText('Property type'), '1_3_family')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await within(dialog()).findByText(BBL_TAKEN)).toBeInTheDocument()
     expect(screen.getByLabelText('Address')).toHaveDisplayValue('99 Other St')
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(within(table()).queryByText('99 Other St')).not.toBeInTheDocument()
-    expect(within(table()).getAllByRole('row')).toHaveLength(3) // the heading and the two properties
+    expect(queryRowOf('99 Other St')).toBeNull()
   })
 
-  it('edits a row from its pre-filled dialog, and the list reflects the change', async () => {
+  it("edits a ped ramp from its pre-filled dialog, its kind fixed, and the table reflects the change", async () => {
     await renderListed()
-    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' }))
-    expect(dialog()).toHaveAccessibleName('Edit site')
-    const address = screen.getByLabelText('Address')
-    expect(address).toHaveDisplayValue('12 Main St')
-    await userEvent.clear(address)
-    await userEvent.type(address, '14 Main St')
+    await userEvent.click(within(rowOf('Atlantic Ave')).getByRole('button', { name: 'Edit' }))
+    expect(dialog()).toHaveAccessibleName('Edit ped ramp')
+    expect(within(dialog()).getByText('Site type: Pedestrian Ramp')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Facing'), 'street_1')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(api.updateProperty).toHaveBeenCalledWith(LISTED[0].id, { address: '14 Main St' })
-    expect(rowOf('4001230045')).toHaveTextContent('14 Main St')
+    expect(api.updateProperty).toHaveBeenCalledWith(LISTED[2].id, { facing_street: 'street_1' })
+    expect(within(rowOf('Court St')).getAllByRole('cell')[4]).toHaveTextContent('Atlantic Ave')
+  })
+
+  it("shows the backend's refusal of a kind change below the form", async () => {
+    api.updateProperty.mockRejectedValueOnce(
+      Object.assign(new Error('Property kind cannot be changed. Delete and recreate.'), { status: 400 }),
+    )
+    await renderListed()
+    await userEvent.click(within(rowOf('12 Main St')).getByRole('button', { name: 'Edit' }))
+    await userEvent.clear(screen.getByLabelText('Address'))
+    await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Property kind cannot be changed. Delete and recreate.')
   })
 })
 
 describe('PropertiesPage — deleting and un-deleting', () => {
-  it('soft-deletes a row once confirmed, and it leaves the list', async () => {
+  it('soft-deletes a row once confirmed, and it leaves its section', async () => {
     await renderListed()
-    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(rowOf('12 Main St')).getByRole('button', { name: 'Delete' }))
     expect(dialog()).toHaveAccessibleName('Delete site 4001230045?')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
 
-    await waitFor(() => expect(queryRowOf('4001230045')).toBeNull())
+    await waitFor(() => expect(queryRowOf('12 Main St')).toBeNull())
     expect(api.softDeleteProperty).toHaveBeenCalledWith(LISTED[0].id)
     expect(screen.getByRole('status')).toHaveTextContent('Site 4001230045 deleted.')
   })
 
-  it('cancelling a delete changes nothing', async () => {
+  it('names a ped ramp by its intersection in the delete dialog and toast', async () => {
     await renderListed()
-    await userEvent.click(within(rowOf('4001230045')).getByRole('button', { name: 'Delete' }))
-    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
-    expect(api.softDeleteProperty).not.toHaveBeenCalled()
-    expect(rowOf('4001230045')).toBeInTheDocument()
+    await userEvent.click(within(rowOf('Atlantic Ave')).getByRole('button', { name: 'Delete' }))
+    const name = 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)'
+    expect(dialog()).toHaveAccessibleName(`Delete site ${name}?`)
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(`Site ${name} deleted.`))
+    expect(within(ramps()).getByText('No pedestrian ramps added yet.')).toBeInTheDocument()
   })
 
-  it('shows a deleted row muted with Un-delete under Show deleted, and un-deleting returns it to the list', async () => {
+  it('cancelling a delete changes nothing', async () => {
+    await renderListed()
+    await userEvent.click(within(rowOf('12 Main St')).getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
+    expect(api.softDeleteProperty).not.toHaveBeenCalled()
+    expect(rowOf('12 Main St')).toBeInTheDocument()
+  })
+
+  it('shows a deleted row muted with Deleted and Un-delete under Show deleted, and un-deleting returns it', async () => {
     server[0] = { ...server[0], deleted_at: `${YEAR}-10-01T09:00:00`, deleted_by: ADMIN.uuid }
     await renderListed()
-    expect(queryRowOf('4001230045')).toBeNull()
+    expect(queryRowOf('12 Main St')).toBeNull()
 
     await userEvent.click(showDeleted())
-    await waitFor(() => expect(queryRowOf('4001230045')).not.toBeNull())
+    await waitFor(() => expect(queryRowOf('12 Main St')).not.toBeNull())
     expect(api.listProperties).toHaveBeenLastCalledWith('HWS0023', { includeDeleted: true })
-    const deleted = rowOf('4001230045')
+    const deleted = rowOf('12 Main St')
     expect(deleted).toHaveAttribute('data-deleted', 'true')
     expect(deleted).toHaveClass('text-gray-400')
-    expect(within(deleted).getByText('4001230045')).toHaveClass('line-through')
+    expect(within(deleted).getByText('12 Main St')).toHaveClass('line-through')
+    expect(deleted).toHaveTextContent('Deleted')
     expect(within(deleted).queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
-    expect(within(deleted).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-    expect(rowOf('4001230099')).not.toHaveAttribute('data-deleted')
+    // A deleted sidewalk doesn't count
+    expect(within(sidewalks()).getByRole('button', { name: 'Prior Notice Violation Sidewalks (1)' })).toBeInTheDocument()
 
     await userEvent.click(within(deleted).getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
-    await waitFor(() => expect(rowOf('4001230045')).not.toHaveAttribute('data-deleted'))
+    await waitFor(() => expect(rowOf('12 Main St')).not.toHaveAttribute('data-deleted'))
     expect(api.undeleteProperty).toHaveBeenCalledWith(LISTED[0].id)
-
-    await userEvent.click(showDeleted())
-    await waitFor(() => expect(api.listProperties).toHaveBeenLastCalledWith('HWS0023', { includeDeleted: false }))
-    expect(within(rowOf('4001230045')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 
   it('shows a refused un-delete in its dialog', async () => {
@@ -283,7 +390,7 @@ describe('PropertiesPage — deleting and un-deleting', () => {
     ))
     await renderListed()
     await userEvent.click(showDeleted())
-    await userEvent.click(within(await waitFor(() => rowOf('4001230045'))).getByRole('button', { name: 'Un-delete' }))
+    await userEvent.click(within(await waitFor(() => rowOf('12 Main St'))).getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Another property in this project now has this BBL')
   })

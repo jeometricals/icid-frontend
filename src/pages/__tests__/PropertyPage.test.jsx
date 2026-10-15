@@ -42,14 +42,16 @@ const live = () => pirs.find(row => !row.deleted_at)
 beforeEach(() => {
   vi.clearAllMocks()
   created = 0
-  property = { id: PROPERTY_ID, project_id: 'HWS0023', bbl: '4001230045', address: '12 Main St',
-    property_type: '4_plus_family', notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
+  property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', bbl: '4001230045',
+    address: '12 Main St', display_address: '12 Main St', property_type: '4_plus_family', violation_no: 'V-77',
+    notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
   pirs = []
   api.listAdminUsers.mockResolvedValue([ADMIN, RE])
   api.listUsers.mockResolvedValue([ADMIN, RE].map(({ uuid, ...rest }) => ({ user_id: uuid, ...rest })))
   api.getProperty.mockImplementation(async () => structuredClone(property))
   api.updateProperty.mockImplementation(async (id, values) => {
     property = { ...property, ...values }
+    property.display_address = property.address
     return structuredClone(property)
   })
   api.softDeleteProperty.mockImplementation(async () => {
@@ -118,7 +120,7 @@ async function addPir(initials = 'JD', date = `${YEAR}-09-14`) {
 }
 
 describe('PropertyPage — who can do what', () => {
-  it("lets a project member who isn't an admin edit the property and add and edit its PIR, but not delete", async () => {
+  it("lets a project member who isn't an admin edit the site and add and edit its PIR, but not delete", async () => {
     await renderLoaded(TEST_USER)
     expect(within(propertyCard()).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(within(propertyCard()).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
@@ -178,15 +180,34 @@ describe('PropertyPage — who can do what', () => {
 })
 
 describe('PropertyPage — the property', () => {
-  it('heads the page with the project and address, and lists BBL, address, type, notes and added', async () => {
+  it("heads the page with the project and address, and lists a sidewalk's borough, BBL, address, violation, type, notes and added", async () => {
     await renderLoaded()
     expect(api.getProperty).toHaveBeenCalledWith(PROPERTY_ID)
     expect(api.listPirs).toHaveBeenCalledWith(PROPERTY_ID, { includeDeleted: true })
+    expect(valueOf(propertyCard(), 'Borough')).toHaveTextContent('Queens')
     expect(valueOf(propertyCard(), 'BBL')).toHaveTextContent('4001230045')
+    expect(valueOf(propertyCard(), 'Violation No.')).toHaveTextContent('V-77')
     expect(valueOf(propertyCard(), 'Address')).toHaveTextContent('12 Main St')
     expect(valueOf(propertyCard(), 'Type')).toHaveTextContent('4+ family / commercial')
     expect(valueOf(propertyCard(), 'Notes')).toHaveTextContent('Corner lot')
     expect(valueOf(propertyCard(), 'Added')).toHaveTextContent('Sep 1')
+  })
+
+  it("heads a ped ramp's page with its intersection, and lists its quadrant, the street it faces and its type", async () => {
+    property = {
+      ...property, kind: 'ped_ramp', boro: 'Brooklyn', bbl: null, address: null, property_type: null, violation_no: null,
+      intersection_street_1: 'Atlantic Ave', intersection_street_2: 'Court St', quadrant: 'NE', facing_street: 'street_2',
+      ramp_type: 'CUT_THROUGH', display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
+    }
+    renderPage()
+    expect(await screen.findByRole('heading', { name: /HWS0023 · Atlantic Ave & Court St — NE Quadrant \(Facing Court St\)/ }))
+      .toBeInTheDocument()
+    expect(valueOf(propertyCard(), 'Borough')).toHaveTextContent('Brooklyn')
+    expect(valueOf(propertyCard(), 'Intersection')).toHaveTextContent('Atlantic Ave & Court St')
+    expect(valueOf(propertyCard(), 'Quadrant')).toHaveTextContent('NE')
+    expect(valueOf(propertyCard(), 'Facing')).toHaveTextContent('Court St')
+    expect(valueOf(propertyCard(), 'Ramp type')).toHaveTextContent('Cut-through')
+    expect(within(propertyCard()).queryByText('BBL')).not.toBeInTheDocument()
   })
 
   it('goes back to the project\'s properties', async () => {
@@ -206,7 +227,8 @@ describe('PropertyPage — the property', () => {
   it('edits the property in its pre-filled dialog', async () => {
     await renderLoaded()
     await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Edit' }))
-    expect(dialog()).toHaveAccessibleName('Edit site')
+    expect(dialog()).toHaveAccessibleName('Edit sidewalk')
+    expect(within(dialog()).getByText('Site type: Sidewalk')).toBeInTheDocument()
     await userEvent.clear(screen.getByLabelText('Address'))
     await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))

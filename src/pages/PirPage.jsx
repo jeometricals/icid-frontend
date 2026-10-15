@@ -6,9 +6,9 @@
  * toolbar, the page's flags drawn over it, the selected flag's panel, Calibrate, and every flag listed below). A
  * writer (a member who isn't a demo user; while the site is deleted only an admin) can use Rotate (a quarter turn
  * clockwise, saved on that page), Set scale (that page only), Replace PIR (a new upload replaces every page) and
- * Remove pages, and draw, and import a Smart PIR file (after which the pages are read again if it set any page's
- * scale, rotation or title block); for a reader they are there but disabled. With no pages the card prompts an upload. The
- * backend refuses anyone not on the project (403), which shows as the load error.
+ * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
+ * heading names the site by its display_address (a ped ramp's intersection), Back by siteName. The backend refuses
+ * anyone not on the project (403), which shows as the load error.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { deletePirPages, getPirByProperty, getProperty, listPirPages, nextRotation, setPirPageRotation } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { PIR_DEMO_NOTE } from '../lib/pirs'
+import { siteName } from '../lib/properties'
 import ConfirmDialog from '../components/ConfirmDialog'
 import GoToProjectButton from '../components/GoToProjectButton'
 import PageScaleModal from '../components/PageScaleModal'
@@ -141,15 +142,6 @@ export default function PirPage() {
     setToast(`PIR ${replacing ? 'replaced' : 'uploaded'}: ${pagesText(saved.pages?.length ?? 0)}.`)
   }
 
-  // An import set some pages' scale or rotation: read them again, quietly (the same pages, so the workspace stays)
-  const rereadPages = async () => {
-    try {
-      setPages(await listPirPages(pir.id))
-    } catch (err) {
-      setActionError(`The import went in, but the pages couldn't be read again: ${err.message}`)
-    }
-  }
-
   const header = (
     <div className="flex flex-wrap items-center gap-x-8 gap-y-2 mb-6">
       <button
@@ -157,7 +149,7 @@ export default function PirPage() {
         className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
       >
         <ArrowLeft className="h-5 w-5" />
-        <span className="font-medium">Back to Site{property ? ` ${property.bbl}` : ''}</span>
+        <span className="font-medium">Back to Site{property ? ` ${siteName(property)}` : ''}</span>
       </button>
       <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />
     </div>
@@ -196,7 +188,7 @@ export default function PirPage() {
   return shell(
     <>
       <h2 className="text-2xl font-bold text-gray-900 mb-6 inline-flex flex-wrap items-center gap-3">
-        <span className={deleted ? 'line-through text-gray-400' : ''}>PIR · {property.address}</span>
+        <span className={deleted ? 'line-through text-gray-400' : ''}>PIR · {property.display_address}</span>
         <PirStatusBadge pir={pir} />
         {deleted && <StatusBadge status="deleted" />}
       </h2>
@@ -293,7 +285,6 @@ export default function PirPage() {
                 replacePage(saved)
                 setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)
               }}
-              onPagesChanged={rereadPages}
               onJump={goTo}
               onImageError={() => setImageFailed(true)}
             />

@@ -12,16 +12,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 
 ## Folder structure
 
-- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties, one property and its PIR workspace, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items). One page per file.
+- `src/pages/` — top-level routed pages (login, project selection, project dashboard, drafts list, report archive, progress, a project's properties, one property and its PIR workspace, a project's task orders and one task order, IDR, review queue, project roles, and the admin's all-IDRs, all-users and all-projects lists and a project's pay items, and the Smart PIR import). One page per file.
 - `src/pages/reports/` — inspection report form pages (General, SWCB, AC, ConcMix, ConcCyl).
 - `src/contexts/` — React context providers: `AuthContext.jsx` (the signed-in user; see Sign-in below), `ProjectRolesContext.jsx` (the roles they hold on each project; see Review below), `TaskCountContext.jsx` (how many IDRs are waiting on them), `RedlineContext.jsx` (a field's reviewer edits and the edit calls, for `RedlinedField`; and which IDRs have edit mode on) and `LeaveGuardContext.jsx` (lets a page with unsaved edits stand between the app header and a navigation away; see Navigation below).
 - `src/services/` — all backend access. One file per resource (`auth.js`, `signatures.js`, `projects.js`, `idrs.js`, `reviews.js`, `fieldEdits.js`, `idrReports.js`, `users.js`, `attachments.js`, `contractItems.js`, `exports.js`, `quantities.js`, `payItems.js`, `properties.js`, `taskOrders.js`, `pirs.js`, `pirPages.js`, `flags.js`, `nonAssessableAreas.js`, `features.js`, `segments.js`) on the shared `apiFetch` helper; `api.js` re-exports them all.
   Exception: `session.js` holds the session token helpers (`getToken` / `setToken` / `clearToken`, stored in
   `localStorage` under `icid_token`), not backend calls; components get the current user from `useAuth()`.
-- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
-- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
+- `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
+- `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `parseBbl` and `facingStreetName`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), and `contractItems.js` (a `getContractItems` response fixture for the pay-item picker).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend` and `PirImportModal`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard` and `Bar`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection` and the admin import's `SmartPirImportForm`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -449,53 +449,86 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   returns 403 to them anyway.
 - **Properties ("Site Info" in the UI).** `/project/:projectId/properties` (`PropertiesPage`), reached from the
   "Site Info" link in the task orders page's header (and "Site Info" on an `/admin/projects` row); the dashboard
-  has no tile for it. Back returns to the project page. The project's properties (the lots its work is done at),
-  kept by hand.
+  has no tile for it. Back returns to the project page. The project's properties (where its work is done), kept by
+  hand, of two kinds since migration 035: a **sidewalk** (a tax lot, named by its BBL) and a **ped ramp** (a corner
+  of an intersection).
   - **Naming.** Internally a property is a property: files, components, services, routes (`/properties`), query
     keys and backend fields keep the word. What the user reads says "site": "Site Info" for the list and its
-    links, "site" / "sites" in buttons, dialogs, confirms, toasts, empty states and notes ("Add site", "Edit
-    site", "Site type", "Delete site <bbl>?", "Site <bbl> deleted."). The column headings (BBL, Address, Type,
-    PIR, Added) are unchanged. The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle site <bbl>?",
-    the picker), and the task orders list's column is "Sites". Messages the backend words itself ("Property not
-    found", "Cannot bundle a deleted property", its 409 details) still say "property" and are shown as worded:
-    the backend's entity is still a property, and they appear only on errors. Backlog: if the backend entity is
-    ever renamed to sites, update those details then (or have the frontend translate known backend wordings).
-  - **Who does what.** Since S2 (as for task orders since S1) any member of the project reads, adds and edits
-    them; only the destructive controls (Delete, Un-delete, Show deleted) are an admin's. A demo user reads only:
-    no Add, no Actions column, and the note "Demo mode: sites are read-only." (the backend answers 403). The
-    backend refuses anyone not on the project (403), which shows as the load error.
-  - A property is `{id, project_id, bbl, address, property_type, notes, created_at, updated_at, created_by,
-    deleted_at, deleted_by}`; `property_type` is one of `1_3_family` ("1-3 family"),
-    `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), listed with their labels in
-    `src/data/propertyTypes.js` (the backend's CHECK holds the same three; a new type needs it first).
-  - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })`, `getProperty`,
-    `createProperty(projectId, data)`, `updateProperty(propertyId, data)`, `softDeleteProperty` and
-    `undeleteProperty`. Reading, adding and editing are for anyone on the project (or an admin), deleting and
-    un-deleting for an admin; `include_deleted` from a non-admin is ignored by the backend.
-  - **Load:** one `listProperties`; the heading is "Site Info — <project_id>". A failure is the load error with
-    Retry.
-  - **The table** (`PropertiesTable`, shared with a task order's bundle) is in the backend's order (by address):
-    BBL (a link to `/project/<project_id>/properties/<id>`, `propertyPath`), address (the notes as a tooltip), type (its label), PIR (the row's
-    `pir_status` as a `PirStatusBadge`; this page turns the column on with `showPirStatus`, a task order's bundle
-    leaves it off, its properties carrying no `pir_status`), added (`created_at` through `lib/shortDate.js`:
-    "Sep 14", with the year when it isn't this one) and, when the page passes `renderActions`, Actions: Edit for a
-    member, Delete too for an admin (none for a demo user, whose table has no Actions column). No properties reads
-    "No sites yet. Click 'Add site' to start." ("No sites yet." for a demo user)
-  - **Add and Edit** share `PropertyFormModal` (`mode`, `initial`; "Add site" / "Edit site"): BBL, address
-    and "Site type" (a select of the three labels) required, notes optional. Save is off until the three are
-    in, and when editing until something changed; adding sends all four, editing only what changed (the backend
-    answers 400 to an empty PATCH). Text is trimmed and blank notes are `null` (which clears them). The page
-    passes the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A site with this BBL already exists in this project."
-    above the BBL field (its `existing_property_id` isn't used yet), a 422's messages sit under the fields their
-    `loc` names, anything else (a blank or over-long value is the backend's 400) shows below the form as worded.
-    The form keeps what was typed. After a save the list is read again.
-  - **Show deleted** (an admin's checkbox above the table, off to start) asks the backend again with
-    `?include_deleted=true`; the table stays on screen meanwhile. A deleted row is muted (`text-gray-400`), its
-    BBL crossed out beside a Deleted badge (the date as a tooltip), and has "Un-delete" instead of Edit / Delete.
-  - **Delete** (a soft delete; it frees the BBL) and **Un-delete** are each confirmed in `ConfirmDialog`, a refusal
-    shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success the list
-    is read again and a toast reads "Site <bbl> deleted." / "Site <bbl> restored." The backend takes a
+    links, "site" / "sites" in dialogs, confirms, toasts and notes ("Site type: Sidewalk", "Delete site <name>?",
+    "Site <name> deleted."), where the name is `siteName` (`lib/properties.js`): a sidewalk's BBL, a ped ramp's
+    `display_address`. The task-order pages say "site" too ("Bundled sites", "Add sites", "24 sites", "Unbundle
+    site <name>?", the picker), and the task orders list's column is "Sites". Messages the backend words itself
+    ("Property not found", "Cannot bundle a deleted property", its 409 details) still say "property" and are shown
+    as worded: the backend's entity is still a property, and they appear only on errors. Backlog: if the backend
+    entity is ever renamed to sites, update those details then (or have the frontend translate known backend
+    wordings).
+  - **Who does what.** Since S2 any member of the project reads, adds and edits them; only the destructive
+    controls (Delete, Un-delete, Show deleted) are an admin's. A demo user reads only: no Add, Edit or Delete, and
+    the note "Demo mode: sites are read-only." (the backend answers 403). The backend refuses anyone not on the
+    project (403), which shows as the load error.
+  - A property is `{id, project_id, kind, boro, bbl, address, property_type, violation_no, intersection_street_1,
+    intersection_street_2, quadrant, facing_street, ramp_type, notes, display_address, block_display, lot_display,
+    created_at, updated_at, created_by, deleted_at, deleted_by}`. A sidewalk has `bbl` (10 digits, the first 1-5),
+    `address`, `property_type` and an optional `violation_no`; a ped ramp has the two streets, `quadrant` (`NE` `NW`
+    `SE` `SW`), `facing_street` (`street_1` / `street_2`: which of its streets it faces) and `ramp_type`
+    (`PERPENDICULAR` `PARALLEL` `CUT_THROUGH`), and none of the sidewalk's. Both have `boro` (the five boroughs
+    spelled out); a sidewalk's is its BBL's first digit, set by the backend. `display_address` (a sidewalk's
+    address; a ped ramp's "Atlantic Ave & Court St — NE Quadrant (Facing Court St)"), `block_display` and
+    `lot_display` are the backend's, and the app shows them as sent: `display_address` wherever a site is named by
+    its place (the PIR and site page headings, a task order's bundle, the picker). `property_type` is one of
+    `1_3_family` ("1-3 family"), `4_plus_family` ("4+ family / commercial") and `expedited` ("Expedited"), in
+    `src/data/propertyTypes.js`; the kinds, boroughs, quadrants and ramp types are in `src/data/propertyKinds.js`
+    (with `facingStreetName` and `parseBbl`, the form's preview). The list adds `pir_status`, `status` (`{state:
+    none | task_ordered | constructed_on, date}`) and `task_order_no`.
+  - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })` (both kinds; the
+    backend's `?kind=` isn't used), `getProperty`, `createProperty(projectId, data)`, `updateProperty(propertyId,
+    data)`, `softDeleteProperty` and `undeleteProperty`. `include_deleted` from a non-admin is ignored by the backend.
+  - **Load:** one `listProperties`, split by `kind` into the two sections; the heading is "Site Info — <project_id>".
+    A failure is the load error with Retry.
+  - **Two sections** (`SiteSection`, in page order): "Prior Notice Violation Sidewalks" and "Pedestrian Ramps", both
+    open on every load (nothing remembers a fold). The header: a button with a chevron and the title with its count
+    of live sites ("Prior Notice Violation Sidewalks (12)", `aria-expanded`), which folds the section; then "Bulk
+    Upload Sidewalks" / "Bulk Upload Ped Ramps", disabled for everyone with the tooltip "AI import — coming soon"
+    (on a wrapper too); then, for a member who isn't a demo user, "Add Sidewalk" / "Add Ped Ramp". Rows are in the backend's order.
+    - Sidewalk columns: Borough, Block, Lot (`block_display` / `lot_display`; no parsing here), Address (a link to
+      the site's page), Violation No., Status, Added, Task Order No., Actions.
+    - Ped ramp columns: Borough, Intersection 1st Street (a link to the site's page), Intersection 2nd Street,
+      Quadrant, Facing (the street's name, `facingStreetName`), Type (the ramp type's label), Status, Added, Task
+      Order No., Actions.
+    - **Status** (`SiteStatus`): a dash for `none`, a "Task Ordered" pill, or "Constructed YYYY-MM-DD" with the
+      server's date as sent; a deleted row reads Deleted instead. Added is `created_at` through `lib/shortDate.js`;
+      a dash for no task order or violation.
+    - **Actions:** View (a link to the site's sketch workspace, `/project/<id>/properties/<id>/pir`) for everyone;
+      Edit for a member who isn't a demo user; Delete for an admin; a deleted row has only Un-delete (an admin's).
+    - **Empty:** "No sidewalks added yet." / "No pedestrian ramps added yet.", with a prominent Add for a member
+      who isn't a demo user.
+  - **Add and Edit** share `PropertyFormModal` (`mode`, `kind`, `initial`; "Add sidewalk" / "Add ped ramp" / "Edit
+    sidewalk" / "Edit ped ramp"), which branches on the kind (the section's when adding, the property's when
+    editing; editing shows it as the fixed line "Site type: Sidewalk" / "Site type: Pedestrian Ramp"). Both kinds
+    end with Notes (optional, at most 2,000 characters; blank is `null`, which clears them).
+    - Sidewalk: Borough, BBL (it must be 10 digits starting 1-5, the hint says so; under it "Block 123 · Lot 45" as
+      typed, `parseBbl`, and once it is valid the borough follows it and its select is locked, since the backend
+      refuses a borough that isn't the BBL's), Address, Violation No. (optional; blank is `null`) and "Property
+      type".
+    - Ped ramp: Borough, Intersection 1st Street, Intersection 2nd Street, Quadrant, Facing (disabled with "Fill in
+      both intersection streets to pick the one it faces." until both are in, then the two street names; it sends
+      `street_1` / `street_2`) and Type.
+    - Save is off until every required field is in and, when editing, something changed. Adding sends `kind` and
+      the kind's fields, editing only what changed (a new BBL brings its borough); text is trimmed. The page passes
+      the thrown error to the modal, which splits it with `lib/formErrors.js`: a 409 reads "A site with this BBL
+      already exists in this project." above the BBL field, a 422's messages sit under the fields their `loc`
+      names, anything else (a 400, the backend's "Property kind cannot be changed. Delete and recreate." included)
+      below the form as worded. The form keeps what was typed. After a save the list is read again.
+  - **Show deleted** (an admin's checkbox above the sections, off to start) asks the backend again with
+    `?include_deleted=true`; the sections stay on screen meanwhile. A deleted row is muted (`text-gray-400`), its
+    link crossed out, its status a Deleted badge (the date as a tooltip), and it doesn't count in the title.
+  - **Delete** (a soft delete; a sidewalk's frees its BBL) and **Un-delete** are each confirmed in `ConfirmDialog`,
+    a refusal shows in the dialog (an un-delete's 409: another live property now has the BBL), and after a success
+    the list is read again and a toast reads "Site <name> deleted." / "Site <name> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
+  - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: BBL
+    ("Ped ramp" for a ped ramp, still the link to its page), `display_address`, and the property type or ramp type.
+    The picker's search matches the BBL or the `display_address`.
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
   admin. One live
   PIR per property; a soft-deleted one frees the property for a new one. A PIR is `{id, property_id, project_id,
@@ -507,12 +540,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `createPir(propertyId, {inspector_initials, inspector_sign_date})`, `updatePir`, `softDeletePir` and
     `undeletePir`. Reading, creating and editing are for anyone on the project; deleting and un-deleting for an
     admin.
-  - **One property:** `/project/:projectId/properties/:propertyId` (`PropertyPage`), from a BBL in
-    `PropertiesTable` (the properties list or a task order's bundle), for anyone on the project; Back ("Back to
+  - **One property:** `/project/:projectId/properties/:propertyId` (`PropertyPage`), from a site's link in
+    Site Info or a task order's bundle, for anyone on the project; Back ("Back to
     Site Info — <project_id>") returns to the project's properties. One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
-    "<project_id> · <address>". The Site card (the property's) lists BBL, address, type, notes and added, with Edit
-    (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
+    "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's BBL,
+    address, violation no. and type or a ped ramp's intersection, quadrant, facing street and ramp type, then notes
+    and added, with Edit (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
     (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
     PIR), anyone else no controls (the backend answers them 400). A demo user gets no controls and the note "Demo
     mode: sites and PIRs are read-only."
@@ -557,9 +591,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `upload_path` and `scale` names) are deprecated and the frontend doesn't call them.
   - **`PirPage`**, `/project/:projectId/properties/:propertyId/pir`, from "Open sketch workspace" on the property
     page's PIR card (`PirWorkspaceLink`, which shows the page count: "3 pages", "No pages uploaded yet"). Back
-    ("Back to Site <bbl>") returns to the property, with `GoToProjectButton` beside it. One `getProperty` and one
+    ("Back to Site <siteName>") returns to the property, with `GoToProjectButton` beside it. One `getProperty` and one
     `getPirByProperty`, then `listPirPages`; a failure (a non-member's 403 included) is the load error with Retry.
-    The heading is "PIR · <address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
+    The heading is "PIR · <display_address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
     one on the site page first."
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
       the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
@@ -621,10 +655,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **The survey's rules** (the backend's 422s; the panel only sends what keeps them): an assessable flag has no
     non-assessable reason and any other has one; the mark is `none` exactly when the flag was added in the field;
     a reported quantity is above zero.
-  - **`SketchWorkspace`** (`pir`, `page`, `pages`, `writer`, `onPageSaved`, `onPagesChanged`, `onJump`,
+  - **`SketchWorkspace`** (`pir`, `page`, `pages`, `writer`, `onPageSaved`, `onJump`,
     `onImageError`; keyed by the page ids, so a new upload reads afresh): reads `listFlags` and `getContractItems`
     once, with the Smart PIR drawings (see Smart PIR drawings). Above the page, `ShapeToolbar`, `CalibrateControl`
-    and Import SMART PIR with the two coming tools; then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
+    and the coming tool (Auto-detect with AI); then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
     shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`.
     - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc) and the thickness
       legend. Picking one arms it (the cursor is a crosshair over the page) until it is picked again or Esc. Off
@@ -703,21 +737,26 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **`SketchLegend`**, always shown, unturned, in the lower-left of the page (`RotatedPage`'s `frame`): the four
     fills, the X, the flag-number circle and a north "+". Nothing records which way north is, so the "+" is only
     in the legend.
-  - **Import SMART PIR** (a writer's button beside Calibrate; `PirImportModal`, `pirId`, `onImported`, `onClose`):
-    a `.json` file, read and parsed in the browser (a file that isn't JSON reads "This file isn't valid JSON: ..."
-    and sends nothing), then `importSmartPir(pirId, parsed)` (`services/pirs.js`, `POST /v1/pirs/{id}/import`). A
-    refusal (a 422 for a file that isn't a Smart PIR import, a 400 for another PIR's file) reads "Couldn't import the
-    file: ..." and the file stays picked. On success the dialog shows "Imported 4 flags, 2 non-assessable areas, ...
-    and 1 title block." (`countsText`), "Set the scale, rotation or title block of N pages." when it did, and the
-    dropped items in an amber box, each with where it was, counted from 1 (`droppedPlace`: "Page 1, flag 4", "Page
-    1, flag 1, non-assessable area 2", "The file's title block") and the backend's reason; Done closes it. Behind
-    the dialog the workspace reads its drawings again and, when `pages_updated` is above 0, `PirPage` reads its
-    pages again quietly (the same page ids, so the workspace stays). Imports add: nothing drawn changes.
-  - **The coming tools**, always disabled, their tooltips on the button and a wrapper (a disabled button shows none
-    in some browsers): "Auto-detect with AI" ("Available when Vercel Pro is enabled (R1k).") and "Bulk upload PIRs"
-    ("Coming in R1m — upload a batch of signed PIRs and AI will identify each site.").
+  - **The import** is the admin's own page now (see Import Smart PIRs below), not a workspace button: a dev / admin
+    tool for seeding and backups, kept out of the site workflow.
+  - **The coming tool**, always disabled, its tooltip on the button and a wrapper (a disabled button shows none in
+    some browsers): "Auto-detect with AI" ("Available when Vercel Pro is enabled (R1k)."). Bulk upload sits on Site
+    Info (each section's disabled "Bulk Upload ..." button).
   - Not used yet: the areas', features' and segments' writes, and the page title block (`GET` / `PUT
     /v1/pir-pages/{id}/annotations`), which only the import sets.
+- **Import Smart PIRs (admin).** `/admin/import-smart-pirs` (`AdminImportSmartPirsPage`), "Import Smart PIRs
+  (Admin)" in the user menu, which only an admin sees. One card, `SmartPirImportForm`: a PIR id (a UUID, checked
+  here: "A PIR id is a UUID, ...") and a `.json` file, read and parsed in the browser (a file that isn't JSON reads
+  "This file isn't valid JSON: ..." and sends nothing), then `importSmartPir(pirId, parsed)` (`services/pirs.js`,
+  `POST /v1/pirs/{id}/import`). A refusal (a 404 for an unknown PIR, a 422 for a file that isn't a Smart PIR import,
+  a 400 for another PIR's file) reads "Couldn't import the file: ..." and the id and file stay. On success the card
+  shows "Imported 4 flags, 2 non-assessable areas, ... and 1 title block into PIR <id>." (`countsText`), "Set the
+  scale, rotation or title block of N pages." when it did, and the dropped items in an amber box, each with where
+  it was, counted from 1 (`droppedPlace`: "Page 1, flag 4", "Page 1, flag 1, non-assessable area 2", "The file's
+  title block") and the backend's reason; "Import another file" starts again. Imports add: nothing drawn changes.
+  A workspace open on that PIR elsewhere shows the import on its next load. A non-admin who opens the URL is told
+  "Only an admin can import Smart PIR files."; the backend itself takes an import from any member but a demo user,
+  so the admin-only rule is this page's.
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
@@ -820,8 +859,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `PATCH /v1/admin/projects/{id}/assessment-rates` (admin only: body `{cost_per_sf_4in?, cost_per_sf_7in?}`)
   - Properties: `GET /v1/projects/{id}/properties?include_deleted=` (anyone on the project; `include_deleted` is
     admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
-    `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (changes admin only;
-    body `{bbl, address, property_type, notes}`, all optional on a PATCH)
+    `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (adding and editing
+    for anyone on the project but a demo user, soft-delete and un-delete admin only; body `kind`, `notes` and a
+    sidewalk's `{boro, bbl, address, violation_no, property_type}` or a ped ramp's `{boro, intersection_street_1,
+    intersection_street_2, quadrant, facing_street, ramp_type}`; a PATCH sends only what changed and never the kind)
   - Task orders: `GET /v1/projects/{id}/task-orders?include_deleted=` · `POST /v1/projects/{id}/task-orders` ·
     `GET /v1/task-orders/{id}` · `PATCH /v1/task-orders/{id}` · `POST /v1/task-orders/{id}/admin/soft-delete` ·
     `POST /v1/task-orders/{id}/admin/undelete` · `POST /v1/task-orders/{id}/properties/{property_id}` (bundle) ·
@@ -842,7 +883,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     /v1/pirs/{id}/flags` and the admin's `/admin/soft-delete` and `/admin/undelete`.
   - Smart PIR drawings: `GET /v1/pirs/{id}/features` · `GET /v1/pirs/{id}/segments` ·
     `GET /v1/flags/{id}/non-assessable-areas` (reading for anyone on the project) · `POST /v1/pirs/{id}/import`
-    (anyone on the project but a demo user). Not called yet: their per-page lists, creates, `PATCH` / `DELETE`
+    (anyone on the project but a demo user; the UI's only caller is the admin's import page). Not called yet: their per-page lists, creates, `PATCH` / `DELETE`
     by id, and `GET` / `PUT /v1/pir-pages/{id}/annotations`.
   - Pay items, under `/v1/admin/projects/{id}/pay-items` (admin only): `GET` (list) · `POST` (add) ·
     `PATCH /{pay_item_uuid}` · `DELETE /{pay_item_uuid}` · `DELETE` (clear them all) ·

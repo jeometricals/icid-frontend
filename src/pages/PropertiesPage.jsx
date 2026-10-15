@@ -1,28 +1,46 @@
 /**
- * One project's properties (route param :projectId), at /project/:projectId/properties, reached from the project
- * page's "Properties". For anyone on the project: a table (BBL, a link to the property's page; address, type, PIR,
- * added) in the backend's order, which is by address. A member who isn't a demo user also gets "Add property" beside
- * the heading and Edit on each row; both share one dialog. The destructive controls are an admin's alone: Delete (a
- * soft delete) on each row, and "Show deleted" (off to start), which asks the backend for the list again with
- * soft-deleted properties in it; a deleted one is muted, its BBL crossed out, and has "Un-delete" instead. Delete
- * and Un-delete are confirmed first. After every change the list is read again, and a delete or un-delete is
- * announced in a toast. The backend refuses anyone not on the project (403), which shows as the load error.
+ * One project's sites (properties; route param :projectId), at /project/:projectId/properties ("Site Info"). For
+ * anyone on the project: two sections that fold (SiteSection), both open to start: "Prior Notice Violation
+ * Sidewalks" and "Pedestrian Ramps", each its kind's rows of one list read from the backend, in its order. Every
+ * live row has View (the site's sketch workspace, PirPage). A member who isn't a demo user also gets Add in each
+ * section's header (and in its empty state), which opens that kind's form, and Edit on each live row (its kind
+ * fixed). The destructive controls are an admin's alone: Delete (a soft delete) and, with "Show deleted" (off to
+ * start), Un-delete on a deleted row, each confirmed first. Each
+ * section also has a disabled Bulk Upload button ("AI import — coming soon"), for everyone. After every change the
+ * list is read again, and a delete or un-delete is announced in a toast. A demo user reads a note that sites are
+ * read-only. The backend refuses anyone not on the project (403), which shows as the load error.
  */
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createProperty, listProperties, updateProperty } from '../services/api'
 import { PROPERTY_ACTIONS } from '../lib/properties'
 import { isAdmin } from '../lib/reviewRoles'
 import ConfirmDialog from '../components/ConfirmDialog'
-import PropertiesTable from '../components/PropertiesTable'
+import SiteSection from '../components/SiteSection'
 import PropertyFormModal from '../components/PropertyFormModal'
 import Toast from '../components/Toast'
 
-export const EMPTY_TEXT = "No sites yet. Click 'Add site' to start."
-export const EMPTY_TEXT_READ_ONLY = 'No sites yet.'
 export const DEMO_NOTE = 'Demo mode: sites are read-only.'
+
+// The two sections, in page order
+const SECTIONS = [
+  {
+    kind: 'sidewalk',
+    title: 'Prior Notice Violation Sidewalks',
+    addLabel: 'Add Sidewalk',
+    bulkLabel: 'Bulk Upload Sidewalks',
+    emptyText: 'No sidewalks added yet.',
+  },
+  {
+    kind: 'ped_ramp',
+    title: 'Pedestrian Ramps',
+    addLabel: 'Add Ped Ramp',
+    bulkLabel: 'Bulk Upload Ped Ramps',
+    emptyText: 'No pedestrian ramps added yet.',
+  },
+]
 
 const isDeleted = (row) => Boolean(row.deleted_at)
 
@@ -41,7 +59,7 @@ export default function PropertiesPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const includeDeleted = admin && showDeleted // only an admin's list has deleted properties
 
-  const [form, setForm] = useState(null) // the open Add / Edit dialog: {mode: 'add'} or {mode: 'edit', property}
+  const [form, setForm] = useState(null) // the open Add / Edit dialog: {mode: 'add', kind} or {mode: 'edit', property}
   const [pending, setPending] = useState(null) // {row, action}: the delete or un-delete waiting to be confirmed
   const [toast, setToast] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -110,7 +128,7 @@ export default function PropertiesPage() {
     setPending(null)
   }
 
-  // A row's controls for a writer: Edit on a live row; Delete, and Un-delete on a deleted row, for an admin
+  // A row's controls: View on a live row, Edit for a writer and Delete for an admin; Un-delete on a deleted row (an admin's)
   const renderActions = row => (isDeleted(row) ? (admin && (
     <button
       type="button"
@@ -121,13 +139,16 @@ export default function PropertiesPage() {
     </button>
   )) : (
     <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={() => open(() => setForm({ mode: 'edit', property: row }))}
-        className="btn-secondary"
-      >
-        Edit
-      </button>
+      <Link to={`/project/${row.project_id}/properties/${row.id}/pir`} className="btn-secondary">View</Link>
+      {writer && (
+        <button
+          type="button"
+          onClick={() => open(() => setForm({ mode: 'edit', property: row }))}
+          className="btn-secondary"
+        >
+          Edit
+        </button>
+      )}
       {admin && (
         <button
           type="button"
@@ -151,20 +172,7 @@ export default function PropertiesPage() {
           <span className="font-medium">Back to Project Page</span>
         </button>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Site Info — {projectId}</h2>
-          {writer && (
-            <button
-              type="button"
-              onClick={() => open(() => setForm({ mode: 'add' }))}
-              disabled={!loaded}
-              className="btn-primary inline-flex items-center space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add site</span>
-            </button>
-          )}
-        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Site Info — {projectId}</h2>
 
         {!writer && <p className="text-sm text-gray-600 mb-4">{DEMO_NOTE}</p>}
 
@@ -196,23 +204,23 @@ export default function PropertiesPage() {
               </p>
             )}
 
-            {properties.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
-                {writer ? EMPTY_TEXT : EMPTY_TEXT_READ_ONLY}
-              </div>
-            ) : (
-              <PropertiesTable
-                properties={properties}
-                showPirStatus
-                renderActions={writer ? renderActions : undefined}
+            {SECTIONS.map(section => (
+              <SiteSection
+                key={section.kind}
+                {...section}
+                rows={properties.filter(row => row.kind === section.kind)}
+                onAdd={writer ? () => open(() => setForm({ mode: 'add', kind: section.kind })) : undefined}
+                addDisabled={!loaded}
+                renderActions={renderActions}
               />
-            )}
+            ))}
           </>
         )}
 
         {form && (
           <PropertyFormModal
             mode={form.mode}
+            kind={form.kind}
             initial={form.property}
             onSave={save}
             onCancel={() => setForm(null)}
