@@ -21,3 +21,8 @@ export function formatPercent(value) {
   if (value === null || value === undefined) return '—'
   return `${value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 }
+
+// A flag quantity on the Progress pages: thousands separated, always two decimals ("383.44", "3.01")
+export function formatFlagQuantity(quantity) {
+  return quantity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}

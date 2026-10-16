@@ -6,6 +6,7 @@ import TaskOrderPage, { DEMO_NOTE, EMPTY_TEXT, addedMessage } from '../TaskOrder
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
+import { EMPTY_PROGRESS, TASK_ORDER_PROGRESS } from '../../test/progress'
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" of one task order, its bundle and the project's properties. Like the
@@ -29,6 +30,7 @@ const GONE = property(4, '4007770007', '1 Gone Ct', '1_3_family', { deleted_at: 
 vi.mock('../../services/api', () => ({
   getTaskOrder: vi.fn(), listAdminUsers: vi.fn(), listUsers: vi.fn(), updateTaskOrder: vi.fn(), softDeleteTaskOrder: vi.fn(),
   undeleteTaskOrder: vi.fn(), unbundleProperty: vi.fn(), bundleProperty: vi.fn(), listProperties: vi.fn(),
+  getTaskOrderProgress: vi.fn(),
 }))
 
 let record // the task order's own columns
@@ -49,6 +51,7 @@ beforeEach(() => {
   bundle = [MAIN.id, OAK.id, GONE.id]
   properties = [MAIN, OAK, ELM, GONE]
   api.getTaskOrder.mockImplementation(async () => detail())
+  api.getTaskOrderProgress.mockResolvedValue({ ...EMPTY_PROGRESS, properties: [], site_count: 0, sites_started: 0 })
   api.listAdminUsers.mockResolvedValue([ADMIN])
   api.listUsers.mockResolvedValue([{ user_id: ADMIN.uuid, email: ADMIN.email, first_name: 'Ada', last_name: 'Admin' }])
   api.listProperties.mockImplementation(async () => structuredClone(properties.filter(row => !row.deleted_at)))
@@ -310,5 +313,108 @@ describe('addedMessage', () => {
       .toBe("Added 1 site. Couldn't add Queens Block 123 Lot 45: Cannot bundle a deleted property. The rest weren't tried.")
     expect(addedMessage({ added: 0, failed: { property: MAIN, message: 'Nope.' } }))
       .toBe("No sites were added. Couldn't add Queens Block 123 Lot 45: Nope. The rest weren't tried.")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The Progress section (TaskOrderProgress)
+// ---------------------------------------------------------------------------
+
+const progressSection = () => screen.getByRole('region', { name: 'Progress' })
+const siteRow = (address) => within(screen.getByRole('list', { name: 'Progress by site' }))
+  .getByRole('button', { name: new RegExp(address) })
+
+describe('TaskOrderPage — Progress', () => {
+  beforeEach(() => {
+    api.getTaskOrderProgress.mockResolvedValue(TASK_ORDER_PROGRESS)
+  })
+
+  it("shows TO-002's walkthrough: all approved, 2 of 5 sites started, two pay items", async () => {
+    await renderLoaded()
+    expect(await within(progressSection()).findByLabelText('Task order progress overall'))
+      .toHaveTextContent('Overall 100.0% approved · 2 of 5 sites started')
+    const table = within(progressSection()).getByRole('table', { name: 'Task order progress by pay item' })
+    expect(within(table).getAllByRole('row').slice(1).map(tr => within(tr).getAllByRole('cell')[0].textContent))
+      .toEqual(['4.13 AAS (SF)SE384-CONS', '73.21AC (CY)SE384-CONS'])
+    expect(api.getTaskOrderProgress).toHaveBeenCalledWith(TASK_ORDER_ID)
+  })
+
+  it('lists each site folded, and folds one open to its own table and shut again', async () => {
+    await renderLoaded()
+    const row = await within(progressSection()).findByRole('button', { name: /138-22 227 Street/ })
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(row).toHaveTextContent('100.0% approved · 10 flags')
+    expect(screen.queryByRole('table', { name: 'Flag progress for 138-22 227 Street' })).not.toBeInTheDocument()
+
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+    const table = screen.getByRole('table', { name: 'Flag progress for 138-22 227 Street' })
+    expect(within(table).getAllByRole('row')).toHaveLength(2)
+
+    await userEvent.click(row)
+    expect(screen.queryByRole('table', { name: 'Flag progress for 138-22 227 Street' })).not.toBeInTheDocument()
+  })
+
+  it('says a site without flags has none yet', async () => {
+    await renderLoaded()
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    expect(siteRow('7 Oak St')).toHaveTextContent('No flags yet')
+    await userEvent.click(siteRow('7 Oak St'))
+    expect(within(progressSection()).getByText('No flags with pay items on this site yet')).toBeInTheDocument()
+  })
+
+  it('folds the whole section shut and open again, open to start', async () => {
+    await renderLoaded()
+    const toggle = within(progressSection()).getByRole('button', { name: 'Progress' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    await userEvent.click(toggle)
+    expect(within(progressSection()).queryByLabelText('Task order progress overall')).not.toBeInTheDocument()
+    await userEvent.click(toggle)
+    expect(within(progressSection()).getByLabelText('Task order progress overall')).toBeInTheDocument()
+  })
+
+  it('reads a dash for the percent while nothing is live', async () => {
+    api.getTaskOrderProgress.mockResolvedValue({ ...EMPTY_PROGRESS, properties: [], site_count: 1, sites_started: 0 })
+    await renderLoaded()
+    expect(await within(progressSection()).findByLabelText('Task order progress overall'))
+      .toHaveTextContent('Overall — approved · 0 of 1 site started')
+    expect(within(progressSection()).getByText('No flags with pay items on these sites yet')).toBeInTheDocument()
+  })
+
+  it("links a site's unmapped flags to its PIR page", async () => {
+    api.getTaskOrderProgress.mockResolvedValue({
+      ...TASK_ORDER_PROGRESS,
+      unmapped_flag_count: 3,
+      unmapped_by_property: [{ property_id: MAIN.id, display_address: '12 Main St', flag_count: 3 }],
+    })
+    await renderLoaded()
+    expect(await within(progressSection()).findByRole('link', { name: '3 unmapped flags on 12 Main St' }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/${MAIN.id}/pir`)
+  })
+
+  it('reads the progress again after an unbundle', async () => {
+    await renderLoaded()
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    const before = api.getTaskOrderProgress.mock.calls.length
+    await userEvent.click(within(rowOf('Queens Block 123 Lot 45')).getByRole('button', { name: 'Unbundle' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Unbundle' }))
+    await waitFor(() => expect(api.getTaskOrderProgress.mock.calls.length).toBeGreaterThan(before))
+  })
+
+  it('shows its own error with Retry', async () => {
+    api.getTaskOrderProgress.mockRejectedValueOnce(new Error('Project access required'))
+    await renderLoaded()
+    expect(await within(progressSection()).findByText("Couldn't load progress: Project access required")).toBeInTheDocument()
+    await userEvent.click(within(progressSection()).getByRole('button', { name: 'Retry' }))
+    expect(await within(progressSection()).findByLabelText('Task order progress overall')).toBeInTheDocument()
+  })
+
+  it('shows a demo user the same rollup', async () => {
+    await renderLoaded(DEMO_USER)
+    expect(await within(progressSection()).findByLabelText('Task order progress overall'))
+      .toHaveTextContent('Overall 100.0% approved · 2 of 5 sites started')
+    await userEvent.click(siteRow('350 Main St'))
+    expect(screen.getByRole('table', { name: 'Flag progress for 350 Main St' })).toBeInTheDocument()
   })
 })

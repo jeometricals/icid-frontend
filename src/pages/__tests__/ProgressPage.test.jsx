@@ -4,8 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import ProgressPage from '../ProgressPage'
 import * as api from '../../services/api'
+import { ELM_ST, EMPTY_PROGRESS, MAIN_ST, PROJECT_PROGRESS, TO_002 } from '../../test/progress'
 
-vi.mock('../../services/api', () => ({ listQuantities: vi.fn() }))
+vi.mock('../../services/api', () => ({
+  listQuantities: vi.fn(), getProjectProgress: vi.fn(), listTaskOrders: vi.fn(), listProperties: vi.fn(), getTaskOrder: vi.fn(),
+}))
 
 // A pay item of the roll-up; without a budget it is unbudgeted, as the backend sends one no contract item matches
 const item = (pay_item_ref, budget_code, unit, actual_quantity, description, budget = null) => ({
@@ -123,6 +126,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 12, 21, 30))
   api.listQuantities.mockResolvedValue(FOUND)
+  // The flag section above the budget view has nothing in it unless a test says otherwise
+  api.getProjectProgress.mockResolvedValue(EMPTY_PROGRESS)
+  api.listTaskOrders.mockResolvedValue([])
+  api.listProperties.mockResolvedValue([])
 })
 
 afterEach(() => { vi.useRealTimers() })
@@ -533,5 +540,152 @@ describe('ProgressPage — nothing to show, and failures', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('table')).toBeInTheDocument()
     expect(api.listQuantities).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The flag section above the budget view (ProjectFlagProgress)
+// ---------------------------------------------------------------------------
+
+const TO_001 = 'b1000000-0000-4000-8000-000000000001'
+const TASK_ORDERS = [
+  { id: TO_001, task_order_number: 'TO-001', property_count: 3 },
+  { id: TO_002, task_order_number: 'TO-002', property_count: 5 },
+]
+const SITES = [
+  { id: MAIN_ST, display_address: '138-22 227 Street' },
+  { id: ELM_ST, display_address: '350 Main St' },
+  { id: 'a1000000-0000-4000-8000-000000000009', display_address: '1 Elsewhere Ave' },
+]
+const flagSection = () => screen.getByRole('region', { name: 'Sidewalk progress (PIR flags)' })
+const flagTable = () => screen.findByRole('table', { name: 'Flag progress by pay item' })
+const flagRows = (table) => within(table).getAllByRole('row').slice(1)
+  .map(tr => within(tr).getAllByRole('cell').map(td => td.textContent))
+const lastProgressCall = () => api.getProjectProgress.mock.calls.at(-1)
+const taskOrderSelect = () => screen.getByLabelText('Task order')
+const siteSelect = () => screen.getByLabelText('Site')
+
+describe('ProgressPage — sidewalk progress from PIR flags', () => {
+  beforeEach(() => {
+    api.getProjectProgress.mockResolvedValue(PROJECT_PROGRESS)
+    api.listTaskOrders.mockResolvedValue(TASK_ORDERS)
+    api.listProperties.mockResolvedValue(SITES)
+    api.getTaskOrder.mockResolvedValue({ id: TO_002, properties: SITES.slice(0, 2) })
+  })
+
+  it('sits above the budget view', async () => {
+    renderPage()
+    await flagTable()
+    const headings = screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+    expect(headings.indexOf('Sidewalk progress (PIR flags)')).toBeLessThan(headings.indexOf('Budget against actual'))
+  })
+
+  it("shows SE384's walkthrough: 100% approved, two pay items, nothing unmapped", async () => {
+    renderPage()
+    const table = await flagTable()
+    expect(within(flagSection()).getByLabelText('Flag progress overall'))
+      .toHaveTextContent('100.0% approved overall · $4,753.38 of $4,753.38 live')
+    expect(flagRows(table)).toEqual([
+      ['4.13 AAS (SF)SE384-CONS', '4.13 AAS description', '383.44(10 flags)', '—', '—', '383.44(10 flags)', '100.0%'],
+      ['73.21AC (CY)SE384-CONS', '73.21AC description', '3.01(5 flags)', '—', '—', '3.01(5 flags)', '100.0%'],
+    ])
+    expect(screen.queryByRole('list', { name: 'Unmapped flags' })).not.toBeInTheDocument()
+    expect(lastProgressCall()).toEqual(['HWS0023', { taskOrderId: undefined, propertyId: undefined }])
+  })
+
+  it('reads a dash for the percent when nothing is live, and says there is nothing yet', async () => {
+    api.getProjectProgress.mockResolvedValue(EMPTY_PROGRESS)
+    renderPage()
+    expect(await within(flagSection()).findByLabelText('Flag progress overall'))
+      .toHaveTextContent('— approved overall · $0.00 of $0.00 live')
+    expect(within(flagSection()).getByText('No flags with pay items here yet')).toBeInTheDocument()
+  })
+
+  it('offers every task order, and every live site of the project while none is picked', async () => {
+    renderPage()
+    await flagTable()
+    await waitFor(() => expect(within(taskOrderSelect()).getAllByRole('option')).toHaveLength(3))
+    expect(within(taskOrderSelect()).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All task orders', 'TO-001', 'TO-002'])
+    await waitFor(() => expect(within(siteSelect()).getAllByRole('option')).toHaveLength(4))
+    expect(api.listProperties).toHaveBeenCalledWith('HWS0023')
+  })
+
+  it('narrows to a task order, its sites the only ones offered, and puts it in the URL', async () => {
+    renderPage()
+    await flagTable()
+    await waitFor(() => expect(within(taskOrderSelect()).getAllByRole('option')).toHaveLength(3))
+    fireEvent.change(taskOrderSelect(), { target: { value: TO_002 } })
+    await waitFor(() => expect(lastProgressCall()).toEqual(['HWS0023', { taskOrderId: TO_002, propertyId: undefined }]))
+    expect(url()).toBe(`?task_order=${TO_002}`)
+    expect(api.getTaskOrder).toHaveBeenCalledWith(TO_002)
+    await waitFor(() => expect(within(siteSelect()).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['All sites', '138-22 227 Street', '350 Main St']))
+  })
+
+  it('narrows to a site, and picking another task order clears it', async () => {
+    renderPage(`?task_order=${TO_002}`)
+    await flagTable()
+    await waitFor(() => expect(within(siteSelect()).getAllByRole('option')).toHaveLength(3))
+    fireEvent.change(siteSelect(), { target: { value: MAIN_ST } })
+    await waitFor(() => expect(lastProgressCall()).toEqual(['HWS0023', { taskOrderId: TO_002, propertyId: MAIN_ST }]))
+    expect(url()).toBe(`?task_order=${TO_002}&property=${MAIN_ST}`)
+
+    await waitFor(() => expect(within(taskOrderSelect()).getAllByRole('option')).toHaveLength(3))
+    fireEvent.change(taskOrderSelect(), { target: { value: '' } })
+    await waitFor(() => expect(lastProgressCall()).toEqual(['HWS0023', { taskOrderId: undefined, propertyId: undefined }]))
+    expect(url()).toBe('')
+  })
+
+  it('shows the filtered rollup, not the one before it', async () => {
+    let answerFirst
+    api.getProjectProgress
+      .mockReturnValueOnce(new Promise(resolve => { answerFirst = resolve }))
+      .mockResolvedValueOnce(EMPTY_PROGRESS)
+    renderPage()
+    await waitFor(() => expect(within(taskOrderSelect()).getAllByRole('option')).toHaveLength(3))
+    fireEvent.change(taskOrderSelect(), { target: { value: TO_001 } })
+    expect(await within(flagSection()).findByText('No flags with pay items here yet')).toBeInTheDocument()
+    answerFirst(PROJECT_PROGRESS)
+    await waitFor(() => expect(within(flagSection()).queryByRole('table')).not.toBeInTheDocument())
+    expect(within(flagSection()).getByLabelText('Flag progress overall')).toHaveTextContent('— approved overall')
+  })
+
+  it("keeps its filters when the budget view's dates change, and the dates when a filter changes", async () => {
+    renderPage(`?from=2026-09-01&to=2026-10-01&task_order=${TO_002}`)
+    await flagTable()
+    pick(fromInput(), '2026-09-05')
+    expect(url()).toBe(`?from=2026-09-05&to=2026-10-01&task_order=${TO_002}`)
+    await waitFor(() => expect(within(siteSelect()).getAllByRole('option')).toHaveLength(3))
+    fireEvent.change(siteSelect(), { target: { value: ELM_ST } })
+    expect(url()).toBe(`?from=2026-09-05&to=2026-10-01&task_order=${TO_002}&property=${ELM_ST}`)
+    expect(lastCall()).toEqual({ projectId: 'HWS0023', from: '2026-09-05', to: '2026-10-01' })
+  })
+
+  it("links each site's unmapped flags to its PIR page", async () => {
+    api.getProjectProgress.mockResolvedValue({
+      ...PROJECT_PROGRESS,
+      unmapped_flag_count: 3,
+      unmapped_by_property: [{ property_id: ELM_ST, display_address: '350 Main St', flag_count: 3 }],
+    })
+    renderPage()
+    expect(await screen.findByRole('link', { name: '3 unmapped flags on 350 Main St' }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/${ELM_ST}/pir`)
+  })
+
+  it('shows its own error with Retry, and the budget view still loads', async () => {
+    api.getProjectProgress.mockRejectedValueOnce(new Error('Project access required'))
+    renderPage()
+    expect(await within(flagSection()).findByText("Couldn't load flag progress: Project access required")).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Project total' })).toBeInTheDocument()
+    await userEvent.click(within(flagSection()).getByRole('button', { name: 'Retry' }))
+    expect(await flagTable()).toBeInTheDocument()
+  })
+
+  it('still shows the rollup when the filter choices fail to load', async () => {
+    api.listTaskOrders.mockRejectedValue(new Error('Network down'))
+    renderPage()
+    await flagTable()
+    expect(await within(flagSection()).findByText("Couldn't load the filter choices: Network down")).toBeInTheDocument()
   })
 })

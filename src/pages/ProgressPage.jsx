@@ -1,7 +1,9 @@
 /**
- * Progress on one project (route param :projectId): what the pay-item quantities of its approved IDRs come to
- * against the project's budget (its contract items), by contract value. Three sections, top to bottom: the project
- * total, a card per budget code, and a table with a row per pay item that has quantities.
+ * Progress on one project (route param :projectId). First, the sidewalk progress its PIR flags describe
+ * (ProjectFlagProgress, with its own Task order and Site filters, ?task_order=&property=). Then the budget view: what
+ * the pay-item quantities of its approved IDRs come to against the project's budget (its contract items), by contract
+ * value, in three sections, top to bottom: the project total, a card per budget code, and a table with a row per pay
+ * item that has quantities.
  * The quantities are those of a range of work dates, or all of them with "Show cumulative" ticked; the budget is
  * always the whole project's. Both live in the URL (?from=&to=, YYYY-MM-DD, and ?cumulative=true), so a view can
  * be linked and reloaded; a URL with no dates means the last 30 days. One request per view.
@@ -14,6 +16,7 @@ import { listQuantities } from '../services/api'
 import { formatDollars, formatPayItemQuantity, formatPercent } from '../lib/payItemFormat'
 import Bar from '../components/Bar'
 import BudgetCodeCard from '../components/BudgetCodeCard'
+import ProjectFlagProgress from '../components/ProjectFlagProgress'
 
 export const DEFAULT_RANGE_DAYS = 30
 
@@ -75,6 +78,10 @@ export default function ProgressPage() {
     if (next.from) params.set('from', next.from)
     if (next.to) params.set('to', next.to)
     if (cumulative) params.set('cumulative', 'true')
+    // The flag section's filters stay as they are
+    for (const key of ['task_order', 'property']) {
+      if (searchParams.get(key)) params.set(key, searchParams.get(key))
+    }
     setSearchParams(params, { replace: true })
   }
 
@@ -104,6 +111,10 @@ export default function ProgressPage() {
         </button>
 
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Progress — {projectId}</h2>
+
+        <ProjectFlagProgress projectId={projectId} />
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Budget against actual</h3>
 
         <section aria-label="Date range" className="bg-white rounded-lg shadow-sm p-4 mb-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">

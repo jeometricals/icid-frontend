@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatDollars, formatPayItemQuantity, formatPercent, formatUnitPrice } from '../payItemFormat'
+import { formatDollars, formatFlagQuantity, formatPayItemQuantity, formatPercent, formatUnitPrice } from '../payItemFormat'
 
 describe('formatPayItemQuantity', () => {
   it('separates thousands and keeps three decimals at most', () => {
@@ -40,5 +40,13 @@ describe('formatPercent', () => {
   it('is a dash for a percentage that isn\'t known', () => {
     expect(formatPercent(null)).toBe('—')
     expect(formatPercent(undefined)).toBe('—')
+  })
+})
+
+describe('formatFlagQuantity', () => {
+  it('always prints two decimals, thousands separated', () => {
+    expect(formatFlagQuantity(383.44)).toBe('383.44')
+    expect(formatFlagQuantity(3.006111111)).toBe('3.01')
+    expect(formatFlagQuantity(1240)).toBe('1,240.00')
   })
 })

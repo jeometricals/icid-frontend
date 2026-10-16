@@ -21,6 +21,8 @@ vi.mock('../services/api', () => ({
   signOutOnServer: vi.fn(),
   getIdrFlags: vi.fn(),
   listTaskOrders: vi.fn(),
+  getProjectProgress: vi.fn(),
+  listProperties: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -43,6 +45,12 @@ beforeEach(() => {
     project_total: { actual_value: 0, budgeted_value: 0, percent: null },
     unbudgeted_total: { actual_value: null, row_count: 0 },
   })
+  // ...and the PIR flags' progress above them (R1g): nothing in scope
+  api.getProjectProgress.mockResolvedValue({
+    scope: { project_id: 'HWS0023', task_order_id: null, property_id: null }, pay_items: [], unmapped_flag_count: 0,
+    unmapped_by_property: [], overall: { approved_value: 0, live_total_value: 0, approved_pct: null },
+  })
+  api.listProperties.mockResolvedValue([])
   api.getIdr.mockReturnValue(new Promise(() => {})) // stay loading; only the URL matters here
 })
 
