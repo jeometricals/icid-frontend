@@ -7,7 +7,8 @@
  * edits of the header read as redlines; the reviewer who holds the IDR gets an edit-mode switch, which carries over to
  * its report pages. Under the reports, the PIR flags it covers (IdrFlagsSection: its task order, the pay items its
  * flags come to, and each flag with a checkbox for whoever may exclude or include it), read with the IDR and again
- * after every change; the review toolbar's approval dialog sums them up.
+ * after every change; the review toolbar's approval dialog sums them up. An approved IDR that claimed flags also gets
+ * "Download Construction Reports" beside Export: a ZIP of one PDF per property (DownloadConstructionReportButton).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -16,7 +17,9 @@ import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import { useTaskCount } from '../contexts/TaskCountContext'
-import { getIdr, getIdrFlags, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers } from '../services/api'
+import {
+  getIdr, getIdrFlags, saveIdrHeader, addReport, deleteReport, submitIdr, listUsers, downloadConstructionReportZip,
+} from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
 import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
@@ -32,6 +35,7 @@ import SaveStatusText from '../components/SaveStatusText'
 import SignedBanner from '../components/SignedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
+import DownloadConstructionReportButton from '../components/DownloadConstructionReportButton'
 import GoToProjectButton from '../components/GoToProjectButton'
 import SignatureSetupModal from '../components/SignatureSetupModal'
 import ReviewToolbar from '../components/ReviewToolbar'
@@ -46,6 +50,7 @@ import useReviewEditing from '../lib/useReviewEditing'
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
 const DEMO_SUBMIT_DISABLED = 'Demo mode — submit is disabled'
+export const CLAIMED_NO_FLAGS = 'This IDR claimed no PIR flags, so it has no Construction Reports.'
 const ATTESTATION_STATEMENT =
   'I attest that the information in this IDR is accurate and complete to the best of my knowledge.'
 const CERTIFICATION_STATEMENT =
@@ -353,7 +358,18 @@ export default function IDRPage() {
               {back !== BACK_TO_PROJECT && <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />}
             </div>
             {readOnly && (
-              <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />
+              <div className="flex flex-wrap items-start justify-end gap-3">
+                {/* An approved IDR's Construction Reports (R1h): on once its frozen flags count one it claimed */}
+                {idr.status === 'approved' && (
+                  <DownloadConstructionReportButton
+                    label="Download Construction Reports"
+                    download={() => downloadConstructionReportZip(idrId)}
+                    enabled={(idrFlags?.counts?.attributed ?? 0) > 0}
+                    disabledTitle={idrFlags ? CLAIMED_NO_FLAGS : 'Checking its flags…'}
+                  />
+                )}
+                <ExportIdrButton idrId={idrId} isDraft={false} disabled={reports.length === 0} />
+              </div>
             )}
           </div>
         </div>

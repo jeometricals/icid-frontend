@@ -3,7 +3,7 @@ import { render, screen, waitFor, within, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { format, parseISO } from 'date-fns'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import IDRPage from '../IDRPage'
+import IDRPage, { CLAIMED_NO_FLAGS } from '../IDRPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
@@ -84,6 +84,7 @@ vi.mock('../../services/api', () => ({
   revisePayItem: vi.fn(),
   addPayItem: vi.fn(),
   getIdrFlags: vi.fn(),
+  downloadConstructionReportZip: vi.fn(),
   excludeIdrFlag: vi.fn(),
   includeIdrFlag: vi.fn(),
   listTaskOrders: vi.fn(),
@@ -1405,5 +1406,50 @@ describe('IDRPage — flags attributed', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveTextContent('This will claim 2 flags across 2 sites. Total: 50 SF 4", 30 SF 7".')
     expect(dialog).toHaveTextContent('608-01 4" Concrete Sidewalk: 80 SF')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The Construction Reports (R1h)
+// ---------------------------------------------------------------------------
+
+describe('IdrPage — Construction Reports', () => {
+  const zipButton = () => screen.queryByRole('button', { name: 'Download Construction Reports' })
+  // An IDR past draft, as the review tests build one
+  const submitted = (overrides = {}) => draftIdr({
+    status: 'submitted', submitted_at: '2026-09-25T16:05:00Z', total_pages: 1, inspector_signed_at: '2026-09-25T16:05:00Z',
+    idr_number: null, stage1_reviewer_uuid: null, re_reviewer_uuid: null, return_reason: null, returned_from: null,
+    ...overrides,
+  })
+  const claimedFlags = (count) => idrFlagsData(
+    Array.from({ length: count }, (_, i) => idrFlag({ flag_id: `flag-${i}`, state: 'claimed' })),
+    { frozen: true, status: 'approved' })
+
+  it('gives an approved IDR that claimed flags the ZIP download', async () => {
+    server = submitted({ status: 'approved', idr_number: '001', re_signed_at: '2026-10-15T18:00:00Z' })
+    api.getIdrFlags.mockResolvedValue(claimedFlags(2))
+    api.downloadConstructionReportZip.mockResolvedValue('IDR_001_construction_reports.zip')
+    renderPage()
+    await ready()
+    await waitFor(() => expect(zipButton()).toBeEnabled())
+    await userEvent.click(zipButton())
+    expect(api.downloadConstructionReportZip).toHaveBeenCalledWith(IDR_ID)
+  })
+
+  it('keeps it off, saying why, for an approved IDR that claimed none', async () => {
+    server = submitted({ status: 'approved', idr_number: '001', re_signed_at: '2026-10-15T18:00:00Z' })
+    api.getIdrFlags.mockResolvedValue(claimedFlags(0))
+    renderPage()
+    await ready()
+    await waitFor(() => expect(zipButton()).toHaveAttribute('title', CLAIMED_NO_FLAGS))
+    expect(zipButton()).toBeDisabled()
+  })
+
+  it.each(['submitted', 'stage1_review', 'stage2_review'])('has none for an IDR that is %s', async (status) => {
+    server = submitted({ status, idr_number: '001' })
+    renderPage()
+    await ready()
+    expect(zipButton()).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument()
   })
 })

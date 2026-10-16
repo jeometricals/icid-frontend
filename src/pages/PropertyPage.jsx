@@ -10,7 +10,9 @@
  * PIR, and the property's soft-deleted PIRs listed under the card, muted, each with Un-delete (off while a live PIR
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
  * A deleted property reads Deleted and takes no new PIR (the backend refuses one); only an admin can change it, or
- * its PIR, or un-delete it. A PIR's flags are drawn and listed in its workspace. Back returns to the project's
+ * its PIR, or un-delete it. A PIR's flags are drawn and listed in its workspace. Everyone on the project, demo users
+ * too, gets "Download Construction Report" (DownloadConstructionReportButton), on once an approved IDR has claimed one
+ * of the live PIR's flags (when the flags can't be read the button stays on, and the backend's 404 says why). Back returns to the project's
  * properties. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  */
@@ -19,7 +21,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createPir, getProperty, listPirs, updatePir, updateProperty } from '../services/api'
+import {
+  createPir, downloadConstructionReport, getProperty, listFlags, listPirs, updatePir, updateProperty,
+} from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
 import { PIR_ACTIONS, PIR_DEMO_NOTE } from '../lib/pirs'
@@ -28,6 +32,7 @@ import { useUserNames } from '../lib/useUserNames'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { facingStreetName, rampTypeLabel } from '../data/propertyKinds'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DownloadConstructionReportButton, { NOT_COVERED } from '../components/DownloadConstructionReportButton'
 import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PirWorkspaceLink from '../components/PirWorkspaceLink'
@@ -127,6 +132,22 @@ export default function PropertyPage() {
   const livePir = pirs.find(pir => !pir.deleted_at) ?? null
   const deletedPirs = pirs.filter(pir => pir.deleted_at)
 
+  // Whether an approved IDR has claimed one of the live PIR's flags (only an approval claims): null while unknown
+  const livePirId = livePir?.id ?? null
+  const [claimed, setClaimed] = useState(null)
+  useEffect(() => {
+    if (!livePirId) {
+      setClaimed(false)
+      return undefined
+    }
+    let ignore = false
+    setClaimed(null)
+    listFlags(livePirId)
+      .then(flags => { if (!ignore) setClaimed(flags.some(flag => flag.claimed_by_idr_id)) })
+      .catch(() => { if (!ignore) setClaimed(true) }) // let the backend decide, and say why if it refuses
+    return () => { ignore = true }
+  }, [livePirId])
+
   const save = async (values) => {
     const saved = form.kind === 'property'
       ? await run(() => updateProperty(property.id, values), setProperty)
@@ -209,7 +230,13 @@ export default function PropertyPage() {
       <section aria-labelledby="property-heading" className="bg-white rounded-lg shadow-sm p-6 mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 id="property-heading" className="text-lg font-semibold text-gray-900">Site</h3>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-start gap-3">
+            <DownloadConstructionReportButton
+              label="Download Construction Report"
+              download={() => downloadConstructionReport(property.id)}
+              enabled={claimed === true}
+              disabledTitle={claimed === null ? 'Checking for an approved IDR…' : NOT_COVERED}
+            />
             {deleted ? (admin && (
               <button
                 type="button"

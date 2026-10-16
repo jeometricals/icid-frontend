@@ -22,18 +22,11 @@ function parseJson(text) {
 }
 
 /**
- * Calls the ICID backend and returns the parsed JSON response.
- * Takes a path plus optional {method, body, redirectOn401}; a body is sent as JSON (a FormData body as it is, for
- * a file upload), and the stored session token, when there is one, as a Bearer Authorization header. Returns null
- * for 204 No Content.
- * Throws on non-2xx responses, with the HTTP code on `error.status` and the parsed error body on `error.body`
- * (network failures throw without either). A 2xx response that isn't JSON throws with the status and a
- * preview of the body instead of a bare SyntaxError.
- * A 401 means the session is over: the token is cleared and UNAUTHORIZED_EVENT fires (AuthContext then sends the
- * user to /login), and the returned promise never settles, so the caller shows no error on the way out. Pass
- * redirectOn401: false to get the 401 thrown like any other error (the sign-in calls do).
+ * Sends a request to the ICID backend and returns the Response once it is a success, for apiFetch and apiFetchFile.
+ * Takes the path and {method, body, redirectOn401}, as apiFetch describes them. On a 401 (with redirectOn401) the
+ * session ends and the promise never settles; any other non-2xx throws with error.status and error.body.
  */
-export async function apiFetch(path, { method = 'GET', body, redirectOn401 = true } = {}) {
+async function send(path, { method = 'GET', body, redirectOn401 = true }) {
   const init = { method }
   const headers = {}
   const token = getToken()
@@ -59,6 +52,40 @@ export async function apiFetch(path, { method = 'GET', body, redirectOn401 = tru
     error.body = errorBody
     throw error
   }
+  return res
+}
+
+// The file name in a Content-Disposition header (attachment; filename="x.pdf"), or null without one
+function dispositionFilename(header) {
+  const match = /filename="?([^";]+)"?/i.exec(header ?? '')
+  return match ? match[1] : null
+}
+
+/**
+ * Calls the ICID backend for a file (a GET) and returns it as {blob, filename}: the file name from the response's
+ * Content-Disposition, else the fallback given. Errors and a 401 go as for apiFetch: a failure throws with
+ * error.status and error.body (the JSON error body), and a 401 ends the session.
+ */
+export async function apiFetchFile(path, fallbackFilename) {
+  const res = await send(path, {})
+  const blob = await res.blob()
+  return { blob, filename: dispositionFilename(res.headers?.get('Content-Disposition')) ?? fallbackFilename }
+}
+
+/**
+ * Calls the ICID backend and returns the parsed JSON response.
+ * Takes a path plus optional {method, body, redirectOn401}; a body is sent as JSON (a FormData body as it is, for
+ * a file upload), and the stored session token, when there is one, as a Bearer Authorization header. Returns null
+ * for 204 No Content.
+ * Throws on non-2xx responses, with the HTTP code on `error.status` and the parsed error body on `error.body`
+ * (network failures throw without either). A 2xx response that isn't JSON throws with the status and a
+ * preview of the body instead of a bare SyntaxError.
+ * A 401 means the session is over: the token is cleared and UNAUTHORIZED_EVENT fires (AuthContext then sends the
+ * user to /login), and the returned promise never settles, so the caller shows no error on the way out. Pass
+ * redirectOn401: false to get the 401 thrown like any other error (the sign-in calls do).
+ */
+export async function apiFetch(path, { method = 'GET', body, redirectOn401 = true } = {}) {
+  const res = await send(path, { method, body, redirectOn401 })
   if (res.status === 204) return null
   const text = await res.text()
   const json = parseJson(text)

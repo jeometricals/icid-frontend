@@ -7,6 +7,8 @@ import { PIR_TAKEN } from '../../components/PirFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
+import { NOT_COVERED } from '../../components/DownloadConstructionReportButton'
+import { SKETCH_TOO_LARGE_MESSAGE } from '../../services/constructionReport'
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" of one property and its PIRs. Like the backend, a property takes one
@@ -23,6 +25,7 @@ vi.mock('../../services/api', () => ({
   listPirs: vi.fn(), createPir: vi.fn(), updatePir: vi.fn(), softDeletePir: vi.fn(), undeletePir: vi.fn(),
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
   listPirPages: vi.fn(),
+  listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -46,6 +49,8 @@ beforeEach(() => {
     address: '12 Main St', display_address: '12 Main St', property_type: '4_plus_family', violation_no: 'V-77',
     notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
   pirs = []
+  // The live PIR's flags, for the Construction Report button: none claimed unless a test says otherwise
+  api.listFlags.mockResolvedValue([])
   api.listAdminUsers.mockResolvedValue([ADMIN, RE])
   api.listUsers.mockResolvedValue([ADMIN, RE].map(({ uuid, ...rest }) => ({ user_id: uuid, ...rest })))
   api.getProperty.mockImplementation(async () => structuredClone(property))
@@ -146,7 +151,8 @@ describe('PropertyPage — who can do what', () => {
     property = { ...property, deleted_at: `${YEAR}-10-02T09:00:00` }
     pirs = [pir(1)]
     await renderLoaded(TEST_USER)
-    expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
+    // nothing to change: the one button is the Construction Report's download, which only reads
+    expect(within(propertyCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Download Construction Report'])
     expect(within(pirCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Open sketch workspace'])
   })
 
@@ -162,7 +168,8 @@ describe('PropertyPage — who can do what', () => {
     pirs = [pir(1)]
     await renderLoaded(DEMO_USER)
     expect(screen.getByText(DEMO_NOTE)).toBeInTheDocument()
-    expect(within(propertyCard()).queryByRole('button')).not.toBeInTheDocument()
+    // nothing to change: the one button is the Construction Report's download, which only reads
+    expect(within(propertyCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Download Construction Report'])
     expect(within(pirCard()).getAllByRole('button').map(b => b.textContent)).toEqual(['Open sketch workspace'])
   })
 
@@ -399,5 +406,69 @@ describe('PropertyPage — the PIR', () => {
     await userEvent.click(within(pirCard()).getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('This property now has another PIR')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The Construction Report (R1h)
+// ---------------------------------------------------------------------------
+
+describe('PropertyPage — Construction Report', () => {
+  const reportButton = () => within(propertyCard()).getByRole('button', { name: 'Download Construction Report' })
+
+  it('is on once an approved IDR has claimed one of the live PIR\'s flags', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: null }, { id: 'f2', claimed_by_idr_id: 'idr-1' }])
+    await renderLoaded()
+    await waitFor(() => expect(reportButton()).toBeEnabled())
+    expect(api.listFlags).toHaveBeenCalledWith(pirs[0].id)
+  })
+
+  it('is off, saying why, while no flag is claimed', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: null }])
+    await renderLoaded()
+    await waitFor(() => expect(reportButton()).toHaveAttribute('title', NOT_COVERED))
+    expect(reportButton()).toBeDisabled()
+  })
+
+  it('is off without a live PIR, and reads no flags', async () => {
+    await renderLoaded()
+    expect(reportButton()).toBeDisabled()
+    expect(api.listFlags).not.toHaveBeenCalled()
+  })
+
+  it('stays on when the flags can\'t be read, so the backend can say why', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockRejectedValue(new Error('Network down'))
+    await renderLoaded()
+    await waitFor(() => expect(reportButton()).toBeEnabled())
+  })
+
+  it('downloads the property\'s report on click', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: 'idr-1' }])
+    api.downloadConstructionReport.mockResolvedValue('12_Main_St_construction_report.pdf')
+    await renderLoaded()
+    await waitFor(() => expect(reportButton()).toBeEnabled())
+    await userEvent.click(reportButton())
+    expect(api.downloadConstructionReport).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it('shows the sketch-too-large refusal in the backend\'s words', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: 'idr-1' }])
+    api.downloadConstructionReport.mockRejectedValue(Object.assign(new Error(SKETCH_TOO_LARGE_MESSAGE), { status: 422 }))
+    await renderLoaded()
+    await waitFor(() => expect(reportButton()).toBeEnabled())
+    await userEvent.click(reportButton())
+    expect(await within(propertyCard()).findByRole('alert')).toHaveTextContent(SKETCH_TOO_LARGE_MESSAGE)
+  })
+
+  it('is there for a demo user too, who can download it', async () => {
+    pirs = [pir(1)]
+    api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: 'idr-1' }])
+    await renderLoaded(DEMO_USER)
+    await waitFor(() => expect(reportButton()).toBeEnabled())
   })
 })
