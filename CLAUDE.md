@@ -195,7 +195,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **On the task order page**, a Progress section after Bundled sites, folded open to start: "Overall 100.0%
     approved · 2 of 5 sites started" (`sites_started` of `site_count`: bundled sites with an approved flag), the
     table, the unmapped lines, then "By site": a row per bundled site, folded shut, reading "100.0% approved · 10
-    flags" (or "No flags yet"; "· N unmapped" when it has any), that opens to its own table. It is read again whenever
+    flags" (or "No flags yet"; "· N unmapped" when it has any), that opens to its own table. Under the rows, a small note (`ROUNDING_NOTE`): each figure is rounded for display
+    from the backend's full-precision quantity, so rounded site rows can miss the rounded total by a little (TO-002:
+    2.03 + 0.97 CY against 3.01, from 3.006); the totals come from the unrounded amounts. It is read again whenever
     the page's task order changes (an edit, bundling, unbundling).
   - Everyone who can read the project sees it, demo users included; there is nothing to change.
 - **Progress.** `/project/:projectId/progress` (`ProgressPage`), the "Progress" tile on the project dashboard:

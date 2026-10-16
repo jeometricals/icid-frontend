@@ -1,7 +1,8 @@
 /**
  * The task order page's Progress section (getTaskOrderProgress): a headline ("Overall 100.0% approved · 2 of 5 sites
  * started"), the pay-item table from its sites' PIR flags, a line per site with unmapped flags, and a row per bundled
- * site that folds open to that site's own table (closed to start). The whole section folds too (open to start).
+ * site that folds open to that site's own table (closed to start), with a note under them on rounding. The whole
+ * section folds too (open to start).
  * Read again whenever the task order it is handed changes (an edit, a bundle or an unbundle).
  * Props: taskOrder (as getTaskOrder gives it).
  */
@@ -11,6 +12,10 @@ import { getTaskOrderProgress } from '../services/api'
 import { formatPercent } from '../lib/payItemFormat'
 import FlagProgressTable, { flagCount } from './FlagProgressTable'
 import UnmappedFlagsNote from './UnmappedFlagsNote'
+
+// Under "By site": why the rounded site rows can miss the rounded total by a little (2.03 + 0.97 against 3.01)
+export const ROUNDING_NOTE = 'Figures are rounded for display from the backend’s full-precision quantities. Rounded site '
+  + 'rows may not add up to the rounded total by a small amount — the totals here are computed from the unrounded amounts.'
 
 // "Overall 100.0% approved · 2 of 5 sites started"; the percent is a dash while nothing is live
 export function taskOrderHeadline(data) {
@@ -114,6 +119,7 @@ export default function TaskOrderProgress({ taskOrder }) {
               <ul aria-label="Progress by site" className="space-y-2">
                 {shown.properties.map(site => <SiteProgressRow key={site.property_id} site={site} />)}
               </ul>
+              <p className="mt-2 text-xs text-gray-500">{ROUNDING_NOTE}</p>
             </>
           )}
         </>

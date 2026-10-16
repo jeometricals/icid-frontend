@@ -7,6 +7,7 @@ import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
 import { EMPTY_PROGRESS, TASK_ORDER_PROGRESS } from '../../test/progress'
+import { ROUNDING_NOTE } from '../../components/TaskOrderProgress'
 
 // ---------------------------------------------------------------------------
 // Shared mocks: a tiny in-memory "server" of one task order, its bundle and the project's properties. Like the
@@ -353,6 +354,21 @@ describe('TaskOrderPage — Progress', () => {
 
     await userEvent.click(row)
     expect(screen.queryByRole('table', { name: 'Flag progress for 138-22 227 Street' })).not.toBeInTheDocument()
+  })
+
+  it('notes under the sites that their rounded rows can miss the rounded total', async () => {
+    await renderLoaded()
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    expect(within(progressSection()).getByText(ROUNDING_NOTE)).toBeInTheDocument()
+    expect(ROUNDING_NOTE).toBe('Figures are rounded for display from the backend’s full-precision quantities. Rounded site '
+      + 'rows may not add up to the rounded total by a small amount — the totals here are computed from the unrounded amounts.')
+  })
+
+  it('has no rounding note when it has no sites', async () => {
+    api.getTaskOrderProgress.mockResolvedValue({ ...EMPTY_PROGRESS, properties: [], site_count: 0, sites_started: 0 })
+    await renderLoaded()
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    expect(within(progressSection()).queryByText(ROUNDING_NOTE)).not.toBeInTheDocument()
   })
 
   it('says a site without flags has none yet', async () => {
