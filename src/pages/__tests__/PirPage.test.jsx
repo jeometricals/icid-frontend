@@ -17,6 +17,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     setPirPageRotation: vi.fn(), setPirPageScale: vi.fn(),
     listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
     listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
+    getPageTitleBlock: vi.fn(), updatePirTitleBlock: vi.fn(),
   }
 })
 vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
@@ -57,6 +58,7 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue([])
   api.listPirFeatures.mockResolvedValue([])
   api.listPirSegments.mockResolvedValue([])
+  api.getPageTitleBlock.mockResolvedValue(null) // page 1 has no title block unless a test gives it one
 })
 
 function CurrentUrl() {
@@ -343,5 +345,78 @@ describe('PirPage — the sketch workspace', () => {
     await renderLoaded({ search: '?page=2' })
     expect(screen.getByText('Scale: not set')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeDisabled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The title block (R1h.2)
+// ---------------------------------------------------------------------------
+
+describe('PirPage — title block', () => {
+  const banner = () => screen.getByLabelText('Title block')
+  const editButton = () => screen.getByRole('button', { name: 'Edit title block' })
+  const editor = () => screen.getByRole('dialog', { name: 'Title block — Page 1' })
+
+  it("shows page 1's title block and the PIR's bearing in one line", async () => {
+    api.getPirByProperty.mockResolvedValue({ ...PIR, north_bearing: 'NE' })
+    api.getPageTitleBlock.mockResolvedValue({ pir_page_id: 'page-1', contract_no: 'HWS0023', date_constructed: '2026-10-05' })
+    await renderLoaded()
+    expect(await screen.findByText('Contract: HWS0023 · Constructed: 2026-10-05 · ↑ NE')).toBeInTheDocument()
+    expect(api.getPageTitleBlock).toHaveBeenCalledWith('page-1')
+  })
+
+  it('reads dashes for what is not set', async () => {
+    await renderLoaded()
+    expect(banner()).toHaveTextContent('Contract: — · Constructed: — · ↑ —')
+  })
+
+  it('opens the editor seeded with the current values, and a save shows in the banner', async () => {
+    api.getPageTitleBlock.mockResolvedValue({ pir_page_id: 'page-1', contract_no: 'HWS2014Q' })
+    api.updatePirTitleBlock.mockResolvedValue({ pir_id: PIR.id, contract_no: 'HWS0023', date_notice_issued: null,
+      date_excavated: null, date_constructed: '2026-10-05', north_bearing: 'NE' })
+    await renderLoaded()
+    await userEvent.click(editButton())
+    expect(within(editor()).getByLabelText('Contract No.')).toHaveValue('HWS2014Q')
+    await userEvent.clear(within(editor()).getByLabelText('Contract No.'))
+    await userEvent.type(within(editor()).getByLabelText('Contract No.'), 'HWS0023')
+    fireEvent.change(within(editor()).getByLabelText('Date Constructed'), { target: { value: '2026-10-05' } })
+    await userEvent.selectOptions(within(editor()).getByLabelText('North Bearing'), 'NE')
+    await userEvent.click(within(editor()).getByRole('button', { name: 'Save' }))
+    expect(api.updatePirTitleBlock).toHaveBeenCalledWith(PIR.id,
+      { contract_no: 'HWS0023', date_constructed: '2026-10-05', north_bearing: 'NE' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(banner()).toHaveTextContent('Contract: HWS0023 · Constructed: 2026-10-05 · ↑ NE')
+    expect(await screen.findByText('Title block saved')).toBeInTheDocument()
+  })
+
+  it('opens read-only for a demo user, with no Save', async () => {
+    await renderLoaded({ user: DEMO_USER })
+    await userEvent.click(editButton())
+    expect(within(editor()).getByLabelText('Contract No.')).toBeDisabled()
+    expect(within(editor()).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
+  it('closes and says so when the PIR is gone (404)', async () => {
+    api.updatePirTitleBlock.mockRejectedValue(Object.assign(new Error('PIR not found'), { status: 404 }))
+    await renderLoaded()
+    await userEvent.click(editButton())
+    await userEvent.selectOptions(within(editor()).getByLabelText('North Bearing'), 'N')
+    await userEvent.click(within(editor()).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('alert')).toHaveTextContent('PIR not found')
+  })
+
+  it('has no title block line without pages', async () => {
+    pages = []
+    await renderLoaded()
+    expect(screen.queryByRole('button', { name: 'Edit title block' })).not.toBeInTheDocument()
+    expect(api.getPageTitleBlock).not.toHaveBeenCalled()
+  })
+
+  it("says so when the title block can't be read, and the page still works", async () => {
+    api.getPageTitleBlock.mockRejectedValue(new Error('Network down'))
+    await renderLoaded()
+    expect(banner()).toHaveTextContent('Title block not loaded: Network down')
+    expect(editButton()).toBeDisabled()
   })
 })

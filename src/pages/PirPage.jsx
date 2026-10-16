@@ -10,13 +10,17 @@
  * heading names the site by its display_address (a ped ramp's intersection), Back by siteName. The backend refuses
  * anyone not on the project (403), which shows as the load error.
  * ?flag=<id> selects that flag to start (the IDR page's "View in sketch"), and a flag's "IDR #042" badge opens
- * the IDR that claimed it.
+ * the IDR that claimed it. Under the heading, the title block the Construction Report prints, in one line ("Contract:
+ * HWS0023 · Constructed: 2026-10-05 · ↑ NE", from page 1's title block and the PIR), with "Edit title block"
+ * (TitleBlockEditor; read-only for anyone who can't write here).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw, Ruler, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { deletePirPages, getPirByProperty, getProperty, listPirPages, nextRotation, setPirPageRotation } from '../services/api'
+import {
+  deletePirPages, getPageTitleBlock, getPirByProperty, getProperty, listPirPages, nextRotation, setPirPageRotation,
+} from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { PIR_DEMO_NOTE } from '../lib/pirs'
 import { siteName } from '../lib/properties'
@@ -27,6 +31,7 @@ import PirStatusBadge from '../components/PirStatusBadge'
 import PirUploadModal, { UPLOAD_PROMPT } from '../components/PirUploadModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
+import TitleBlockEditor from '../components/TitleBlockEditor'
 import SketchWorkspace from '../components/sketch/SketchWorkspace'
 
 export const NO_PIR_TEXT = 'This site has no PIR yet. Add one on the site page first.'
@@ -35,6 +40,19 @@ export const IMAGE_FAILED_TEXT = "The page didn't load; its link may have expire
 
 // "15 px/ft", "12.35 px/ft"; "not set" for a page without a scale
 export const scaleText = (scale) => (scale == null ? 'not set' : `${Number(Number(scale).toFixed(2))} px/ft`)
+
+// The title block the Construction Report prints: page 1's title block (null when it has none) and the PIR's bearing
+const titleBlockOf = (pir, annotation) => ({
+  contract_no: annotation?.contract_no ?? null,
+  date_notice_issued: annotation?.date_notice_issued ?? null,
+  date_excavated: annotation?.date_excavated ?? null,
+  date_constructed: annotation?.date_constructed ?? null,
+  north_bearing: pir?.north_bearing ?? null,
+})
+
+// "Contract: HWS0023 · Constructed: 2026-10-05 · ↑ NE", a dash for what isn't set
+export const titleBlockLine = (block) =>
+  `Contract: ${block.contract_no || '—'} · Constructed: ${block.date_constructed || '—'} · ↑ ${block.north_bearing || '—'}`
 
 // "3 pages", "1 page"
 const pagesText = (count) => `${count} ${count === 1 ? 'page' : 'pages'}`
@@ -57,7 +75,9 @@ export default function PirPage() {
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
 
-  const [dialog, setDialog] = useState(null) // 'upload', 'scale' or 'remove'
+  const [titleBlock, setTitleBlock] = useState(null) // what the Construction Report prints; null until read
+  const [titleBlockError, setTitleBlockError] = useState(null)
+  const [dialog, setDialog] = useState(null) // 'upload', 'scale', 'remove' or 'title-block'
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null) // a failed rotate or remove
   const [imageFailed, setImageFailed] = useState(false)
@@ -70,10 +90,24 @@ export default function PirPage() {
     Promise.all([getProperty(propertyId), getPirByProperty(propertyId)])
       .then(async ([foundProperty, foundPir]) => {
         const foundPages = foundPir ? await listPirPages(foundPir.id) : []
+        // Page 1's title block; a failure here is the banner's, not the page's
+        const firstPage = foundPages.find(found => found.page_number === 1)
+        let annotation = null
+        let blockError = null
+        if (firstPage) {
+          try {
+            annotation = await getPageTitleBlock(firstPage.pir_page_id)
+          } catch (err) {
+            blockError = err.message
+          }
+        }
         if (ignore) return
         setProperty(foundProperty)
         setPir(foundPir)
         setPages(foundPages)
+        // Without what is stored, there is nothing to edit against
+        setTitleBlock(firstPage && !blockError ? titleBlockOf(foundPir, annotation) : null)
+        setTitleBlockError(blockError)
         setImageFailed(false)
       })
       .catch(err => { if (!ignore) setLoadError(err.message) })
@@ -197,6 +231,18 @@ export default function PirPage() {
 
       {user?.is_demo && <p className="text-sm text-gray-600 mb-4">{PIR_DEMO_NOTE}</p>}
 
+      {pir && pages.some(found => found.page_number === 1) && (
+        <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+          <span aria-label="Title block" className="text-gray-700 tabular-nums">
+            {titleBlockError ? `Title block not loaded: ${titleBlockError}` : titleBlock && titleBlockLine(titleBlock)}
+          </span>
+          <button type="button" onClick={() => setDialog('title-block')} disabled={!titleBlock}
+            className="btn-secondary text-sm">
+            Edit title block
+          </button>
+        </div>
+      )}
+
       {!pir ? (
         <section className="bg-white rounded-lg shadow-sm p-6">
           <p className="text-gray-600">{NO_PIR_TEXT}</p>
@@ -298,6 +344,25 @@ export default function PirPage() {
 
       {dialog === 'upload' && (
         <PirUploadModal pirId={pir.id} replacing={count > 0} onUploaded={uploaded} onClose={() => setDialog(null)} />
+      )}
+
+      {dialog === 'title-block' && titleBlock && (
+        <TitleBlockEditor
+          pirId={pir.id}
+          titleBlock={titleBlock}
+          canEdit={writer}
+          onSaved={(saved) => {
+            setTitleBlock(titleBlockOf({ north_bearing: saved.north_bearing }, saved))
+            setPir(current => ({ ...current, north_bearing: saved.north_bearing }))
+            setDialog(null)
+            setToast('Title block saved')
+          }}
+          onGone={(message) => {
+            setDialog(null)
+            setActionError(message)
+          }}
+          onClose={() => setDialog(null)}
+        />
       )}
 
       {dialog === 'scale' && (
