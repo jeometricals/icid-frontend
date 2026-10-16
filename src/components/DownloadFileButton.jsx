@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { FileDown } from 'lucide-react'
 
-export const NOT_COVERED = 'No approved IDR has claimed this site’s flags yet.'
 
 /**
- * A Construction Report download button (R1h), for a property's PDF or an IDR's ZIP: while the file is made the button
- * is off and a spinner says so; a failure shows its message under it. A 422 (a sketch too large for one sheet) and a
- * 404 can't be fixed by trying again; anything else gets Retry.
+ * A button that downloads a file the backend makes: a property's Construction Report, an IDR's ZIP of them, a
+ * project's Assessment Summary. While the file is made the button is off and a spinner says so; a failure shows its
+ * message under it. A 422 (e.g. a sketch too large for one sheet) and a 404 can't be fixed by trying again and show the
+ * backend's own words; anything else gets Retry.
  * Props: label, download (the call that fetches and saves the file), enabled (false: off, with disabledTitle as its
  * tooltip) and disabledTitle.
  */
-export default function DownloadConstructionReportButton({ label, download, enabled = true, disabledTitle }) {
+export default function DownloadFileButton({ label, download, enabled = true, disabledTitle }) {
   const [status, setStatus] = useState('idle') // 'idle' | 'working' | 'error'
   const [error, setError] = useState(null) // { message, canRetry }
 
@@ -45,7 +45,7 @@ export default function DownloadConstructionReportButton({ label, download, enab
       {working && (
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <div role="status" className="animate-spin rounded-full h-4 w-4 border-b-2 border-construction-600"></div>
-          <span>Making the report…</span>
+          <span>Preparing the file…</span>
         </div>
       )}
       {status === 'error' && (

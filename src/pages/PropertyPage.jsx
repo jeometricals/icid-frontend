@@ -11,7 +11,7 @@
  * exists). Every delete and un-delete is confirmed first and announced in a toast; a refusal stays in its dialog.
  * A deleted property reads Deleted and takes no new PIR (the backend refuses one); only an admin can change it, or
  * its PIR, or un-delete it. A PIR's flags are drawn and listed in its workspace. Everyone on the project, demo users
- * too, gets "Download Construction Report" (DownloadConstructionReportButton), on once an approved IDR has claimed one
+ * too, gets "Download Construction Report" (DownloadFileButton), on once an approved IDR has claimed one
  * of the live PIR's flags (when the flags can't be read the button stays on, and the backend's 404 says why). Back returns to the project's
  * properties. The backend refuses anyone not on the
  * project (403), which shows as the load error.
@@ -32,7 +32,7 @@ import { useUserNames } from '../lib/useUserNames'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { facingStreetName, rampTypeLabel } from '../data/propertyKinds'
 import ConfirmDialog from '../components/ConfirmDialog'
-import DownloadConstructionReportButton, { NOT_COVERED } from '../components/DownloadConstructionReportButton'
+import DownloadFileButton from '../components/DownloadFileButton'
 import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PirWorkspaceLink from '../components/PirWorkspaceLink'
@@ -41,6 +41,7 @@ import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 
 export const NO_PIR_TEXT = 'No PIR yet.'
+export const NOT_COVERED = 'No approved IDR has claimed this site’s flags yet.'
 export const NOT_CONFIRMED_TEXT = 'Not yet confirmed'
 export const LIVE_PIR_TOOLTIP = 'This site has a live PIR. Delete it first to restore this one.'
 export const DEMO_NOTE = PIR_DEMO_NOTE
@@ -231,7 +232,7 @@ export default function PropertyPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 id="property-heading" className="text-lg font-semibold text-gray-900">Site</h3>
           <div className="flex flex-wrap items-start gap-3">
-            <DownloadConstructionReportButton
+            <DownloadFileButton
               label="Download Construction Report"
               download={() => downloadConstructionReport(property.id)}
               enabled={claimed === true}

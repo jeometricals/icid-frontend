@@ -2,12 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import PropertyPage, { DEMO_NOTE, LIVE_PIR_TOOLTIP, NOT_CONFIRMED_TEXT, NO_PIR_TEXT } from '../PropertyPage'
+import PropertyPage, { DEMO_NOTE, LIVE_PIR_TOOLTIP, NOT_CONFIRMED_TEXT, NOT_COVERED, NO_PIR_TEXT } from '../PropertyPage'
 import { PIR_TAKEN } from '../../components/PirFormModal'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { DEMO_USER, TEST_USER } from '../../test/users'
-import { NOT_COVERED } from '../../components/DownloadConstructionReportButton'
 import { SKETCH_TOO_LARGE_MESSAGE } from '../../services/constructionReport'
 
 // ---------------------------------------------------------------------------

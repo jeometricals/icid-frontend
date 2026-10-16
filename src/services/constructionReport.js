@@ -1,5 +1,5 @@
 import { apiFetchFile } from './apiClient'
-import { downloadFile } from './exports'
+import { saveFile } from './exports'
 
 // The Construction Report (R1h): a property's as-built sheet for an approved IDR, DOT form 5/95, as a PDF the backend
 // draws; and an approved IDR's reports, one PDF per property it claimed flags on, in a ZIP. For anyone on the
@@ -9,17 +9,6 @@ import { downloadFile } from './exports'
 // The backend's 422 for a sketch too large for one sheet (or on more than one page), word for word
 export const SKETCH_TOO_LARGE_MESSAGE =
   "This property's sketch is too large to render on a single sheet. Multi-sheet support ships in R1h.1."
-
-/**
- * Saves a file fetched from the backend: hands its bytes to the browser as a download, then lets them go.
- * Takes {blob, filename}.
- */
-function saveFile({ blob, filename }) {
-  const url = URL.createObjectURL(blob)
-  downloadFile(url, filename)
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-  return filename
-}
 
 /**
  * Downloads a property's Construction Report: of the given IDR, or by default the most recently approved one that

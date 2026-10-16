@@ -7,7 +7,7 @@ import * as api from '../../services/api'
 import { ELM_ST, EMPTY_PROGRESS, MAIN_ST, PROJECT_PROGRESS, TO_002 } from '../../test/progress'
 
 vi.mock('../../services/api', () => ({
-  listQuantities: vi.fn(), getProjectProgress: vi.fn(), listTaskOrders: vi.fn(), listProperties: vi.fn(), getTaskOrder: vi.fn(),
+  listQuantities: vi.fn(), getProjectProgress: vi.fn(), downloadAssessmentSummary: vi.fn(), listTaskOrders: vi.fn(), listProperties: vi.fn(), getTaskOrder: vi.fn(),
 }))
 
 // A pay item of the roll-up; without a budget it is unbudgeted, as the backend sends one no contract item matches
@@ -687,5 +687,40 @@ describe('ProgressPage — sidewalk progress from PIR flags', () => {
     renderPage()
     await flagTable()
     expect(await within(flagSection()).findByText("Couldn't load the filter choices: Network down")).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The Assessment Summary download (R1i)
+// ---------------------------------------------------------------------------
+
+describe('ProgressPage — Assessment Summary', () => {
+  const summaryButton = () => screen.getByRole('button', { name: 'Download Assessment Summary' })
+
+  it('sits beside the title, on from the start', async () => {
+    renderPage()
+    expect(summaryButton()).toBeEnabled()
+    await screen.findByRole('table')
+  })
+
+  it("downloads the project's workbook on click", async () => {
+    api.downloadAssessmentSummary.mockResolvedValue('HWS0023_assessment_summary_2026-10-12.xlsx')
+    renderPage()
+    await screen.findByRole('table')
+    await userEvent.click(summaryButton())
+    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023')
+  })
+
+  it.each([
+    [403, 'Project access required', 'Download failed: Project access required'],
+    [404, 'Project not found', 'Project not found'],
+    [500, "Failed to read the Assessment Summary's data", "Download failed: Failed to read the Assessment Summary's data"],
+  ])('shows a %i under the button in the backend\'s words', async (status, detail, shown) => {
+    api.downloadAssessmentSummary.mockRejectedValue(Object.assign(new Error(detail), { status }))
+    renderPage()
+    await screen.findByRole('table')
+    await userEvent.click(summaryButton())
+    const alerts = await screen.findAllByRole('alert')
+    expect(alerts.some(alert => alert.textContent.includes(shown))).toBe(true)
   })
 })

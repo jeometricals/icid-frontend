@@ -8,7 +8,7 @@
  * its report pages. Under the reports, the PIR flags it covers (IdrFlagsSection: its task order, the pay items its
  * flags come to, and each flag with a checkbox for whoever may exclude or include it), read with the IDR and again
  * after every change; the review toolbar's approval dialog sums them up. An approved IDR that claimed flags also gets
- * "Download Construction Reports" beside Export: a ZIP of one PDF per property (DownloadConstructionReportButton).
+ * "Download Construction Reports" beside Export: a ZIP of one PDF per property (DownloadFileButton).
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -35,7 +35,7 @@ import SaveStatusText from '../components/SaveStatusText'
 import SignedBanner from '../components/SignedBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ExportIdrButton from '../components/ExportIdrButton'
-import DownloadConstructionReportButton from '../components/DownloadConstructionReportButton'
+import DownloadFileButton from '../components/DownloadFileButton'
 import GoToProjectButton from '../components/GoToProjectButton'
 import SignatureSetupModal from '../components/SignatureSetupModal'
 import ReviewToolbar from '../components/ReviewToolbar'
@@ -361,7 +361,7 @@ export default function IDRPage() {
               <div className="flex flex-wrap items-start justify-end gap-3">
                 {/* An approved IDR's Construction Reports (R1h): on once its frozen flags count one it claimed */}
                 {idr.status === 'approved' && (
-                  <DownloadConstructionReportButton
+                  <DownloadFileButton
                     label="Download Construction Reports"
                     download={() => downloadConstructionReportZip(idrId)}
                     enabled={(idrFlags?.counts?.attributed ?? 0) > 0}

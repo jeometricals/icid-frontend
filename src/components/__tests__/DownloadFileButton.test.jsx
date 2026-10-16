@@ -1,20 +1,20 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DownloadConstructionReportButton, { NOT_COVERED } from '../DownloadConstructionReportButton'
+import DownloadFileButton from '../DownloadFileButton'
 import { SKETCH_TOO_LARGE_MESSAGE } from '../../services/constructionReport'
 
 const failure = (status, message) => Object.assign(new Error(message), { status })
 
 function renderButton(props = {}) {
   const download = props.download ?? vi.fn().mockResolvedValue('report.pdf')
-  render(<DownloadConstructionReportButton label="Download Construction Report" download={download} {...props} />)
+  render(<DownloadFileButton label="Download Construction Report" download={download} {...props} />)
   return download
 }
 
 const button = () => screen.getByRole('button', { name: 'Download Construction Report' })
 
-describe('DownloadConstructionReportButton', () => {
+describe('DownloadFileButton', () => {
   it('downloads on click', async () => {
     const download = renderButton()
     await userEvent.click(button())
@@ -23,9 +23,9 @@ describe('DownloadConstructionReportButton', () => {
   })
 
   it('is off, with the reason as its tooltip, until a report can be made', () => {
-    renderButton({ enabled: false, disabledTitle: NOT_COVERED })
+    renderButton({ enabled: false, disabledTitle: 'Nothing to download yet.' })
     expect(button()).toBeDisabled()
-    expect(button()).toHaveAttribute('title', NOT_COVERED)
+    expect(button()).toHaveAttribute('title', 'Nothing to download yet.')
   })
 
   it('says it is working while the report is made, and is off meanwhile', async () => {

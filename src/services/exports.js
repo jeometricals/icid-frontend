@@ -25,3 +25,14 @@ export function downloadFile(url, filename) {
   link.click()
   document.body.removeChild(link)
 }
+
+/**
+ * Saves a file fetched from the backend (apiFetchFile's {blob, filename}): hands its bytes to the browser as a
+ * download through an object URL, then lets the URL go. Returns the file name.
+ */
+export function saveFile({ blob, filename }) {
+  const url = URL.createObjectURL(blob)
+  downloadFile(url, filename)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return filename
+}

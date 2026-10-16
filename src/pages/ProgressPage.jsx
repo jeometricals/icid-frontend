@@ -1,5 +1,5 @@
 /**
- * Progress on one project (route param :projectId). First, the sidewalk progress its PIR flags describe
+ * Progress on one project (route param :projectId), with "Download Assessment Summary" (R1i) beside its title. First, the sidewalk progress its PIR flags describe
  * (ProjectFlagProgress, with its own Task order and Site filters, ?task_order=&property=). Then the budget view: what
  * the pay-item quantities of its approved IDRs come to against the project's budget (its contract items), by contract
  * value, in three sections, top to bottom: the project total, a card per budget code, and a table with a row per pay
@@ -12,11 +12,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { format, parseISO, subDays } from 'date-fns'
-import { listQuantities } from '../services/api'
+import { downloadAssessmentSummary, listQuantities } from '../services/api'
 import { formatDollars, formatPayItemQuantity, formatPercent } from '../lib/payItemFormat'
 import Bar from '../components/Bar'
 import BudgetCodeCard from '../components/BudgetCodeCard'
 import ProjectFlagProgress from '../components/ProjectFlagProgress'
+import DownloadFileButton from '../components/DownloadFileButton'
 
 export const DEFAULT_RANGE_DAYS = 30
 
@@ -110,7 +111,14 @@ export default function ProgressPage() {
           <span className="font-medium">Back to Project Page</span>
         </button>
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Progress — {projectId}</h2>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Progress — {projectId}</h2>
+          {/* The project's monthly report for DOT (R1i), always on: an empty project still gets a workbook */}
+          <DownloadFileButton
+            label="Download Assessment Summary"
+            download={() => downloadAssessmentSummary(projectId)}
+          />
+        </div>
 
         <ProjectFlagProgress projectId={projectId} />
 
