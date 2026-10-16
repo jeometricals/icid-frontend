@@ -3,16 +3,25 @@ import Modal from './Modal'
 import { updatePirTitleBlock } from '../services/api'
 
 export const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-export const FIELDS = ['contract_no', 'date_notice_issued', 'date_excavated', 'date_constructed', 'north_bearing']
+export const FIELDS = ['contract_no', 'date_notice_issued', 'date_excavated', 'date_constructed', 'north_bearing',
+  'cross_street_left', 'cross_street_right', 'frontage_street', 'tax_map_width_ft', 'cc_curb_to_curb_ft']
+// The streets round the Construction Report's sketch (R1h.3): up the left and right sides, and the frontage under it
+export const STREET_FIELDS = [
+  ['cross_street_left', 'Left street'], ['cross_street_right', 'Right street'], ['frontage_street', 'Frontage street (bottom)'],
+]
+// The widths the sketch draws at scale: the lot between the PLs along the top, the curb-to-curb along the bottom
+export const WIDTH_FIELDS = [['tax_map_width_ft', 'Tax map width (ft)'], ['cc_curb_to_curb_ft', 'Curb to curb, CC (ft)']]
+export const MAX_STREET_LENGTH = 60
 export const DEMO_TITLE = 'Demo mode: PIRs are read-only'
 export const ORDER_WARNING = 'Date Excavated is after Date Constructed. Saving is still allowed.'
 
-// The form's values from a title block: text for the inputs, '' for a field not set
-const valuesOf = (block) => Object.fromEntries(FIELDS.map(field => [field, block?.[field] ?? '']))
+// The form's values from a title block: text for the inputs (a width as its number's text), '' for a field not set
+const valuesOf = (block) => Object.fromEntries(FIELDS.map(field => [field, block?.[field] == null ? '' : String(block[field])]))
 
 /**
- * The title-block editor (R1h.2), a dialog: "Title block — Page 1" with the five fields the Construction Report
- * prints (Contract No., the three dates, North Bearing). Save sends only the fields changed ('' as null, which clears
+ * The title-block editor (R1h.2), a dialog: "Title block — Page 1" with the fields the Construction Report prints
+ * (Contract No., the three dates, North Bearing, and R1h.3's Streets group: the left, right and frontage streets and
+ * the tax-map and curb-to-curb widths, sent as typed for the backend to check). Save sends only the fields changed ('' as null, which clears
  * one) and hands the saved block to onSaved; it is off until something changes. A refusal shows under Save and the
  * dialog stays open; a 404 (the PIR is gone) goes to onGone instead. A soft warning shows when Date Excavated is after
  * Date Constructed. A reader (a demo user, or anyone the page doesn't let write) sees the fields disabled and no Save.
@@ -98,6 +107,32 @@ export default function TitleBlockEditor({ pirId, titleBlock, canEdit, onSaved, 
             {COMPASS_POINTS.map(point => <option key={point} value={point}>{point}</option>)}
           </select>
         </div>
+        <fieldset className="space-y-3">
+          <legend className="input-label">Streets</legend>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {STREET_FIELDS.map(([field, label]) => (
+              <div key={field}>
+                <label htmlFor={`title-block-${field}`} className="input-label">
+                  {label} <span className="font-normal text-gray-500">(optional)</span>
+                </label>
+                <input id={`title-block-${field}`} type="text" maxLength={MAX_STREET_LENGTH} className="input-field"
+                  value={values[field]} disabled={disabled} onChange={set(field)} />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {WIDTH_FIELDS.map(([field, label]) => (
+              <div key={field}>
+                <label htmlFor={`title-block-${field}`} className="input-label">
+                  {label} <span className="font-normal text-gray-500">(optional)</span>
+                </label>
+                <input id={`title-block-${field}`} type="text" inputMode="decimal" className="input-field"
+                  value={values[field]} disabled={disabled} onChange={set(field)} />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">The top of the sketch is the property line (PL).</p>
+        </fieldset>
       </div>
     </Modal>
   )

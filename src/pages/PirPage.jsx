@@ -48,11 +48,23 @@ const titleBlockOf = (pir, annotation) => ({
   date_excavated: annotation?.date_excavated ?? null,
   date_constructed: annotation?.date_constructed ?? null,
   north_bearing: pir?.north_bearing ?? null,
+  cross_street_left: annotation?.cross_street_left ?? null,
+  cross_street_right: annotation?.cross_street_right ?? null,
+  frontage_street: annotation?.frontage_street ?? null,
+  tax_map_width_ft: annotation?.tax_map_width_ft ?? null,
+  cc_curb_to_curb_ft: annotation?.cc_curb_to_curb_ft ?? null,
 })
 
 // "Contract: HWS0023 · Constructed: 2026-10-05 · ↑ NE", a dash for what isn't set
 export const titleBlockLine = (block) =>
   `Contract: ${block.contract_no || '—'} · Constructed: ${block.date_constructed || '—'} · ↑ ${block.north_bearing || '—'}`
+
+// A street for the banner: cut to 20 characters, a dash when not set
+const streetText = (street) => (!street ? '—' : street.length > 20 ? `${street.slice(0, 19)}…` : street)
+
+// "Streets: 139 AVENUE / 227 STREET / 138 AVENUE": left, frontage, right, as the sketch has them
+export const streetsLine = (block) =>
+  `Streets: ${[block.cross_street_left, block.frontage_street, block.cross_street_right].map(streetText).join(' / ')}`
 
 // "3 pages", "1 page"
 const pagesText = (count) => `${count} ${count === 1 ? 'page' : 'pages'}`
@@ -236,6 +248,9 @@ export default function PirPage() {
           <span aria-label="Title block" className="text-gray-700 tabular-nums">
             {titleBlockError ? `Title block not loaded: ${titleBlockError}` : titleBlock && titleBlockLine(titleBlock)}
           </span>
+          {titleBlock && !titleBlockError && (
+            <span aria-label="Streets" className="text-gray-700">{streetsLine(titleBlock)}</span>
+          )}
           <button type="button" onClick={() => setDialog('title-block')} disabled={!titleBlock}
             className="btn-secondary text-sm">
             Edit title block

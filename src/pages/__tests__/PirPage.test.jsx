@@ -368,6 +368,26 @@ describe('PirPage — title block', () => {
   it('reads dashes for what is not set', async () => {
     await renderLoaded()
     expect(banner()).toHaveTextContent('Contract: — · Constructed: — · ↑ —')
+    expect(screen.getByLabelText('Streets')).toHaveTextContent('Streets: — / — / —')
+  })
+
+  it('shows the streets left, frontage, right, a long one cut short', async () => {
+    api.getPageTitleBlock.mockResolvedValue({ pir_page_id: 'page-1', cross_street_left: '139 AVENUE',
+      frontage_street: 'A VERY LONG BOULEVARD NAME INDEED', cross_street_right: '138 AVENUE' })
+    await renderLoaded()
+    expect(screen.getByLabelText('Streets')).toHaveTextContent('Streets: 139 AVENUE / A VERY LONG BOULEVA… / 138 AVENUE')
+  })
+
+  it('shows saved streets in the banner', async () => {
+    api.updatePirTitleBlock.mockResolvedValue({ pir_id: PIR.id, contract_no: null, date_notice_issued: null,
+      date_excavated: null, date_constructed: null, north_bearing: null, cross_street_left: null,
+      cross_street_right: null, frontage_street: 'MAIN ST', tax_map_width_ft: null, cc_curb_to_curb_ft: null })
+    await renderLoaded()
+    await userEvent.click(editButton())
+    await userEvent.type(within(editor()).getByLabelText(/Frontage street/), 'MAIN ST')
+    await userEvent.click(within(editor()).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Streets')).toHaveTextContent('Streets: — / MAIN ST / —')
   })
 
   it('opens the editor seeded with the current values, and a save shows in the banner', async () => {

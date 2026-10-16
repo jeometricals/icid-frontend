@@ -186,14 +186,18 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     the backend's 404 says why. It downloads the most recently approved IDR's report.
   - **IDR page:** an approved IDR gets "Download Construction Reports" beside Export, on when its frozen flags
     (`getIdrFlags`) count one it claimed, off with `CLAIMED_NO_FLAGS` otherwise. No other status has it.
-- **Title block** (R1h.2). The five fields the Construction Report prints: page 1's Contract No., Date Notice Issued,
-  Date Excavated and Date Constructed, and the PIR's North Bearing.
+- **Title block** (R1h.2, R1h.3). The fields the Construction Report prints: page 1's Contract No., Date Notice Issued,
+  Date Excavated and Date Constructed, the PIR's North Bearing, and (R1h.3) the streets and widths round its sketch:
+  `cross_street_left`, `cross_street_right`, `frontage_street` (the bottom; the top is always the property line, PL),
+  `tax_map_width_ft` and `cc_curb_to_curb_ft`.
   - **On the PIR workspace,** under the heading, one line: "Contract: HWS0023 · Constructed: 2026-10-05 · ↑ NE" (a dash
     for what isn't set), read with the pages (`getPageTitleBlock` on page 1, and the PIR's `north_bearing`), with "Edit
-    title block" beside it. No line without a page 1; a failed read says so and leaves the button off, so nothing is
+    title block" beside it, and a second line, "Streets: 139 AVENUE / 227 STREET / 138 AVENUE" (left, frontage,
+    right; `streetsLine`, each cut to 20 characters, a dash when not set). No line without a page 1; a failed read says so and leaves the button off, so nothing is
     saved over values never loaded.
   - **`TitleBlockEditor`** (`pirId`, `titleBlock`, `canEdit`, `onSaved`, `onGone`, `onClose`), a dialog "Title block —
-    Page 1": a text field, three date inputs and a compass select (blank is "—"). Save is off until something changes
+    Page 1": a text field, three date inputs, a compass select (blank is "—"), and a "Streets" group (`STREET_FIELDS`,
+    at most 60 characters each; `WIDTH_FIELDS`, text inputs sent as typed, so the backend's 400 names a bad width). Save is off until something changes
     and sends only what changed (`updatePirTitleBlock`, `PATCH /v1/pirs/{id}/title-block`; blank as null, which clears
     it). A refusal shows under Save; a 404 closes it with "PIR not found" on the page. A soft warning when Date
     Excavated is after Date Constructed; nothing stops the save. For anyone who can't write (a demo user, or anyone
