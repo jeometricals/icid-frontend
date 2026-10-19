@@ -25,6 +25,7 @@ vi.mock('../../services/api', () => ({
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
   listPirPages: vi.fn(),
   listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
+  listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -50,6 +51,9 @@ beforeEach(() => {
   pirs = []
   // The live PIR's flags, for the Construction Report button: none claimed unless a test says otherwise
   api.listFlags.mockResolvedValue([])
+  // A ped ramp's corners and attributes: none unless a test says otherwise
+  api.listCorners.mockResolvedValue([])
+  api.getRampAttributes.mockResolvedValue(null)
   api.listAdminUsers.mockResolvedValue([ADMIN, RE])
   api.listUsers.mockResolvedValue([ADMIN, RE].map(({ uuid, ...rest }) => ({ user_id: uuid, ...rest })))
   api.getProperty.mockImplementation(async () => structuredClone(property))
@@ -216,6 +220,33 @@ describe('PropertyPage — the property', () => {
     expect(valueOf(propertyCard(), 'Facing')).toHaveTextContent('Court St')
     expect(valueOf(propertyCard(), 'Ramp type')).toHaveTextContent('Cut-through')
     expect(within(propertyCard()).queryByText('Block')).not.toBeInTheDocument()
+    expect(valueOf(propertyCard(), 'Inspection corner')).toHaveTextContent('—')
+  })
+
+  it("shows a ped ramp's inspection corner and its Ramp Attributes", async () => {
+    const CORNER_ID = 'd0000000-0000-4000-8000-000000000001'
+    api.listCorners.mockResolvedValue([{ corner_id: CORNER_ID, north_south_street: 'Court St',
+      east_west_street: 'Atlantic Ave', corner_direction: 'NE', deleted_at: null, ramps: [] }])
+    api.getRampAttributes.mockResolvedValue({ property_id: PROPERTY_ID, ramp_type: 'PERPENDICULAR', ramp_width_in: 30,
+      warnings: [{ field: 'ramp_width_in', value: 30, limit: 'at least 36 in', message: 'Ramp width 30 in is less than 36 in' }] })
+    property = {
+      ...property, kind: 'ped_ramp', boro: 'Brooklyn', block: null, lot: null, address: null, property_type: null, violation_no: null,
+      intersection_street_1: 'Atlantic Ave', intersection_street_2: 'Court St', quadrant: 'NE', facing_street: 'street_2',
+      ramp_type: 'PERPENDICULAR', corner_id: CORNER_ID, display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
+    }
+    renderPage()
+    expect(await screen.findByText('Ramp width 30 in is less than 36 in')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Ramp Attributes/ })).toBeInTheDocument()
+    await waitFor(() => expect(valueOf(propertyCard(), 'Inspection corner')).toHaveTextContent('Court St & Atlantic Ave (NE)'))
+    expect(api.listCorners).toHaveBeenCalledWith('HWS0023')
+    expect(api.getRampAttributes).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it('reads no corners or attributes for a sidewalk', async () => {
+    await renderLoaded()
+    expect(screen.queryByRole('heading', { name: /Ramp Attributes/ })).not.toBeInTheDocument()
+    expect(api.listCorners).not.toHaveBeenCalled()
+    expect(api.getRampAttributes).not.toHaveBeenCalled()
   })
 
   it('goes back to the project\'s properties', async () => {

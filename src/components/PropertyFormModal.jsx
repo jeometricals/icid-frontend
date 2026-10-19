@@ -24,9 +24,9 @@ export const FACING_HINT = 'Fill in both intersection streets to pick the one it
 const KEYS = {
   sidewalk: ['boro', 'block', 'lot', 'community_board', 'address', 'violation_no', 'property_type', 'notes'],
   ped_ramp: ['boro', 'community_board', 'intersection_street_1', 'intersection_street_2', 'quadrant', 'facing_street',
-    'ramp_type', 'notes'],
+    'ramp_type', 'corner_id', 'notes'],
 }
-const OPTIONAL = ['violation_no', 'community_board', 'notes']
+const OPTIONAL = ['violation_no', 'community_board', 'corner_id', 'notes']
 // The fields a taken site is: the three together
 const LOCATION = { boro: true, block: true, lot: true }
 // A sidewalk's block and lot as typed: digits only, at most so many (leading zeros included, as the inputs cap them)
@@ -42,6 +42,7 @@ function cleaned(kind, values) {
   const sending = Object.fromEntries(KEYS[kind].map(key => [key, typeof values[key] === 'string' ? values[key].trim() : values[key]]))
   sending.notes = sending.notes || null
   sending.community_board = sending.community_board || null
+  if (kind === 'ped_ramp') sending.corner_id = sending.corner_id || null
   if (kind === 'sidewalk') {
     sending.violation_no = sending.violation_no || null
     sending.block = withoutLeadingZeros(sending.block)
@@ -55,7 +56,8 @@ function cleaned(kind, values) {
  * (1-5 digits) and lot (1-4 digits), each losing its leading zeros when it loses focus, Community Board (CB,
  * optional, at most 10 characters), address, violation no. (optional) and property type.
  * A ped ramp: borough, Community Board (optional), the two intersection streets, quadrant, the street it faces (offered by name once both
- * streets are in; sent as street_1 / street_2) and ramp type. Both end with notes (optional; blank is null). Editing shows the kind as a fixed line at the top: it
+ * streets are in; sent as street_1 / street_2), ramp type and the inspection corner it is at (optional, one of corners;
+ * offered only when corners is given, none sends null). Both end with notes (optional; blank is null). Editing shows the kind as a fixed line at the top: it
  * can't change. Save is off until every required field is in (and a block and lot are digits) and, when editing, until
  * something has changed. Adding passes on every field and the kind; editing only what changed. The caller runs the
  * save: it sets busy while it works and error (the thrown error) if it failed, and the form keeps what was typed. A
@@ -63,9 +65,9 @@ function cleaned(kind, values) {
  * fields they name, anything else (a 400, such as the
  * backend's "Property kind cannot be changed. Delete and recreate.") below the form.
  * Props: mode ('add' | 'edit'), kind ('sidewalk' | 'ped_ramp'; when editing, the property's), initial (the property
- * being edited; none when adding), onSave(values), onCancel, busy, error.
+ * being edited; none when adding), corners (the project's live ped ramp corners), onSave(values), onCancel, busy, error.
  */
-export default function PropertyFormModal({ mode = 'add', kind: kindProp, initial, onSave, onCancel, busy = false, error = null }) {
+export default function PropertyFormModal({ mode = 'add', kind: kindProp, initial, corners, onSave, onCancel, busy = false, error = null }) {
   const kind = initial?.kind ?? kindProp ?? 'sidewalk'
   const [values, setValues] = useState(() => startingValues(kind, initial))
 
@@ -197,6 +199,23 @@ export default function PropertyFormModal({ mode = 'add', kind: kindProp, initia
               disabled: busy || !bothStreets,
             })}
             {selectField('ramp_type', 'Type', RAMP_TYPES, { placeholder: 'Choose a type' })}
+            {corners && (
+              <div>
+                <label htmlFor="property-corner_id" className="input-label">
+                  Inspection corner <span className="text-gray-500 font-normal">(optional)</span>
+                </label>
+                <select {...control('corner_id')}>
+                  <option value="">None</option>
+                  {corners.map(corner => (
+                    <option key={corner.corner_id} value={corner.corner_id}>
+                      {corner.north_south_street} & {corner.east_west_street}
+                      {corner.corner_direction ? ` (${corner.corner_direction})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {fieldError('corner_id')}
+              </div>
+            )}
           </>
         )}
 

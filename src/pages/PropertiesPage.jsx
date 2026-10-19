@@ -9,17 +9,24 @@
  * section also has a disabled Bulk Upload button ("AI import — coming soon"), for everyone. After every change the
  * list is read again, and a delete or un-delete is announced in a toast. A demo user reads a note that sites are
  * read-only. The backend refuses anyone not on the project (403), which shows as the load error.
+ * Beside "Pedestrian Ramps", "Ped Ramp Corners" (PedRampCornersSection, pedramp 2a): the project's corners, read with
+ * the sites, each with its Inspection Report download; a member who isn't a demo user adds and edits them
+ * (PedRampCornerFormModal), an admin deletes them (confirmed). A ped ramp's form offers the live corners to place it at.
  */
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createProperty, listProperties, updateProperty } from '../services/api'
+import {
+  createCorner, createProperty, deleteCorner, listCorners, listProperties, updateCorner, updateProperty,
+} from '../services/api'
 import { PROPERTY_ACTIONS } from '../lib/properties'
 import { isAdmin } from '../lib/reviewRoles'
 import ConfirmDialog from '../components/ConfirmDialog'
 import SiteSection from '../components/SiteSection'
 import PropertyFormModal from '../components/PropertyFormModal'
+import PedRampCornerFormModal from '../components/PedRampCornerFormModal'
+import PedRampCornersSection, { cornerName } from '../components/PedRampCornersSection'
 import Toast from '../components/Toast'
 
 export const DEMO_NOTE = 'Demo mode: sites are read-only.'
@@ -44,6 +51,20 @@ const SECTIONS = [
 
 const isDeleted = (row) => Boolean(row.deleted_at)
 
+// The project's sites and its ped ramp corners, read together
+const loadSites = (projectId, includeDeleted) =>
+  Promise.all([listProperties(projectId, { includeDeleted }), listCorners(projectId, { includeDeleted })])
+
+// Deleting a corner, confirmed first
+const CORNER_DELETE = {
+  title: corner => `Delete ${cornerName(corner)}?`,
+  message: () => "The corner leaves this project's list. Its ramps stay, and keep it as their corner.",
+  confirmLabel: 'Delete',
+  confirmClassName: 'btn-danger',
+  run: corner => deleteCorner(corner.corner_id),
+  done: corner => `Deleted ${cornerName(corner)}.`,
+}
+
 export default function PropertiesPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
@@ -52,6 +73,7 @@ export default function PropertiesPage() {
   const writer = !user?.is_demo // the backend keeps demo users read-only on properties
 
   const [properties, setProperties] = useState([])
+  const [corners, setCorners] = useState([])
   const [loading, setLoading] = useState(true)
   const [loaded, setLoaded] = useState(false) // whether there is a list to keep on screen while it is read again
   const [loadError, setLoadError] = useState(null)
@@ -60,6 +82,7 @@ export default function PropertiesPage() {
   const includeDeleted = admin && showDeleted // only an admin's list has deleted properties
 
   const [form, setForm] = useState(null) // the open Add / Edit dialog: {mode: 'add', kind} or {mode: 'edit', property}
+  const [cornerForm, setCornerForm] = useState(null) // the open corner dialog: {mode: 'add'} or {mode: 'edit', corner}
   const [pending, setPending] = useState(null) // {row, action}: the delete or un-delete waiting to be confirmed
   const [toast, setToast] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -71,10 +94,11 @@ export default function PropertiesPage() {
     setLoading(true)
     setLoadError(null)
     setRefreshError(null)
-    listProperties(projectId, { includeDeleted })
-      .then(found => {
+    loadSites(projectId, includeDeleted)
+      .then(([found, foundCorners]) => {
         if (ignore) return
         setProperties(found)
+        setCorners(foundCorners)
         setLoaded(true)
       })
       .catch(err => {
@@ -105,7 +129,9 @@ export default function PropertiesPage() {
       return false
     }
     try {
-      setProperties(await listProperties(projectId, { includeDeleted }))
+      const [found, foundCorners] = await loadSites(projectId, includeDeleted)
+      setProperties(found)
+      setCorners(foundCorners)
       setRefreshError(null)
     } catch (err) {
       setRefreshError(`The change was saved, but the list couldn't be refreshed: ${err.message}`)
@@ -121,10 +147,20 @@ export default function PropertiesPage() {
     if (saved) setForm(null)
   }
 
+  const saveCorner = async (values) => {
+    const saved = await run(cornerForm.mode === 'add'
+      ? () => createCorner(projectId, values)
+      : () => updateCorner(cornerForm.corner.corner_id, values))
+    if (saved) setCornerForm(null)
+  }
+
+  // The action a pending confirmation runs: a site's delete or un-delete, or a corner's delete
+  const pendingAction = pending && (pending.action === 'corner-delete' ? CORNER_DELETE : PROPERTY_ACTIONS[pending.action])
+
   const confirm = async () => {
-    const { row, action } = pending
-    if (!(await run(() => PROPERTY_ACTIONS[action].run(row)))) return
-    setToast(PROPERTY_ACTIONS[action].done(row))
+    const { row } = pending
+    if (!(await run(() => pendingAction.run(row)))) return
+    setToast(pendingAction.done(row))
     setPending(null)
   }
 
@@ -214,6 +250,14 @@ export default function PropertiesPage() {
                 renderActions={renderActions}
               />
             ))}
+
+            <PedRampCornersSection
+              corners={corners}
+              onAdd={writer ? () => open(() => setCornerForm({ mode: 'add' })) : undefined}
+              addDisabled={!loaded}
+              onEdit={writer ? corner => open(() => setCornerForm({ mode: 'edit', corner })) : undefined}
+              onDelete={admin ? corner => open(() => setPending({ row: corner, action: 'corner-delete' })) : undefined}
+            />
           </>
         )}
 
@@ -222,6 +266,7 @@ export default function PropertiesPage() {
             mode={form.mode}
             kind={form.kind}
             initial={form.property}
+            corners={corners.filter(corner => !isDeleted(corner))}
             onSave={save}
             onCancel={() => setForm(null)}
             busy={busy}
@@ -229,13 +274,24 @@ export default function PropertiesPage() {
           />
         )}
 
+        {cornerForm && (
+          <PedRampCornerFormModal
+            mode={cornerForm.mode}
+            initial={cornerForm.corner}
+            onSave={saveCorner}
+            onCancel={() => setCornerForm(null)}
+            busy={busy}
+            error={actionError}
+          />
+        )}
+
         {pending && (
           <ConfirmDialog
-            title={PROPERTY_ACTIONS[pending.action].title(pending.row)}
-            message={PROPERTY_ACTIONS[pending.action].message(pending.row)}
-            confirmLabel={PROPERTY_ACTIONS[pending.action].confirmLabel}
+            title={pendingAction.title(pending.row)}
+            message={pendingAction.message(pending.row)}
+            confirmLabel={pendingAction.confirmLabel}
             cancelLabel="Cancel"
-            confirmClassName={PROPERTY_ACTIONS[pending.action].confirmClassName}
+            confirmClassName={pendingAction.confirmClassName}
             onConfirm={confirm}
             onCancel={() => setPending(null)}
             busy={busy}

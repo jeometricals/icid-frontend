@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import PropertiesPage, { DEMO_NOTE } from '../PropertiesPage'
@@ -48,6 +48,8 @@ const LISTED = [
 vi.mock('../../services/api', () => ({
   listProperties: vi.fn(), createProperty: vi.fn(), updateProperty: vi.fn(),
   softDeleteProperty: vi.fn(), undeleteProperty: vi.fn(),
+  listCorners: vi.fn(), createCorner: vi.fn(), updateCorner: vi.fn(), deleteCorner: vi.fn(),
+  downloadInspectionReport: vi.fn(),
 }))
 
 const conflict = () => Object.assign(new Error('A site at Queens Block 123 Lot 45 already exists in this project.'), {
@@ -60,6 +62,7 @@ let server
 beforeEach(() => {
   vi.clearAllMocks()
   server = structuredClone(LISTED)
+  api.listCorners.mockResolvedValue([])
   api.listProperties.mockImplementation(async (projectId, { includeDeleted = false } = {}) => (
     structuredClone(server.filter(row => includeDeleted || live(row)))
   ))
@@ -292,7 +295,8 @@ describe('PropertiesPage — adding and editing', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.createProperty).toHaveBeenCalledWith('HWS0023', {
       kind: 'ped_ramp', boro: 'Queens', community_board: null, intersection_street_1: 'Main St',
-      intersection_street_2: '37th Ave', quadrant: 'SW', facing_street: 'street_1', ramp_type: 'PARALLEL', notes: null,
+      intersection_street_2: '37th Ave', quadrant: 'SW', facing_street: 'street_1', ramp_type: 'PARALLEL', corner_id: null,
+      notes: null,
     })
     const cells = within(within(ramps()).getByText('37th Ave').closest('tr')).getAllByRole('cell').map(td => td.textContent)
     expect(cells.slice(0, 7)).toEqual(['Queens', '—', 'Main St', '37th Ave', 'SW', 'Main St', 'Parallel'])
@@ -403,5 +407,81 @@ describe('PropertiesPage — deleting and un-deleting', () => {
     await userEvent.click(within(await waitFor(() => rowOf('12 Main St'))).getByRole('button', { name: 'Un-delete' }))
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Un-delete' }))
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Another site at Queens Block 123 Lot 45 now exists in this project.')
+  })
+})
+
+describe('PropertiesPage — ped ramp corners', () => {
+  const CORNER = {
+    corner_id: 'd0000000-0000-4000-8000-000000000001', project_id: 'HWS0023', boro: 'Brooklyn',
+    north_south_street: 'Court St', east_west_street: 'Atlantic Ave', corner_direction: 'NE', corner_number: '2',
+    inspection_date: `${YEAR}-10-19`, deleted_at: null,
+    ramps: [{ property_id: LISTED[2].id, ramp_type: 'PERPENDICULAR', ramp_id_label: 'R1', quadrant: 'NE',
+      display_address: LISTED[2].display_address, has_attributes: true }],
+  }
+  let corners
+
+  beforeEach(() => {
+    corners = [structuredClone(CORNER)]
+    api.listCorners.mockImplementation(async () => structuredClone(corners))
+    api.createCorner.mockImplementation(async (projectId, values) => {
+      const created = { ...CORNER, ...values, corner_id: 'd0000000-0000-4000-8000-000000000002', ramps: [] }
+      corners = [...corners, created]
+      return created
+    })
+    api.deleteCorner.mockImplementation(async (id) => {
+      corners = corners.filter(corner => corner.corner_id !== id)
+      return { ...CORNER, deleted_at: `${YEAR}-10-19T09:00:00` }
+    })
+  })
+
+  const cornersSection = () => screen.getByRole('region', { name: 'Ped Ramp Corners' })
+
+  it('lists the corners beside the ped ramps, each with its ramps and its report', async () => {
+    await renderListed()
+    expect(api.listCorners).toHaveBeenCalledWith('HWS0023', { includeDeleted: false })
+    expect(within(cornersSection()).getByRole('button', { name: 'Ped Ramp Corners (1)' })).toBeInTheDocument()
+    const row = within(cornersSection()).getByText('Court St & Atlantic Ave').closest('tr')
+    expect(within(row).getAllByRole('cell').map(td => td.textContent).slice(0, 6)).toEqual(
+      ['Court St & Atlantic Ave', 'Brooklyn', 'NE', '2', 'Perpendicular (R1)', `${YEAR}-10-19`])
+    await userEvent.click(within(row).getByRole('button', { name: 'Inspection Report' }))
+    expect(api.downloadInspectionReport).toHaveBeenCalledWith(CORNER.corner_id)
+  })
+
+  it('adds a corner, and the form of a ped ramp offers it', async () => {
+    await renderListed()
+    await userEvent.click(within(cornersSection()).getByRole('button', { name: 'Add Corner' }))
+    await userEvent.selectOptions(within(dialog()).getByLabelText('Borough'), 'Queens')
+    await userEvent.type(within(dialog()).getByLabelText('North-south street'), '38th St')
+    await userEvent.type(within(dialog()).getByLabelText('East-west street'), '31st Ave')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(within(cornersSection()).getByText('38th St & 31st Ave')).toBeInTheDocument())
+    expect(api.createCorner.mock.calls[0][1]).toMatchObject({ boro: 'Queens', north_south_street: '38th St' })
+
+    await userEvent.click(within(rowOf('Atlantic Ave')).getByRole('button', { name: 'Edit' }))
+    await userEvent.selectOptions(within(dialog()).getByLabelText(/Inspection corner/), CORNER.corner_id)
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.updateProperty).toHaveBeenCalledWith(LISTED[2].id, { corner_id: CORNER.corner_id }))
+  })
+
+  it('lets an admin delete a corner once confirmed', async () => {
+    await renderListed()
+    const row = within(cornersSection()).getByText('Court St & Atlantic Ave').closest('tr')
+    await userEvent.click(within(row).getByRole('button', { name: 'Delete' }))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(within(cornersSection()).queryByText('Court St & Atlantic Ave')).not.toBeInTheDocument())
+    expect(api.deleteCorner).toHaveBeenCalledWith(CORNER.corner_id)
+    expect(screen.getByText('Deleted Court St & Atlantic Ave.')).toBeInTheDocument()
+  })
+
+  it('gives a member Edit but no Delete, and a demo user only the report', async () => {
+    await renderListed({ ...TEST_USER, role: null })
+    let row = within(cornersSection()).getByText('Court St & Atlantic Ave').closest('tr')
+    expect(within(row).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    cleanup()
+    await renderListed(DEMO_USER)
+    row = within(cornersSection()).getByText('Court St & Atlantic Ave').closest('tr')
+    expect(within(row).getAllByRole('button').map(button => button.textContent)).toEqual(['Inspection Report'])
+    expect(within(cornersSection()).queryByRole('button', { name: 'Add Corner' })).not.toBeInTheDocument()
   })
 })

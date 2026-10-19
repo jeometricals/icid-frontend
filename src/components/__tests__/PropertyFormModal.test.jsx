@@ -191,7 +191,7 @@ describe('PropertyFormModal — adding a ped ramp', () => {
     await userEvent.click(saveButton())
     expect(onSave).toHaveBeenCalledWith({
       kind: 'ped_ramp', boro: 'Queens', community_board: null, intersection_street_1: 'Main St',
-      intersection_street_2: '37th Ave', quadrant: 'SE', facing_street: 'street_2', ramp_type: 'CUT_THROUGH',
+      intersection_street_2: '37th Ave', quadrant: 'SE', facing_street: 'street_2', ramp_type: 'CUT_THROUGH', corner_id: null,
       notes: 'Curb cut cracked',
     })
   })

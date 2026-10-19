@@ -16,6 +16,9 @@
  * properties; Back to task order to the latest live task order the site is in (the property's task_order_id), and is
  * off, titled "Not in a task order", when it is in none. The backend refuses anyone not on the
  * project (403), which shows as the load error.
+ * A ped ramp (pedramp 2a) also shows its inspection corner in the Site card (its streets and direction, or a dash), and
+ * offers the project's live corners in its edit form; and under the Site card, its Ramp Attributes
+ * (RampAttributesSection), which whoever may change the site saves and everyone else reads.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -23,7 +26,7 @@ import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  createPir, downloadConstructionReport, getProperty, listFlags, listPirs, updatePir, updateProperty,
+  createPir, downloadConstructionReport, getProperty, listCorners, listFlags, listPirs, updatePir, updateProperty,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
@@ -38,6 +41,7 @@ import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PirWorkspaceLink from '../components/PirWorkspaceLink'
 import PropertyFormModal from '../components/PropertyFormModal'
+import RampAttributesSection from '../components/RampAttributesSection'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 
@@ -155,6 +159,20 @@ export default function PropertyPage() {
       .catch(() => { if (!ignore) setClaimed(true) }) // let the backend decide, and say why if it refuses
     return () => { ignore = true }
   }, [livePirId])
+
+  // A ped ramp's project's live corners: its own shown in the Site card, all offered in its edit form. null until read
+  // (or when they can't be: the card then shows a dash and the form offers none)
+  const rampProject = property?.kind === 'ped_ramp' ? property.project_id : null
+  const [corners, setCorners] = useState(null)
+  useEffect(() => {
+    if (!rampProject) return undefined
+    let ignore = false
+    listCorners(rampProject)
+      .then(found => { if (!ignore) setCorners(found) })
+      .catch(() => { if (!ignore) setCorners(null) })
+    return () => { ignore = true }
+  }, [rampProject])
+  const corner = corners?.find(item => item.corner_id === property?.corner_id) ?? null
 
   const save = async (values) => {
     const saved = form.kind === 'property'
@@ -300,6 +318,11 @@ export default function PropertyPage() {
               <Detail term="Quadrant">{property.quadrant}</Detail>
               <Detail term="Facing">{facingStreetName(property) || '—'}</Detail>
               <Detail term="Ramp type">{rampTypeLabel(property.ramp_type)}</Detail>
+              <Detail term="Inspection corner">
+                {corner
+                  ? `${corner.north_south_street} & ${corner.east_west_street}${corner.corner_direction ? ` (${corner.corner_direction})` : ''}`
+                  : '—'}
+              </Detail>
             </>
           ) : (
             <>
@@ -315,6 +338,8 @@ export default function PropertyPage() {
           <Detail term="Added">{shortDate(property.created_at)}</Detail>
         </dl>
       </section>
+
+      {property.kind === 'ped_ramp' && <RampAttributesSection property={property} canEdit={canChange} />}
 
       <section aria-labelledby="pir-heading" className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -410,6 +435,7 @@ export default function PropertyPage() {
         <PropertyFormModal
           mode="edit"
           initial={property}
+          corners={corners ? corners.filter(item => !item.deleted_at) : undefined}
           onSave={save}
           onCancel={() => setForm(null)}
           busy={busy}
