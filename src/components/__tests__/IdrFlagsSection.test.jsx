@@ -10,6 +10,7 @@ import { PED_RAMP_SITE, idrFlag, idrFlagsData } from '../../test/idrFlags'
 
 vi.mock('../../services/api', () => ({
   excludeIdrFlag: vi.fn(), includeIdrFlag: vi.fn(), listTaskOrders: vi.fn(),
+  getIdrSegments: vi.fn(), excludeIdrSegment: vi.fn(), includeIdrSegment: vi.fn(),
 }))
 
 const IDR = { idr_id: 'idr-1', project_id: 'SE384', status: 'draft', task_order_id: 'to-1' }
@@ -31,6 +32,7 @@ const FLAGS = [
 beforeEach(() => {
   vi.clearAllMocks()
   api.listTaskOrders.mockResolvedValue(TASK_ORDERS)
+  api.getIdrSegments.mockResolvedValue(segmentsData([]))
 })
 
 function renderSection(props = {}) {
@@ -205,5 +207,133 @@ describe('IdrFlagsSection — excluding and including', () => {
     renderSection({ canChange: true })
     await userEvent.click(checkbox(1))
     expect(checkbox(2)).toBeDisabled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Curb segments (curb billing)
+// ---------------------------------------------------------------------------
+
+// A curb segment as getIdrSegments lists it: a 20 ft concrete curb at the flags' sidewalk, mapped to 4.08 AA, attributed
+function segment(overrides = {}) {
+  return {
+    segment_id: 'seg-1', pir_id: 'pir-1', pir_page_id: 'page-1', page_number: 1, segment_type: 'curb_concrete',
+    length_ft: 20, note: null, property_id: 'prop-1', property_kind: 'sidewalk', boro: 'Queens', block: '123',
+    lot: '45', address: '12 Main St', intersection_street_1: null, intersection_street_2: null, quadrant: null,
+    facing_street: null, display_address: '12 Main St', pay_item_id: 'item-aa', pay_item_ref: '4.08 AA',
+    budget_code: 'HW-200(S)', pay_item_description: 'Concrete Curb', unit: 'LF', amount: 20, state: 'attributed',
+    override: null, in_task_order: true, claimed_by_idr_id: null, claimed_by_idr_number: null, constructed_on: null,
+    deleted_at: null, ...overrides,
+  }
+}
+
+// getIdrSegments' answer over some segments: live unless frozen, its rollup over the counted ones in LF
+function segmentsData(segments, { frozen = false, unmapped = 0 } = {}) {
+  const counted = segments.filter(s => s.state === (frozen ? 'claimed' : 'attributed'))
+  const lines = {}
+  for (const s of counted.filter(s => s.amount !== null)) {
+    lines[s.pay_item_id] ??= {
+      pay_item_id: frozen ? null : s.pay_item_id, pay_item_ref: s.pay_item_ref, budget_code: s.budget_code,
+      description: s.pay_item_description, unit: 'LF', amount: 0, segment_count: frozen ? null : 0,
+    }
+    lines[s.pay_item_id].amount += s.amount
+    if (!frozen) lines[s.pay_item_id].segment_count += 1
+  }
+  return {
+    idr_id: 'idr-1', status: frozen ? 'approved' : 'draft', task_order_id: 'to-1', frozen,
+    counts: {
+      attributed: counted.length, excluded: segments.filter(s => s.state === 'excluded').length,
+      claimed_elsewhere: segments.filter(s => s.state === 'claimed_elsewhere').length, total: segments.length,
+    },
+    segments, pay_items: Object.values(lines), unmapped,
+  }
+}
+
+const SEGMENTS = [
+  segment(),
+  segment({
+    segment_id: 'seg-2', segment_type: 'curb_concrete_depressed', length_ft: 10, amount: 10, pay_item_id: 'item-ab',
+    pay_item_ref: '4.08 AB', pay_item_description: 'Depressed Concrete Curb',
+  }),
+  segment({ segment_id: 'seg-3', segment_type: 'curb_granite', page_number: 2, state: 'excluded', override: 'exclude' }),
+  segment({ segment_id: 'seg-4', state: 'claimed_elsewhere', claimed_by_idr_id: 'idr-other', claimed_by_idr_number: '003' }),
+]
+const segmentsTable = () => screen.findByRole('table', { name: 'Curb segments' })
+const segmentBox = (kind, page = 1) =>
+  screen.getByRole('checkbox', { name: `Attribute ${kind} at Queens Block 123 Lot 45, page ${page}` })
+
+describe('IdrFlagsSection — curb segments', () => {
+  it('reads them for the IDR, heads them with the attributed count, and rolls them up per pay item in LF', async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData(SEGMENTS, { unmapped: 1 }))
+    renderSection()
+    await segmentsTable()
+    expect(api.getIdrSegments).toHaveBeenCalledWith('idr-1')
+    expect(screen.getByRole('heading', { name: 'Curb segments (2 of 4)' })).toBeInTheDocument()
+    const rollup = screen.getByRole('table', { name: 'Pay items from curb segments' })
+    expect(within(rollup).getAllByRole('row').slice(1).map(row => row.textContent)).toEqual([
+      '4.08 AAConcrete CurbHW-200(S)20 LF1', '4.08 ABDepressed Concrete CurbHW-200(S)10 LF1',
+    ])
+    expect(screen.getByText(/1 segment adds nothing here/)).toBeInTheDocument()
+  })
+
+  it('lists each segment with its site, page, kind, length, pay item, LF and state', async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData(SEGMENTS))
+    renderSection({ canChange: true })
+    const rows = within(await segmentsTable()).getAllByRole('row').slice(1)
+    expect(rows[0].textContent).toBe('Queens Block 123 Lot 451Concrete curb20.00 ft4.08 AA — Concrete Curb20 LFAttributed')
+    expect(rows[2].textContent).toContain('Granite curb')
+    expect(within(rows[3]).getByRole('link', { name: 'Claimed by IDR 003' })).toHaveAttribute('href', '/project/SE384/idr/idr-other')
+    expect(within(rows[3]).queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(segmentBox('concrete curb')).toBeChecked()
+    expect(segmentBox('granite curb', 2)).not.toBeChecked()
+  })
+
+  it('excludes on unticking and includes on ticking, showing what the call answers', async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData(SEGMENTS))
+    api.excludeIdrSegment.mockResolvedValue(segmentsData([segment({ state: 'excluded', override: 'exclude' })]))
+    api.includeIdrSegment.mockResolvedValue(segmentsData(SEGMENTS))
+    renderSection({ canChange: true })
+    await segmentsTable()
+    await userEvent.click(segmentBox('granite curb', 2))
+    expect(api.includeIdrSegment).toHaveBeenCalledWith('idr-1', 'seg-3')
+    await userEvent.click(segmentBox('concrete curb'))
+    expect(api.excludeIdrSegment).toHaveBeenCalledWith('idr-1', 'seg-1')
+    expect(await screen.findByRole('heading', { name: 'Curb segments (0 of 1)' })).toBeInTheDocument()
+  })
+
+  it('gives no checkboxes to someone who may not change them', async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData(SEGMENTS))
+    renderSection({ canChange: false })
+    expect(within(await segmentsTable()).queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('shows a refusal of a change', async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData(SEGMENTS))
+    api.excludeIdrSegment.mockRejectedValue(new Error('Segment is claimed by IDR 004'))
+    renderSection({ canChange: true })
+    await segmentsTable()
+    await userEvent.click(segmentBox('concrete curb'))
+    expect(await screen.findByText("Couldn't exclude the segment: Segment is claimed by IDR 004")).toBeInTheDocument()
+  })
+
+  it("heads an approved IDR's segments as claimed", async () => {
+    api.getIdrSegments.mockResolvedValue(segmentsData([segment({ state: 'claimed', constructed_on: '2026-10-15' })], { frozen: true }))
+    renderSection()
+    expect(await screen.findByRole('heading', { name: 'Curb segments claimed (1)' })).toBeInTheDocument()
+  })
+
+  it('shows nothing when the IDR covers no segment', async () => {
+    renderSection()
+    await waitFor(() => expect(api.getIdrSegments).toHaveBeenCalled())
+    expect(screen.queryByRole('table', { name: 'Curb segments' })).not.toBeInTheDocument()
+  })
+
+  it('shows its own failure with Retry, the flags still standing', async () => {
+    api.getIdrSegments.mockRejectedValueOnce(new Error('Network down')).mockResolvedValueOnce(segmentsData(SEGMENTS))
+    renderSection()
+    expect(await screen.findByText("Couldn't load this IDR's curb segments: Network down")).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Flags' })).toBeInTheDocument()
+    await userEvent.click(screen.getAllByRole('button', { name: 'Retry' }).at(-1))
+    await segmentsTable()
   })
 })

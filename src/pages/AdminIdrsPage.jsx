@@ -38,6 +38,12 @@ export function deleteForeverPhrase(idr) {
   return idr.idr_number || idr.report_date
 }
 
+// "3 flags", "3 flags and 2 curb segments", "2 curb segments": what a move claimed or released; '' for nothing
+function moved(flags = 0, segments = 0) {
+  return [flags > 0 && countOf(flags, 'flag'), segments > 0 && countOf(segments, 'curb segment')].filter(Boolean).join(' and ')
+}
+const released = (idr) => moved(idr?.flags_released, idr?.segments_released)
+
 // The admin actions: the call, the words of its confirm dialog, and what the toast says once it went through
 // (given the IDR as it was and what the call returned)
 const ACTIONS = {
@@ -49,9 +55,7 @@ const ACTIONS = {
     confirmClassName: 'btn-primary',
     failure: "Couldn't unlock the IDR",
     releases: true,
-    done: (idr, unlocked) => (unlocked?.flags_released > 0
-      ? `${idrName(idr)} unlocked; ${countOf(unlocked.flags_released, 'flag')} released.`
-      : null),
+    done: (idr, unlocked) => (released(unlocked) ? `${idrName(idr)} unlocked; ${released(unlocked)} released.` : null),
   },
   delete: {
     run: idrId => adminDeleteIdr(idrId),
@@ -61,9 +65,7 @@ const ACTIONS = {
     confirmClassName: 'btn-danger',
     failure: "Couldn't delete the IDR",
     releases: true,
-    done: (idr, deleted) => (deleted?.flags_released > 0
-      ? `${idrName(idr)} deleted; ${countOf(deleted.flags_released, 'flag')} released.`
-      : null),
+    done: (idr, deleted) => (released(deleted) ? `${idrName(idr)} deleted; ${released(deleted)} released.` : null),
   },
   undelete: {
     run: idrId => undeleteIdr(idrId),
@@ -74,7 +76,8 @@ const ACTIONS = {
     failure: "Couldn't un-delete the IDR",
     done: (idr, restored) => {
       const status = STATUS_LABELS[restored?.status]
-      const claimed = restored?.flags_claimed > 0 ? ` ${countOf(restored.flags_claimed, 'flag')} claimed back.` : ''
+      const back = moved(restored?.flags_claimed, restored?.segments_claimed)
+      const claimed = back ? ` ${back} claimed back.` : ''
       return `${status ? `${idrName(idr)} restored to ${status}.` : `${idrName(idr)} restored.`}${claimed}`
     },
   },

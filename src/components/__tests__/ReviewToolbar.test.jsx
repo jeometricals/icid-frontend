@@ -547,6 +547,8 @@ describe('ReviewToolbar — the flags an approval claims', () => {
     await user.click(within(dialog('Final Approve & Sign')).getByRole('button', { name: 'Approve & Sign' }))
     expect(await screen.findByText('IDR approved; 1 flag already claimed by another IDR was left out.')).toBeInTheDocument()
     expect(droppedText(2)).toBe('IDR approved; 2 flags already claimed by another IDR were left out.')
+    expect(droppedText(0, 1)).toBe('IDR approved; 1 curb segment already claimed by another IDR was left out.')
+    expect(droppedText(1, 2)).toBe('IDR approved; 1 flag and 2 curb segments already claimed by another IDR were left out.')
   })
 
   it('says nothing more when every flag was claimed', async () => {

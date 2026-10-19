@@ -31,8 +31,10 @@ const APPROVE_STAGE1_MESSAGE = 'Send this IDR on to the Resident Engineer for fi
 const APPROVE_STAGE2_MESSAGE = 'Approve this IDR? Your signature will be stamped on every page of its export.'
 
 // The toast after an approval that left out flags another IDR claimed first
-export const droppedText = (count) =>
-  `IDR approved; ${countOf(count, 'flag')} already claimed by another IDR ${count === 1 ? 'was' : 'were'} left out.`
+export const droppedText = (count, segments = 0) => {
+  const left = [count && countOf(count, 'flag'), segments && countOf(segments, 'curb segment')].filter(Boolean)
+  return `IDR approved; ${left.join(' and ')} already claimed by another IDR ${count + segments === 1 ? 'was' : 'were'} left out.`
+}
 
 // What approving claims, for its dialog: the summary sentence (shown first, the approval question after the lines)
 // and, as its lines, the pay items the flags come to. Nothing when the flags couldn't be read or there are none.
@@ -134,7 +136,9 @@ export default function ReviewToolbar({
 
   const approve = async () => {
     const approved = await approveStage2(idr.idr_id)
-    if (approved?.flags_dropped > 0) setToast(droppedText(approved.flags_dropped))
+    const flags = approved?.flags_dropped ?? 0
+    const segments = approved?.segments_dropped ?? 0
+    if (flags > 0 || segments > 0) setToast(droppedText(flags, segments))
   }
 
   return (

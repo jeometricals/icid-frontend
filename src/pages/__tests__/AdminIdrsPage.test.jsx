@@ -750,6 +750,16 @@ describe('AdminIdrsPage — flags an unlock or a delete releases', () => {
     expect(await screen.findByText(done)).toBeInTheDocument()
   })
 
+  it('says how many curb segments went too', async () => {
+    api.getIdrFlags.mockResolvedValue(claimedFlags(18))
+    api.adminUnlockIdr.mockResolvedValue({ idr_id: 'approved', flags_released: 18, segments_released: 3 })
+    renderPage()
+    await ready()
+    await click('Sep 16, 2026', 'Unlock')
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Unlock' }))
+    expect(await screen.findByText('IDR 004 unlocked; 18 flags and 3 curb segments released.')).toBeInTheDocument()
+  })
+
   it('says it is counting while the flags are read', async () => {
     api.getIdrFlags.mockReturnValue(new Promise(() => {}))
     renderPage()

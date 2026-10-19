@@ -229,7 +229,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     a flag in scope is on (`includeEmpty` would list the whole flag-measurable catalog: SE384 has 265; not used).
   - **`FlagProgressTable`** (`payItems`, `label`): Pay Item ("4.13 AAS (SF)", its budget code under it), Description,
     Approved, In flight, Unclaimed, Live total and %. A state prints its quantity to two decimals (`formatFlagQuantity`;
-    the backend sends it unrounded) and its flag count ("383.44 (10 flags)"); an empty state and a null percent print
+    the backend sends it unrounded) and its flag count ("383.44 (10 flags)"; "(3 segments)" on a pay item in LF, which
+    curb segments fill: `flagCount(count, unit)`); an empty state and a null percent print
     "—". Rows are keyed on `pay_item_id`: one item number can sit under two budget codes.
   - **`UnmappedFlagsNote`** (`projectId`, `entries`): "3 unmapped flags on 350 Main St" per site with live flags that
     add nothing (no pay item, or a unit a flag can't measure), each linking to the site's PIR page
@@ -927,6 +928,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     live flags on that task order's sites, without one none. Per-IDR overrides change that: `exclude` leaves a flag
     out, `include` brings one in (the backend also lets an include bring a flag in from elsewhere in the project;
     the UI has no picker for that yet, so it only re-includes listed flags).
+  - **Service:** `services/idrSegments.js` (curb billing): `getIdrSegments`, `excludeIdrSegment`,
+    `includeIdrSegment`, the same shape with `segments` (each with `segment_type`, `length_ft`, `amount` in LF) and
+    pay items' `segment_count`.
   - **Service:** `services/idrFlags.js`: `getIdrFlags(idrId)`, `excludeIdrFlag(idrId, flagId)` and
     `includeIdrFlag`, each answering `{idr_id, status, task_order_id, frozen, counts: {attributed, excluded,
     claimed_elsewhere, total}, flags, pay_items, unmapped}`. A flag's `state` is `attributed`, `excluded`, `claimed`
@@ -946,6 +950,14 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       claimed-elsewhere rows are muted.
     - Without flags: "Pick a task order to bring in its sites' flags." (a draft), "No task order: this IDR covers no
       flags.", or "No flags on this task order's sites yet."
+    - **Curb segments** (curb billing; `CurbSegments` in the same file), under the flags: read by the panel itself
+      (`getIdrSegments`, again when the IDR's task order or status changes), nothing shown when it covers none. "Curb
+      segments (3 of 4)" ("Curb segments claimed (3)" once approved), "Pay items from curb segments" (pay item,
+      description, budget code, LF, and before approval how many segments), "N segments add nothing here" for
+      `unmapped`, then a row per segment: site, page, kind ("Concrete curb", "Depressed curb", "Granite curb",
+      "Steel-faced curb"; `SEGMENT_KINDS`), length (ft, two decimals), pay item, LF and status, as a flag's. The same
+      users get the same checkboxes (`excludeIdrSegment` / `includeIdrSegment`); a refusal reads "Couldn't exclude
+      the segment: ...". A failure to read them is its own line with Retry; the flags stand.
   - **Who excludes and includes** (`canChangeIdrFlags`, as the backend allows): the inspector on their own draft,
     the reviewer who accepted it at its stage (`canEditInReview`), or an admin; never a demo user, and nobody on a
     submitted (not yet accepted), approved or deleted IDR. They get a checkbox per row (ticked when attributed;
@@ -1059,7 +1071,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - IDR flags: `GET /v1/idrs/{id}/attributed-flags` · `POST /v1/idrs/{id}/attributed-flags/{flag_id}/exclude` ·
     `POST /v1/idrs/{id}/attributed-flags/{flag_id}/include` (reading for anyone who can read the IDR; changes for
     its inspector on a draft, the stage's reviewer in review, an admin; never a demo user). approve-stage2,
-    admin/unlock, admin/delete and admin/undelete add `flags_claimed` / `flags_dropped` / `flags_released`.
+    admin/unlock, admin/delete and admin/undelete add `flags_claimed` / `flags_dropped` / `flags_released`, and the
+    same for curb segments (`segments_claimed` / `segments_dropped` / `segments_released`), which the approval toast
+    and the admin IDR list's toasts add ("18 flags and 3 curb segments released.").
+  - IDR curb segments: `GET /v1/idrs/{id}/attributed-segments` · `POST .../attributed-segments/{segment_id}/exclude`
+    · `POST .../attributed-segments/{segment_id}/include` (who: as for flags).
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
     `POST /v1/idrs/{id}/accept-stage2` · `POST /v1/idrs/{id}/approve-stage2` · `POST /v1/idrs/{id}/return`
   - Reviewer edits: `PATCH /v1/idrs/{id}/field` · `POST /v1/idrs/{id}/pay-items/{item id}/revise` ·

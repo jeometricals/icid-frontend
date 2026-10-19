@@ -1,7 +1,9 @@
 import { apiFetch } from './apiClient'
 
-// The counts a move that claims or releases an IDR's flags adds to its response (R1f)
-const FLAG_COUNTS = ['flags_claimed', 'flags_dropped', 'flags_released']
+// The counts a move that claims or releases an IDR's flags (R1f) and curb segments adds to its response
+const FLAG_COUNTS = [
+  'flags_claimed', 'flags_dropped', 'flags_released', 'segments_claimed', 'segments_dropped', 'segments_released',
+]
 
 // The IDR a move returned, with whichever flag counts the response carries set on it
 function movedIdr(json) {

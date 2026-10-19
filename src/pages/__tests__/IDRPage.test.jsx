@@ -84,6 +84,9 @@ vi.mock('../../services/api', () => ({
   revisePayItem: vi.fn(),
   addPayItem: vi.fn(),
   getIdrFlags: vi.fn(),
+  getIdrSegments: vi.fn(),
+  excludeIdrSegment: vi.fn(),
+  includeIdrSegment: vi.fn(),
   downloadConstructionReportZip: vi.fn(),
   excludeIdrFlag: vi.fn(),
   includeIdrFlag: vi.fn(),
@@ -120,6 +123,8 @@ beforeEach(() => {
   })
   // An IDR with no task order covers no flags
   api.getIdrFlags.mockImplementation(async () => idrFlagsData([], { taskOrderId: server.task_order_id ?? null }))
+  // No curb segments unless a test says otherwise
+  api.getIdrSegments.mockResolvedValue({ frozen: false, counts: { attributed: 0, excluded: 0, claimed_elsewhere: 0, total: 0 }, segments: [], pay_items: [], unmapped: 0 })
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-7' }, { id: 'to-2', task_order_number: 'TO-8' }])
   window.confirm = vi.fn(() => true) // jsdom has no confirm() or alert()
   window.alert = vi.fn()

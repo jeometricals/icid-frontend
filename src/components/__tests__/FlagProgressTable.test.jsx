@@ -42,4 +42,10 @@ describe('flagCount', () => {
     expect(flagCount(1)).toBe('1 flag')
     expect(flagCount(10)).toBe('10 flags')
   })
+
+  it('counts segments for a pay item in LF, which curb segments fill', () => {
+    expect(flagCount(1, 'LF')).toBe('1 segment')
+    expect(flagCount(3, 'LF')).toBe('3 segments')
+    expect(flagCount(3, 'SF')).toBe('3 flags')
+  })
 })

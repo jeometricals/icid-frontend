@@ -1,7 +1,7 @@
 /**
  * The Progress pages' pay-item table from PIR flags: one row per pay item of a rollup (getProjectProgress /
  * getTaskOrderProgress), in the backend's order, with its Approved, In flight, Unclaimed and Live total quantities
- * (two decimals, with their flag counts) and the approved share. A state with nothing in it reads "—".
+ * (two decimals, with their flag counts; segment counts for a pay item in LF, which curb segments fill) and the approved share. A state with nothing in it reads "—".
  * Props: payItems (a rollup's pay_items) and label (the table's accessible name).
  */
 import { formatFlagQuantity, formatPercent } from '../lib/payItemFormat'
@@ -15,18 +15,19 @@ const STATES = [
 
 const dash = <span className="text-gray-400">—</span>
 
-// "1 flag", "10 flags"
-export function flagCount(count) {
-  return `${count} ${count === 1 ? 'flag' : 'flags'}`
+// "1 flag", "10 flags"; for a pay item in LF, whose quantities are curb segments' lengths, "1 segment", "3 segments"
+export function flagCount(count, unit) {
+  const word = unit === 'LF' ? 'segment' : 'flag'
+  return `${count} ${word}${count === 1 ? '' : 's'}`
 }
 
-// A state's cell: its quantity and how many flags make it up, or a dash when it has none
-function BucketCell({ bucket }) {
+// A state's cell: its quantity and how many flags (or segments) make it up, or a dash when it has none
+function BucketCell({ bucket, unit }) {
   if (!bucket.flag_count && !bucket.quantity) return dash
   return (
     <>
       <span className="text-gray-900">{formatFlagQuantity(bucket.quantity)}</span>
-      <span className="ml-1 text-xs text-gray-500">({flagCount(bucket.flag_count)})</span>
+      <span className="ml-1 text-xs text-gray-500">({flagCount(bucket.flag_count, unit)})</span>
     </>
   )
 }
@@ -55,7 +56,7 @@ export default function FlagProgressTable({ payItems, label }) {
               <td className="px-4 py-3 text-gray-700">{item.description}</td>
               {STATES.map(([key]) => (
                 <td key={key} className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
-                  <BucketCell bucket={item[key]} />
+                  <BucketCell bucket={item[key]} unit={item.unit} />
                 </td>
               ))}
               <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums text-gray-900">
