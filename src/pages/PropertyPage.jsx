@@ -13,7 +13,8 @@
  * its PIR, or un-delete it. A PIR's flags are drawn and listed in its workspace. Everyone on the project, demo users
  * too, gets "Download Construction Report" (DownloadFileButton), on once an approved IDR has claimed one
  * of the live PIR's flags (when the flags can't be read the button stays on, and the backend's 404 says why). Back returns to the project's
- * properties. The backend refuses anyone not on the
+ * properties; Back to task order to the latest live task order the site is in (the property's task_order_id), and is
+ * off, titled "Not in a task order", when it is in none. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  */
 import { useEffect, useState } from 'react'
@@ -39,6 +40,8 @@ import PirWorkspaceLink from '../components/PirWorkspaceLink'
 import PropertyFormModal from '../components/PropertyFormModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
+
+const NOT_IN_A_TASK_ORDER = 'Not in a task order'
 
 export const NO_PIR_TEXT = 'No PIR yet.'
 export const NOT_COVERED = 'No approved IDR has claimed this site’s flags yet.'
@@ -66,6 +69,10 @@ export default function PropertyPage() {
   const nameOf = useUserNames(user)
 
   const [property, setProperty] = useState(null)
+  // A write answers with the property alone; the task order it is in is only read with it, and no write changes it
+  const setWritten = written => setProperty(current => ({
+    ...written, task_order_id: current?.task_order_id ?? null, task_order_no: current?.task_order_no ?? null,
+  }))
   const [pirs, setPirs] = useState([]) // every PIR of the property, deleted ones included, newest first
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -151,7 +158,7 @@ export default function PropertyPage() {
 
   const save = async (values) => {
     const saved = form.kind === 'property'
-      ? await run(() => updateProperty(property.id, values), setProperty)
+      ? await run(() => updateProperty(property.id, values), setWritten)
       : await run(
         () => (form.mode === 'add' ? createPir(property.id, values) : updatePir(livePir.id, values)),
         rereadPirs,
@@ -162,20 +169,32 @@ export default function PropertyPage() {
   const confirm = async () => {
     const { kind, target } = pending
     const action = ACTIONS[kind]
-    const done = await run(() => action.run(target), kind.startsWith('property') ? setProperty : rereadPirs)
+    const done = await run(() => action.run(target), kind.startsWith('property') ? setWritten : rereadPirs)
     if (!done) return
     setToast(action.done(target))
     setPending(null)
   }
 
+  const taskOrderId = property?.task_order_id ?? null
   const back = (
-    <button
-      onClick={() => navigate(`/project/${projectId}/properties`)}
-      className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 mb-6"
-    >
-      <ArrowLeft className="h-5 w-5" />
-      <span className="font-medium">Back to Site Info — {projectId}</span>
-    </button>
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-2 mb-6">
+      <button
+        onClick={() => navigate(`/project/${projectId}/properties`)}
+        className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span className="font-medium">Back to Site Info — {projectId}</span>
+      </button>
+      <button
+        onClick={() => navigate(`/project/${projectId}/task-orders/${taskOrderId}`)}
+        disabled={!taskOrderId}
+        title={taskOrderId ? undefined : NOT_IN_A_TASK_ORDER}
+        className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span className="font-medium">Back to task order{property?.task_order_no ? ` ${property.task_order_no}` : ''}</span>
+      </button>
+    </div>
   )
 
   const page = (children) => (

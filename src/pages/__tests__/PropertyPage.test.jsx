@@ -224,6 +224,36 @@ describe('PropertyPage — the property', () => {
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/properties')
   })
 
+  it('goes back to the task order the site is in', async () => {
+    property = { ...property, task_order_id: 'd0000000-0000-4000-8000-000000000001', task_order_no: 'TO-001' }
+    await renderLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to task order TO-001' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/task-orders/d0000000-0000-4000-8000-000000000001')
+  })
+
+  it('greys out Back to task order for a site in no task order', async () => {
+    property = { ...property, task_order_id: null, task_order_no: null }
+    await renderLoaded()
+    const button = screen.getByRole('button', { name: 'Back to task order' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Not in a task order')
+  })
+
+  it('keeps Back to task order after an edit, whose answer has no task order', async () => {
+    property = { ...property, task_order_id: 'd0000000-0000-4000-8000-000000000001', task_order_no: 'TO-001' }
+    api.updateProperty.mockImplementationOnce(async (id, values) => {
+      const { task_order_id, task_order_no, ...rest } = { ...property, ...values }
+      return rest
+    })
+    await renderLoaded()
+    await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Edit' }))
+    await userEvent.clear(screen.getByLabelText('Address'))
+    await userEvent.type(screen.getByLabelText('Address'), '14 Main St')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Back to task order TO-001' })).toBeEnabled()
+  })
+
   it('shows a load failure with Retry', async () => {
     api.getProperty.mockRejectedValueOnce(new Error('Property not found'))
     renderPage()

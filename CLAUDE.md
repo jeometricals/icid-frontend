@@ -619,7 +619,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     admin.
   - **One property:** `/project/:projectId/properties/:propertyId` (`PropertyPage`), from a site's link in
     Site Info or a task order's bundle, for anyone on the project; Back ("Back to
-    Site Info — <project_id>") returns to the project's properties. One `getProperty` and one
+    Site Info — <project_id>") returns to the project's properties; beside it "Back to task order <number>" opens the
+    latest live task order the site is in (`task_order_id` on `getProperty`'s answer, kept across the site's writes,
+    whose answers don't carry it), greyed out and titled "Not in a task order" when it is in none. One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
     "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's block, lot,
     address, violation no. and type or a ped ramp's intersection, quadrant, facing street and ramp type, then notes
