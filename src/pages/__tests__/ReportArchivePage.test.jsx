@@ -250,7 +250,7 @@ describe('ReportArchivePage — filters', () => {
     renderPage()
     await screen.findByText('Sep 23, 2026')
     const panel = screen.getByRole('region', { name: 'Filters' })
-    expect(within(panel).getAllByRole('checkbox')).toHaveLength(6)
+    expect(within(panel).getAllByRole('checkbox')).toHaveLength(7)
     expect(panel.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 

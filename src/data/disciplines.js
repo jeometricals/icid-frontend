@@ -5,6 +5,7 @@ export const DISCIPLINES = [
   'Concrete (delivery)',
   'Concrete (testing)',
   'Curb',
+  'Daily Site Patrol',
   'General',
   'Sidewalk',
 ]
