@@ -45,9 +45,9 @@ describe('ArchiveFilters', () => {
     expect(within(group).getAllByRole('checkbox').map(box => box.parentElement.textContent)).toEqual(DISCIPLINES)
   })
 
-  it('offers the six disciplines exactly as the backend spells them', () => {
+  it('offers the seven disciplines exactly as the backend spells them', () => {
     expect(DISCIPLINES).toEqual([
-      'AC Pavement', 'Concrete (delivery)', 'Concrete (testing)', 'Curb', 'General', 'Sidewalk',
+      'AC Pavement', 'Concrete (delivery)', 'Concrete (testing)', 'Curb', 'Daily Site Patrol', 'General', 'Sidewalk',
     ])
   })
 

@@ -31,6 +31,7 @@ import GeneralReportPage from './pages/reports/GeneralReportPage'
 import SWCBReportPage from './pages/reports/SWCBReportPage'
 import ConcMixReportPage from './pages/reports/ConcMixReportPage'
 import ConcCylReportPage from './pages/reports/ConcCylReportPage'
+import DSPReportPage from './pages/reports/DSPReportPage'
 import ACReportPage from './pages/reports/ACReportPage'
 
 // Report pages used to live at .../report/:reportId, and every one of them was a General
@@ -72,6 +73,7 @@ function AppRoutes() {
           <Route path="/project/:projectId/idr/:idrId/ac/:reportId" element={<ACReportPage />} />
           <Route path="/project/:projectId/idr/:idrId/conc-mix/:reportId" element={<ConcMixReportPage />} />
           <Route path="/project/:projectId/idr/:idrId/conc-cyl/:reportId" element={<ConcCylReportPage />} />
+          <Route path="/project/:projectId/idr/:idrId/dsp/:reportId" element={<DSPReportPage />} />
         </Route>
         <Route path="/project/:projectId/idr/:idrId/report/:reportId" element={<LegacyReportRedirect />} />
         <Route path="/" element={<Navigate to="/projects" replace />} />
