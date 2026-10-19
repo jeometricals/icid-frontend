@@ -463,6 +463,39 @@ describe('IDRPage — submit', () => {
     expect(api.submitIdr).not.toHaveBeenCalled()
   })
 
+  it('asks before submitting a DSP with no answers, and stops when declined', async () => {
+    server = draftIdr({ reports: [report({ report_id: 'rep-dsp', report_type: 'DSP', report_data: {} })] })
+    window.confirm.mockReturnValue(false)
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(window.confirm).toHaveBeenCalledWith('DSP report has no answers; submit anyway?')
+    expect(certifyDialog()).not.toBeInTheDocument()
+  })
+
+  it('goes on to certification when a blank DSP is confirmed, and does not ask when the DSP has an answer', async () => {
+    server = draftIdr({ reports: [report({ report_id: 'rep-dsp', report_type: 'DSP', report_data: {} })] })
+    const user = userEvent.setup()
+    const { unmount } = renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(window.confirm).toHaveBeenCalledTimes(1)
+    expect(certifyDialog()).toBeInTheDocument()
+    unmount()
+
+    window.confirm.mockClear()
+    server = draftIdr({ reports: [report({
+      report_id: 'rep-dsp', report_type: 'DSP',
+      report_data: { mosChecklist: [{ item: 'trees_protected', answer: 'yes', details: null }] },
+    })] })
+    renderPage()
+    await ready()
+    await user.click(submitButton())
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(certifyDialog()).toBeInTheDocument()
+  })
+
   it('on a submit error keeps the dialog open with the error inside it; after Cancel the error stays under the button', async () => {
     const ERROR = 'Submit failed: IDR must contain at least one report before submission.'
     api.submitIdr.mockRejectedValueOnce(new Error('IDR must contain at least one report before submission.'))

@@ -46,6 +46,7 @@ import EditModeToggle from '../components/EditModeToggle'
 import Toast from '../components/Toast'
 import { RedlineProvider } from '../contexts/RedlineContext'
 import useReviewEditing from '../lib/useReviewEditing'
+import { DSP_UNANSWERED_CONFIRM, dspHasNoAnswers } from '../data/dspForm'
 
 const SAVE_HEADER_BEFORE_SUBMIT = 'Please save the header before submitting.'
 // Demo users can do everything except submit (the backend refuses it too)
@@ -295,7 +296,8 @@ export default function IDRPage() {
     }
   }
 
-  // Blocks on unsaved header edits so what gets submitted is what's on screen, then asks for certification.
+  // Blocks on unsaved header edits so what gets submitted is what's on screen, asks before submitting a DSP with no
+  // answers, then asks for certification.
   // Submitting signs the IDR, so a user without a signature sets one up first and goes on to certify from there.
   const openCertify = () => {
     if (busy || reports.length === 0) return
@@ -303,6 +305,9 @@ export default function IDRPage() {
       window.alert(SAVE_HEADER_BEFORE_SUBMIT)
       return
     }
+    // A soft check, not a block: a DSP with nothing answered exports as a blank form
+    const blankDsp = reports.some(r => r.report_type === 'DSP' && dspHasNoAnswers(r.report_data))
+    if (blankDsp && !window.confirm(DSP_UNANSWERED_CONFIRM)) return
     if (!user?.has_signature) {
       setSignatureSetupOpen(true)
       return

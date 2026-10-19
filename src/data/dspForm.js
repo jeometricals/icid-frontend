@@ -97,3 +97,11 @@ export function dspSaveError(data) {
 export function needsDetails(row) {
   return row.answer === 'no' && !(row.details ?? '').trim()
 }
+
+export const DSP_UNANSWERED_CONFIRM = 'DSP report has no answers; submit anyway?'
+
+/** Whether a DSP report's saved report_data has no checklist answer at all (a never-saved {} report included). */
+export function dspHasNoAnswers(reportData) {
+  const data = dspFormData(reportData)
+  return [...data.mosChecklist, ...data.mptChecklist].every(row => row.answer === null)
+}

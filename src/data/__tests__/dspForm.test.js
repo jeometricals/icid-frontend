@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ANSWERS, FIELD_ORDER_NUMBER_REQUIRED, MOS_ITEMS, MPT_ITEMS, dspFormData, dspSaveError, emptyDspData, needsDetails,
+  ANSWERS, FIELD_ORDER_NUMBER_REQUIRED, MOS_ITEMS, MPT_ITEMS, dspFormData, dspHasNoAnswers, dspSaveError, emptyDspData,
+  needsDetails,
 } from '../dspForm'
 
 // The backend's keys (api/schemas/dsp_report.py), in DSP Fr's order
@@ -91,5 +92,22 @@ describe('dspSaveError and needsDetails', () => {
     expect(needsDetails({ answer: 'no', details: 'Trench open' })).toBe(false)
     expect(needsDetails({ answer: 'yes', details: null })).toBe(false)
     expect(needsDetails({ answer: null, details: null })).toBe(false)
+  })
+})
+
+describe('dspHasNoAnswers', () => {
+  it('is true for a never-saved report and a blank form', () => {
+    expect(dspHasNoAnswers({})).toBe(true)
+    expect(dspHasNoAnswers(null)).toBe(true)
+    expect(dspHasNoAnswers(emptyDspData())).toBe(true)
+  })
+
+  it('is false once any row of either checklist is answered, N/A included', () => {
+    const mos = emptyDspData()
+    mos.mosChecklist[2].answer = 'na'
+    expect(dspHasNoAnswers(mos)).toBe(false)
+    const mpt = emptyDspData()
+    mpt.mptChecklist[15].answer = 'no'
+    expect(dspHasNoAnswers(mpt)).toBe(false)
   })
 })

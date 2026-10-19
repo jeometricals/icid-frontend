@@ -330,7 +330,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   `{timeOfPatrol, mosChecklist, mptChecklist, fieldOrderIssued, fieldOrderNumber}`, each checklist a row per item of
   `dspForm.js` in its order (`{item, answer: 'yes' | 'no' | 'na' | null, details}`); the page always saves the whole
   form. The date, day of week, I.R. No. and sheet show read-only (the export works them out). A field order issued
-  without a number blocks the save inline, as the backend would refuse it; a No without details only warns. No
+  without a number blocks the save inline, as the backend would refuse it; a No without details only warns. Submit
+  asks `DSP report has no answers; submit anyway?` when a DSP has nothing answered (`dspHasNoAnswers`), never blocks. No
   redlines yet: in review its inputs stay disabled.
 - **Reviewer edits (redlines).** While an IDR is in review, the reviewer who accepted it at its current stage (or
   an admin) can change its fields. The backend applies each edit and logs it, so the IDR and its reports always
