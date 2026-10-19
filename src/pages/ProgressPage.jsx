@@ -4,9 +4,12 @@
  * the pay-item quantities of its approved IDRs come to against the project's budget (its contract items), by contract
  * value, in three sections, top to bottom: the project total, a card per budget code, and a table with a row per pay
  * item that has quantities.
- * The quantities are those of a range of work dates, or all of them with "Show cumulative" ticked; the budget is
- * always the whole project's. Both live in the URL (?from=&to=, YYYY-MM-DD, and ?cumulative=true), so a view can
- * be linked and reloaded; a URL with no dates means the last 30 days. One request per view.
+ * The quantities are all of them with "Show cumulative" ticked, as the page opens, or those of a range of work dates;
+ * the budget is always the whole project's. Both live in the URL (?from=&to=, YYYY-MM-DD, and ?cumulative=true|false),
+ * so a view can be linked and reloaded; a URL with neither is cumulative, one with dates and no cumulative is ranged
+ * (as links were before), and unticked with no dates means the last 30 days. One request per view. The pay-item
+ * table: Pay Item, Description, Budget Code, Total Qty to date (cumulative) or in range, Unit, Total contract Qty
+ * (the bid quantity), Cost to date (the quantity's contract value) and % Progress (quantity over contract quantity).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -41,6 +44,13 @@ function actualsLabel({ from, to, cumulative }) {
   return `${dayLabel(from)} – ${dayLabel(to)}`
 }
 
+// A pay item's progress by quantity: its quantity over the contract's, as a percentage to 1 decimal place; null
+// when it has no contract quantity (unbudgeted, or bid at none)
+function quantityProgress(item) {
+  if (item.unbudgeted || !item.budgeted_quantity) return null
+  return Math.round((item.actual_quantity / item.budgeted_quantity) * 1000) / 10
+}
+
 const dash = <span className="text-gray-400">—</span>
 
 export default function ProgressPage() {
@@ -52,7 +62,9 @@ export default function ProgressPage() {
   const ranged = searchParams.has('from') || searchParams.has('to')
   const from = ranged ? searchParams.get('from') || '' : defaults.from
   const to = ranged ? searchParams.get('to') || '' : defaults.to
-  const cumulative = searchParams.get('cumulative') === 'true'
+  // Cumulative unless the URL says otherwise: ?cumulative=false, or dates with no cumulative at all (a link from before)
+  const cumulativeParam = searchParams.get('cumulative')
+  const cumulative = cumulativeParam === null ? !ranged : cumulativeParam === 'true'
   // Cumulative leaves the dates out of the request, so a backwards range is no trouble then
   const backwards = !cumulative && Boolean(from && to && from > to)
   const [data, setData] = useState(null)
@@ -78,7 +90,9 @@ export default function ProgressPage() {
     const params = new URLSearchParams()
     if (next.from) params.set('from', next.from)
     if (next.to) params.set('to', next.to)
+    // Dates alone mean a range; with none, unticked has to be said
     if (cumulative) params.set('cumulative', 'true')
+    else if (!next.from && !next.to) params.set('cumulative', 'false')
     // The flag section's filters stay as they are
     for (const key of ['task_order', 'property']) {
       if (searchParams.get(key)) params.set(key, searchParams.get(key))
@@ -90,7 +104,8 @@ export default function ProgressPage() {
   const changeCumulative = (on) => {
     const params = new URLSearchParams(searchParams)
     if (on) params.set('cumulative', 'true')
-    else params.delete('cumulative')
+    else if (ranged) params.delete('cumulative')
+    else params.set('cumulative', 'false')
     setSearchParams(params, { replace: true })
   }
 
@@ -226,16 +241,19 @@ export default function ProgressPage() {
                       <th scope="col" className="px-4 py-3">Pay Item</th>
                       <th scope="col" className="px-4 py-3">Description</th>
                       <th scope="col" className="px-4 py-3">Budget Code</th>
-                      <th scope="col" className="px-4 py-3 text-right">Total Qty</th>
+                      <th scope="col" className="px-4 py-3 text-right">
+                        {cumulative ? 'Total Qty to date' : 'Total Qty in range'}
+                      </th>
                       <th scope="col" className="px-4 py-3">Unit</th>
-                      <th scope="col" className="px-4 py-3 text-right">Budgeted</th>
-                      <th scope="col" className="px-4 py-3 text-right">%</th>
-                      <th scope="col" className="px-4 py-3">Progress</th>
+                      <th scope="col" className="px-4 py-3 text-right">Total contract Qty</th>
+                      <th scope="col" className="px-4 py-3 text-right">Cost to date</th>
+                      <th scope="col" className="px-4 py-3 text-right">% Progress</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {shown.pay_items.map(item => {
-                      const over = item.percent > 100
+                      const progress = quantityProgress(item)
+                      const over = progress > 100
                       return (
                         <tr key={JSON.stringify([item.pay_item_ref, item.budget_code, item.unit, item.unbudgeted])}>
                           <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900">
@@ -248,21 +266,15 @@ export default function ProgressPage() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-gray-700">{item.unit || dash}</td>
                           <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums text-gray-700">
-                            {item.unbudgeted ? dash : formatDollars(item.budgeted_value, { cents: true })}
+                            {item.budgeted_quantity == null ? dash : formatPayItemQuantity(item.budgeted_quantity)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums text-gray-900">
+                            {item.actual_value == null ? dash : formatDollars(item.actual_value, { cents: true })}
                           </td>
                           <td className={`px-4 py-3 whitespace-nowrap text-right tabular-nums ${over ? 'text-warn font-semibold' : 'text-gray-900'}`}>
                             {item.unbudgeted
                               ? <span className="text-xs text-gray-400">— unbudgeted</span>
-                              : formatPercent(item.percent)}
-                          </td>
-                          <td className="px-4 py-3 w-40">
-                            {!item.unbudgeted && (
-                              <Bar
-                                percent={item.percent}
-                                tone={over ? 'warn' : 'default'}
-                                label={`${item.pay_item_ref} progress`}
-                              />
-                            )}
+                              : formatPercent(progress)}
                           </td>
                         </tr>
                       )

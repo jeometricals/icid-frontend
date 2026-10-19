@@ -253,12 +253,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     **unbudgeted** (a change order, an item added by description alone): it has a quantity but no value, and is
     in no total and no percent.
   - **The range is in the URL** (`?from=&to=`, the archive's convention), written with `replace` so picking dates
-    doesn't pile up history. A URL with no dates means the last 30 days (`DEFAULT_RANGE_DAYS`), by the viewer's
-    own calendar (`date-fns`, never `toISOString()`, which is UTC's day), and is left without them, so such a
-    link always means "the latest 30 days". A URL naming either bound is taken as it stands: a cleared picker is
-    an open bound, and clearing both is the default again.
+    doesn't pile up history. **The page opens cumulative** (Slice D): a URL with neither dates nor `cumulative`
+    is cumulative, and one with dates but no `cumulative` is a range (as links were before). Unticked with no dates
+    (`?cumulative=false`) means the last 30 days (`DEFAULT_RANGE_DAYS`), by the viewer's own calendar (`date-fns`,
+    never `toISOString()`, which is UTC's day). A URL naming either bound is taken as it stands: a cleared picker is
+    an open bound, and clearing both is the 30 days again (`?cumulative=false`).
   - **From after To** shows a red hint under the pickers, hides the results and asks the backend nothing.
-  - **Show cumulative** (a checkbox beside the pickers, `?cumulative=true`) asks for every approved quantity,
+  - **Show cumulative** (a checkbox beside the pickers, ticked to start; `?cumulative=true|false`) asks for every approved quantity,
     whatever its date: the request is `{ projectId, cumulative: true }` with no dates. The pickers are disabled
     and a line says the range is off; the dates stay in the URL for when the box is unticked. A backwards range
     doesn't matter while it is ticked.
@@ -275,9 +276,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       item). The response only lists pay items that have quantities, so the card can't say how many the code
       has in all. The code's name is a button that folds those items open under it; closed to start.
     - **Pay items** (the table): one row per entry of `pay_items`, in the backend's order (budget code, then
-      ref, as text): pay item, description, budget code, total quantity, unit, then Budgeted (dollars and
-      cents), % and Progress (a bar). An unbudgeted row stays in the table with a dash for its budget, a muted
-      "— unbudgeted" in the % column and no bar. With nothing approved in the range the table gives way to "No
+      ref, as text): Pay Item, Description, Budget Code, Total Qty to date ("Total Qty in range" when not
+      cumulative), Unit, Total contract Qty (`budgeted_quantity`, the bid quantity), Cost to date (`actual_value`,
+      dollars and cents) and % Progress: quantity over contract quantity, to 1 decimal place (worked out on the
+      page, a dash for a contract quantity of 0), in the warn colour past 100. No bar. An unbudgeted row stays in
+      the table with dashes for its contract quantity and cost and a muted "— unbudgeted" in % Progress. With nothing approved in the range the table gives way to "No
       approved quantities in this range" ("...yet" when cumulative); the two sections above still show, at 0%.
   - **Over budget** (a percent past 100) takes the warn colour on the percent and the bar, at all three levels:
     Tailwind's `warn` (`text-warn`, `bg-warn`), which is the `--warn` token in `src/index.css`, kept apart from

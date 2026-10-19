@@ -141,20 +141,38 @@ describe('ProgressPage — first load', () => {
     expect(screen.getByRole('heading', { name: 'Progress — HWS0023' })).toBeInTheDocument()
     expect(fromInput()).toHaveAttribute('type', 'date')
     expect(toInput()).toHaveAttribute('type', 'date')
-    expect(cumulativeBox()).not.toBeChecked()
+    expect(cumulativeBox()).toBeChecked()
+    expect(fromInput()).toBeDisabled()
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Project total' })).not.toBeInTheDocument()
   })
 
-  it('asks for the last 30 days, by the local calendar, and leaves the URL bare', async () => {
+  it('opens cumulative: asks with no dates, and leaves the URL bare', async () => {
     renderPage()
     await screen.findByRole('table')
+    expect(api.listQuantities).toHaveBeenCalledTimes(1)
+    expect(lastCall()).toEqual({ projectId: 'HWS0023', cumulative: true })
+    expect(url()).toBe('')
+  })
+
+  it('unticked, asks for the last 30 days, by the local calendar', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('table')
+    await user.click(cumulativeBox())
+    await waitFor(() => expect(url()).toBe('?cumulative=false'))
+    await waitFor(() => expect(lastCall()).toEqual({ projectId: 'HWS0023', from: '2026-09-12', to: '2026-10-12' }))
     expect(fromInput()).toHaveValue('2026-09-12')
     expect(toInput()).toHaveValue('2026-10-12')
-    expect(api.listQuantities).toHaveBeenCalledTimes(1)
-    expect(lastCall()).toEqual({ projectId: 'HWS0023', from: '2026-09-12', to: '2026-10-12' })
-    expect(url()).toBe('')
+    expect(fromInput()).toBeEnabled()
+  })
+
+  it('takes a link with dates and no cumulative as a range, as links were before', async () => {
+    renderPage('?from=2026-08-01&to=2026-08-31')
+    await screen.findByRole('table')
+    expect(cumulativeBox()).not.toBeChecked()
+    expect(lastCall()).toEqual({ projectId: 'HWS0023', from: '2026-08-01', to: '2026-08-31' })
   })
 
   it('goes back to the project page', async () => {
@@ -185,7 +203,7 @@ describe('ProgressPage — the project total', () => {
   })
 
   it('says which quantities the figures are of, against the whole budget', async () => {
-    renderPage()
+    renderPage('?cumulative=false')
     await screen.findByRole('table')
     expect(within(projectTotal()).getByText('actuals: Sep 12 – Oct 12 · budget: full project')).toBeInTheDocument()
   })
@@ -293,69 +311,71 @@ describe('ProgressPage — the budget codes', () => {
 })
 
 describe('ProgressPage — the pay-item table', () => {
-  it('lists the pay items in the backend\'s order, with Budgeted, % and Progress at the end', async () => {
+  it('lists the pay items in the backend\'s order: quantity to date, contract quantity, cost to date, % progress', async () => {
     renderPage()
     await screen.findByRole('table')
     expect(screen.getAllByRole('columnheader').map(th => th.textContent)).toEqual([
-      'Pay Item', 'Description', 'Budget Code', 'Total Qty', 'Unit', 'Budgeted', '%', 'Progress',
+      'Pay Item', 'Description', 'Budget Code', 'Total Qty to date', 'Unit', 'Total contract Qty', 'Cost to date',
+      '% Progress',
     ])
     expect(tableRows()).toEqual([
-      ['4.13 AAS', '4" concrete sidewalk', 'BC-1', '901', 'SF', '$120,000.00', '9.0%', ''],
-      ['6.02', 'Steel faced curb', 'BC-1', '171', 'LF', '$4,000.00', '171.0%', ''],
-      ['10.02', 'Asphaltic concrete', 'BC-4', '3.2', 'TN', '$150,000.00', '0.3%', ''],
-      ['9.99', 'Change order item', 'BC-4', '2', 'EA', '—', '— unbudgeted', ''],
-      ['7.01', 'Excavation', 'BC-7', '30', 'CY', '$2,000.00', '150.0%', ''],
-      ['—', 'Tree guard', '—', '54', 'EA', '—', '— unbudgeted', ''],
+      ['4.13 AAS', '4" concrete sidewalk', 'BC-1', '901', 'SF', '10,000', '$10,812.00', '9.0%'],
+      ['6.02', 'Steel faced curb', 'BC-1', '171', 'LF', '100', '$6,840.00', '171.0%'],
+      ['10.02', 'Asphaltic concrete', 'BC-4', '3.2', 'TN', '1,000', '$480.00', '0.3%'],
+      ['9.99', 'Change order item', 'BC-4', '2', 'EA', '—', '—', '— unbudgeted'],
+      ['7.01', 'Excavation', 'BC-7', '30', 'CY', '20', '$3,000.00', '150.0%'],
+      ['—', 'Tree guard', '—', '54', 'EA', '—', '—', '— unbudgeted'],
     ])
+    expect(screen.queryByRole('progressbar', { name: '4.13 AAS progress' })).not.toBeInTheDocument()
   })
 
-  it('draws a bar on every budgeted row', async () => {
-    renderPage()
+  it('heads the quantity "in range" when dates are picked', async () => {
+    renderPage('?from=2026-08-01&to=2026-08-31')
     await screen.findByRole('table')
-    const bar = within(bodyRows()[0]).getByRole('progressbar')
-    expect(bar).toHaveAccessibleName('4.13 AAS progress')
-    expect(bar).toHaveAttribute('aria-valuenow', '9')
+    expect(screen.getAllByRole('columnheader')[3]).toHaveTextContent('Total Qty in range')
   })
 
-  it('gives an over-budget row the warn colour on its percent and bar', async () => {
-    renderPage()
-    await screen.findByRole('table')
-    const over = within(bodyRows()[1])
-    expect(over.getByText('171.0%')).toHaveClass('text-warn')
-    expect(over.getByTestId('bar-fill')).toHaveClass('bg-warn')
-    expect(over.getByTestId('bar-overflow')).toBeInTheDocument()
-
-    const under = within(bodyRows()[0])
-    expect(under.getByText('9.0%')).not.toHaveClass('text-warn')
-    expect(under.getByTestId('bar-fill')).toHaveClass('bg-construction-600')
-  })
-
-  it('keeps an unbudgeted row, marked in the % column, with no budget and no bar', async () => {
-    renderPage()
-    await screen.findByRole('table')
-    const unbudgeted = within(bodyRows()[3])
-    expect(unbudgeted.getByText('— unbudgeted')).toHaveClass('text-gray-400')
-    expect(unbudgeted.queryByRole('progressbar')).not.toBeInTheDocument()
-  })
-
-  it('shows a dash and an empty bar for a contract item bid at nothing', async () => {
+  it('works % Progress out by quantity, not by value', async () => {
     api.listQuantities.mockResolvedValue({
       ...FOUND,
       pay_items: [item('1.01', 'BC-1', 'LS', 1, 'Mobilization', {
-        unit_price: 0, budgeted_quantity: 1, budgeted_value: 0, actual_value: 0, percent: null,
+        unit_price: 0, budgeted_quantity: 4, budgeted_value: 0, actual_value: 0, percent: null,
       })],
     })
     renderPage()
     await screen.findByRole('table')
-    expect(tableRows()).toEqual([['1.01', 'Mobilization', 'BC-1', '1', 'LS', '$0.00', '—', '']])
-    expect(within(bodyRows()[0]).getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')
-    expect(within(bodyRows()[0]).queryByTestId('bar-fill')).not.toBeInTheDocument()
+    expect(tableRows()).toEqual([['1.01', 'Mobilization', 'BC-1', '1', 'LS', '4', '$0.00', '25.0%']])
+  })
+
+  it('gives a row past its contract quantity the warn colour', async () => {
+    renderPage()
+    await screen.findByRole('table')
+    expect(within(bodyRows()[1]).getByText('171.0%')).toHaveClass('text-warn')
+    expect(within(bodyRows()[0]).getByText('9.0%')).not.toHaveClass('text-warn')
+  })
+
+  it('keeps an unbudgeted row, marked in the % Progress column', async () => {
+    renderPage()
+    await screen.findByRole('table')
+    expect(within(bodyRows()[3]).getByText('— unbudgeted')).toHaveClass('text-gray-400')
+  })
+
+  it('reads a dash for a contract item bid at no quantity', async () => {
+    api.listQuantities.mockResolvedValue({
+      ...FOUND,
+      pay_items: [item('1.01', 'BC-1', 'LS', 1, 'Mobilization', {
+        unit_price: 5, budgeted_quantity: 0, budgeted_value: 0, actual_value: 5, percent: null,
+      })],
+    })
+    renderPage()
+    await screen.findByRole('table')
+    expect(tableRows()).toEqual([['1.01', 'Mobilization', 'BC-1', '1', 'LS', '0', '$5.00', '—']])
   })
 })
 
 describe('ProgressPage — the date range', () => {
   it('a picked date goes in the URL with the other bound, and the quantities are fetched again', async () => {
-    renderPage()
+    renderPage('?cumulative=false')
     await screen.findByRole('table')
     pick(fromInput(), '2026-10-01')
     await waitFor(() => expect(url()).toBe('?from=2026-10-01&to=2026-10-12'))
@@ -377,7 +397,7 @@ describe('ProgressPage — the date range', () => {
   })
 
   it('a cleared picker is an open bound', async () => {
-    renderPage()
+    renderPage('?cumulative=false')
     await screen.findByRole('table')
     pick(fromInput(), '')
     await waitFor(() => expect(url()).toBe('?to=2026-10-12'))
@@ -390,14 +410,14 @@ describe('ProgressPage — the date range', () => {
     await screen.findByRole('table')
     expect(toInput()).toHaveValue('')
     pick(fromInput(), '')
-    await waitFor(() => expect(url()).toBe(''))
+    await waitFor(() => expect(url()).toBe('?cumulative=false'))
     expect(fromInput()).toHaveValue('2026-09-12')
     expect(toInput()).toHaveValue('2026-10-12')
     await waitFor(() => expect(lastCall()).toEqual({ projectId: 'HWS0023', from: '2026-09-12', to: '2026-10-12' }))
   })
 
   it('From after To shows a hint and asks the backend nothing until it is put right', async () => {
-    renderPage()
+    renderPage('?cumulative=false')
     await screen.findByRole('table')
     pick(fromInput(), '2026-10-20')
     expect(await screen.findByRole('alert')).toHaveTextContent("From can't be after To.")
@@ -422,7 +442,7 @@ describe('ProgressPage — the date range', () => {
 describe('ProgressPage — Show cumulative', () => {
   it('asks for cumulative quantities with no dates, and disables the pickers', async () => {
     const user = userEvent.setup()
-    renderPage()
+    renderPage('?cumulative=false')
     await screen.findByRole('table')
     await user.click(cumulativeBox())
 
@@ -497,8 +517,8 @@ describe('ProgressPage — nothing to show, and failures', () => {
     expect(screen.queryByRole('region', { name: 'Budget codes' })).not.toBeInTheDocument()
     expect(screen.queryByRole('article')).not.toBeInTheDocument()
     expect(tableRows()).toEqual([
-      ['4.13 AAS', '4" concrete sidewalk', 'BC-1', '901', 'SF', '—', '— unbudgeted', ''],
-      ['—', 'Tree guard', '—', '54', 'EA', '—', '— unbudgeted', ''],
+      ['4.13 AAS', '4" concrete sidewalk', 'BC-1', '901', 'SF', '—', '—', '— unbudgeted'],
+      ['—', 'Tree guard', '—', '54', 'EA', '—', '—', '— unbudgeted'],
     ])
   })
 
@@ -511,7 +531,7 @@ describe('ProgressPage — nothing to show, and failures', () => {
 
   it('a project with no actuals reads 0% on the total and on every card, and says the table is empty', async () => {
     api.listQuantities.mockResolvedValue(NO_ACTUALS)
-    renderPage()
+    renderPage('?cumulative=false')
     expect(await screen.findByText('No approved quantities in this range')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
 
