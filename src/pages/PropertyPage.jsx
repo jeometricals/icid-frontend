@@ -1,7 +1,7 @@
 /**
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
- * on the project: a card with the site's details (a sidewalk's borough, block, lot, address, violation no. and property
- * type; a ped ramp's borough, intersection, quadrant, the street it faces and ramp type; then notes and when it was
+ * on the project: a card with the site's details (a sidewalk's borough, block, lot, CB, address, violation no. and property
+ * type; a ped ramp's borough, CB, intersection, quadrant, the street it faces and ramp type; then notes and when it was
  * added), headed by its display_address; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
  * as-built is signed, under the way into its sketch workspace (PirWorkspaceLink: its page count and "Open sketch
@@ -295,6 +295,7 @@ export default function PropertyPage() {
           <Detail term="Borough">{property.boro}</Detail>
           {property.kind === 'ped_ramp' ? (
             <>
+              <Detail term="CB">{property.community_board || '—'}</Detail>
               <Detail term="Intersection">{property.intersection_street_1} & {property.intersection_street_2}</Detail>
               <Detail term="Quadrant">{property.quadrant}</Detail>
               <Detail term="Facing">{facingStreetName(property) || '—'}</Detail>
@@ -304,6 +305,7 @@ export default function PropertyPage() {
             <>
               <Detail term="Block">{property.block}</Detail>
               <Detail term="Lot">{property.lot}</Detail>
+              <Detail term="CB">{property.community_board || '—'}</Detail>
               <Detail term="Address">{property.address}</Detail>
               <Detail term="Violation No.">{property.violation_no || '—'}</Detail>
               <Detail term="Type">{propertyTypeLabel(property.property_type)}</Detail>

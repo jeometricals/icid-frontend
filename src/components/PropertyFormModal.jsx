@@ -10,6 +10,7 @@ import { formErrors } from '../lib/formErrors'
 export const MAX_ADDRESS_LENGTH = 200
 export const MAX_VIOLATION_LENGTH = 200
 export const MAX_STREET_LENGTH = 200
+export const MAX_COMMUNITY_BOARD_LENGTH = 10
 export const MAX_NOTES_LENGTH = 2000
 
 export const BLOCK_LOT_TAKEN = 'A site at this Borough + Block + Lot already exists in this project.'
@@ -21,10 +22,11 @@ export const FACING_HINT = 'Fill in both intersection streets to pick the one it
 
 // Each kind's fields, in form order, and the ones it can't do without
 const KEYS = {
-  sidewalk: ['boro', 'block', 'lot', 'address', 'violation_no', 'property_type', 'notes'],
-  ped_ramp: ['boro', 'intersection_street_1', 'intersection_street_2', 'quadrant', 'facing_street', 'ramp_type', 'notes'],
+  sidewalk: ['boro', 'block', 'lot', 'community_board', 'address', 'violation_no', 'property_type', 'notes'],
+  ped_ramp: ['boro', 'community_board', 'intersection_street_1', 'intersection_street_2', 'quadrant', 'facing_street',
+    'ramp_type', 'notes'],
 }
-const OPTIONAL = ['violation_no', 'notes']
+const OPTIONAL = ['violation_no', 'community_board', 'notes']
 // The fields a taken site is: the three together
 const LOCATION = { boro: true, block: true, lot: true }
 // A sidewalk's block and lot as typed: digits only, at most so many (leading zeros included, as the inputs cap them)
@@ -34,11 +36,12 @@ const validNumber = (key, text) => new RegExp(`^\\d{1,${DIGITS[key]}}$`).test(te
 // What the form starts with: the property being edited, or nothing
 const startingValues = (kind, initial) => Object.fromEntries(KEYS[kind].map(key => [key, initial?.[key] ?? '']))
 
-// The values as they are sent: text trimmed, blank notes or violation number as null, a block and lot without their
+// The values as they are sent: text trimmed, blank notes, community board or violation number as null, a block and lot without their
 // leading zeros
 function cleaned(kind, values) {
   const sending = Object.fromEntries(KEYS[kind].map(key => [key, typeof values[key] === 'string' ? values[key].trim() : values[key]]))
   sending.notes = sending.notes || null
+  sending.community_board = sending.community_board || null
   if (kind === 'sidewalk') {
     sending.violation_no = sending.violation_no || null
     sending.block = withoutLeadingZeros(sending.block)
@@ -49,9 +52,9 @@ function cleaned(kind, values) {
 
 /**
  * Lets an admin add a site to a project, or edit one, by kind. A sidewalk: borough (chosen, never derived), block
- * (1-5 digits) and lot (1-4 digits), each losing its leading zeros when it loses focus, address, violation no.
- * (optional) and property type.
- * A ped ramp: borough, the two intersection streets, quadrant, the street it faces (offered by name once both
+ * (1-5 digits) and lot (1-4 digits), each losing its leading zeros when it loses focus, Community Board (CB,
+ * optional, at most 10 characters), address, violation no. (optional) and property type.
+ * A ped ramp: borough, Community Board (optional), the two intersection streets, quadrant, the street it faces (offered by name once both
  * streets are in; sent as street_1 / street_2) and ramp type. Both end with notes (optional; blank is null). Editing shows the kind as a fixed line at the top: it
  * can't change. Save is off until every required field is in (and a block and lot are digits) and, when editing, until
  * something has changed. Adding passes on every field and the kind; editing only what changed. The caller runs the
@@ -143,6 +146,7 @@ export default function PropertyFormModal({ mode = 'add', kind: kindProp, initia
   )
   const boroughs = BOROUGHS.map(name => ({ value: name, label: name }))
   const noun = sidewalk ? 'sidewalk' : 'ped ramp'
+  const communityBoard = textField('community_board', 'Community Board (CB)', MAX_COMMUNITY_BOARD_LENGTH, { optional: true })
 
   return (
     <Modal
@@ -171,6 +175,7 @@ export default function PropertyFormModal({ mode = 'add', kind: kindProp, initia
             {selectField('boro', 'Borough', boroughs, { placeholder: 'Choose a borough', autoFocus: true })}
             {numberField('block', 'Block', BLOCK_HINT, BLOCK_INVALID)}
             {numberField('lot', 'Lot', LOT_HINT, LOT_INVALID)}
+            {communityBoard}
 
             {textField('address', 'Address', MAX_ADDRESS_LENGTH)}
             {textField('violation_no', 'Violation No.', MAX_VIOLATION_LENGTH, { optional: true })}
@@ -179,6 +184,7 @@ export default function PropertyFormModal({ mode = 'add', kind: kindProp, initia
         ) : (
           <>
             {selectField('boro', 'Borough', boroughs, { placeholder: 'Choose a borough', autoFocus: true })}
+            {communityBoard}
             {textField('intersection_street_1', 'Intersection 1st Street', MAX_STREET_LENGTH)}
             {textField('intersection_street_2', 'Intersection 2nd Street', MAX_STREET_LENGTH)}
             {selectField('quadrant', 'Quadrant', QUADRANTS.map(name => ({ value: name, label: name })), { placeholder: 'Choose a quadrant' })}

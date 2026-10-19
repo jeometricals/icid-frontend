@@ -21,10 +21,16 @@ function renderTable(props) {
 const headings = () => within(screen.getByRole('table')).getAllByRole('columnheader').map(th => th.textContent)
 
 describe('PropertiesTable', () => {
-  it('lists the site (its block and lot), address, type and added', () => {
+  it('lists the site (its block and lot), CB, address, type and added', () => {
     renderTable()
-    expect(headings()).toEqual(['Site', 'Address', 'Type', 'Added', 'Actions'])
-    expect(screen.getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['Queens Block 123 Lot 45', '12 Main St', '1-3 family'])
+    expect(headings()).toEqual(['Site', 'CB', 'Address', 'Type', 'Added', 'Actions'])
+    expect(screen.getAllByRole('cell').slice(0, 4).map(td => td.textContent))
+      .toEqual(['Queens Block 123 Lot 45', '—', '12 Main St', '1-3 family'])
+  })
+
+  it('shows the site\'s community board under CB', () => {
+    renderTable({ properties: [{ ...ROW, community_board: 'QN13' }] })
+    expect(screen.getAllByRole('cell')[1]).toHaveTextContent('QN13')
   })
 
   it('links each site to its page under its project', () => {
@@ -34,7 +40,7 @@ describe('PropertiesTable', () => {
 
   it('has no Actions column without renderActions, as for a demo user', () => {
     renderTable({ renderActions: undefined })
-    expect(headings()).toEqual(['Site', 'Address', 'Type', 'Added'])
+    expect(headings()).toEqual(['Site', 'CB', 'Address', 'Type', 'Added'])
   })
 
   it('shows a ped ramp by its intersection and ramp type, its link reading "Ped ramp"', () => {
@@ -43,7 +49,7 @@ describe('PropertiesTable', () => {
       display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
     }] })
     expect(screen.getByRole('link', { name: 'Ped ramp' })).toHaveAttribute('href', `/project/HWS0023/properties/${ROW.id}`)
-    expect(screen.getAllByRole('cell').slice(1, 3).map(td => td.textContent))
+    expect(screen.getAllByRole('cell').slice(2, 4).map(td => td.textContent))
       .toEqual(['Atlantic Ave & Court St — NE Quadrant (Facing Court St)', 'Parallel'])
   })
 })

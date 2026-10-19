@@ -62,6 +62,14 @@ describe('PropertyPickerModal', () => {
     expect(screen.getByText('No sites match "nowhere".')).toBeInTheDocument()
   })
 
+  it('shows a site\'s CB beside its block and lot, and finds it by it', async () => {
+    api.listProperties.mockResolvedValue([ELM, { ...MAIN, community_board: 'QN13' }, MAPLE, OAK])
+    await renderPicker()
+    expect(box('Queens Block 123 Lot 45').closest('label')).toHaveTextContent('CB QN13')
+    await userEvent.type(search(), 'qn13')
+    expect(shownSites()).toEqual(['Queens Block 123 Lot 45'])
+  })
+
   it('lists a ped ramp by its intersection and ramp type, and finds it by a street', async () => {
     const RAMP = { ...property(5, null, null, null, null), kind: 'ped_ramp', ramp_type: 'PARALLEL',
       display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)' }

@@ -14,7 +14,7 @@ const typeText = (row) => (row.kind === 'ped_ramp' ? rampTypeLabel(row.ramp_type
 
 /**
  * A table of properties (a task order's bundle): Site (a link to the property's page: a sidewalk's "Queens Block 123 Lot 45",
- * "Ped ramp" for a ped ramp), address (the display_address, so a ped ramp's intersection; the notes as a tooltip), type (a
+ * "Ped ramp" for a ped ramp), CB (its community_board, a dash for none), address (the display_address, so a ped ramp's intersection; the notes as a tooltip), type (a
  * sidewalk's property type, a ped ramp's ramp type), added (when the property was added to the project) and, when
  * the caller gives renderActions, an Actions cell it fills. A soft-deleted property is muted, its Site crossed out
  * beside a Deleted badge (the date as a tooltip). Rows are in the order given.
@@ -22,7 +22,7 @@ const typeText = (row) => (row.kind === 'ped_ramp' ? rampTypeLabel(row.ramp_type
  * a demo user).
  */
 export default function PropertiesTable({ properties, renderActions }) {
-  const headings = ['Site', 'Address', 'Type', 'Added', ...(renderActions ? ['Actions'] : [])]
+  const headings = ['Site', 'CB', 'Address', 'Type', 'Added', ...(renderActions ? ['Actions'] : [])]
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -55,6 +55,9 @@ export default function PropertiesTable({ properties, renderActions }) {
                   ) : (
                     <Link to={propertyPath(row)} className="text-construction-700 hover:underline">{siteLabel(row)}</Link>
                   )}
+                </td>
+                <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
+                  {row.community_board || '—'}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <p title={row.notes || undefined}>{row.display_address}</p>

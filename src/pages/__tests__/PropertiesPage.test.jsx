@@ -124,11 +124,11 @@ describe('PropertiesPage — the two sections', () => {
     expect(within(sidewalks()).getByRole('button', { name: 'Prior Notice Violation Sidewalks (2)' })).toBeInTheDocument()
     expect(within(ramps()).getByRole('button', { name: 'Pedestrian Ramps (1)' })).toBeInTheDocument()
     expect(headings(sidewalks())).toEqual(
-      ['Borough', 'Block', 'Lot', 'Address', 'Violation No.', 'Status', 'Added', 'Task Order No.', 'Actions'],
+      ['Borough', 'Block', 'Lot', 'CB', 'Address', 'Violation No.', 'Status', 'Added', 'Task Order No.', 'Actions'],
     )
     expect(headings(ramps())).toEqual([
-      'Borough', 'Intersection 1st Street', 'Intersection 2nd Street', 'Quadrant', 'Facing', 'Type', 'Status', 'Added',
-      'Task Order No.', 'Actions',
+      'Borough', 'CB', 'Intersection 1st Street', 'Intersection 2nd Street', 'Quadrant', 'Facing', 'Type', 'Status',
+      'Added', 'Task Order No.', 'Actions',
     ])
     expect(within(sidewalks()).queryByText('Atlantic Ave')).not.toBeInTheDocument()
     expect(within(ramps()).queryByText('12 Main St')).not.toBeInTheDocument()
@@ -137,15 +137,21 @@ describe('PropertiesPage — the two sections', () => {
   it("shows a sidewalk's borough, block and lot as the backend sends them, its violation, status and task order", async () => {
     await renderListed()
     const cells = within(rowOf('12 Main St')).getAllByRole('cell').map(td => td.textContent)
-    expect(cells.slice(0, 8)).toEqual(['Queens', '123', '45', '12 Main St', 'V-100', 'Task Ordered', 'Sep 14', 'TO-7'])
+    expect(cells.slice(0, 9)).toEqual(['Queens', '123', '45', '—', '12 Main St', 'V-100', 'Task Ordered', 'Sep 14', 'TO-7'])
     const other = within(rowOf('40 Oak Ave')).getAllByRole('cell').map(td => td.textContent)
-    expect(other.slice(4, 8)).toEqual(['—', `Constructed ${YEAR}-10-02`, 'Sep 14', '—'])
+    expect(other.slice(5, 9)).toEqual(['—', `Constructed ${YEAR}-10-02`, 'Sep 14', '—'])
   })
 
   it("shows a ped ramp's streets, quadrant, the street it faces by name, its type, and a dash for no status", async () => {
     await renderListed()
     const cells = within(rowOf('Atlantic Ave')).getAllByRole('cell').map(td => td.textContent)
-    expect(cells.slice(0, 9)).toEqual(['Brooklyn', 'Atlantic Ave', 'Court St', 'NE', 'Court St', 'Perpendicular', '—', 'Sep 14', '—'])
+    expect(cells.slice(0, 10)).toEqual(['Brooklyn', '—', 'Atlantic Ave', 'Court St', 'NE', 'Court St', 'Perpendicular', '—', 'Sep 14', '—'])
+  })
+
+  it("shows a site's community board under CB", async () => {
+    server[0] = { ...server[0], community_board: 'QN13' }
+    await renderListed()
+    expect(within(rowOf('12 Main St')).getAllByRole('cell')[3]).toHaveTextContent('QN13')
   })
 
   it('opens both sections, and folds and unfolds each by its header', async () => {
@@ -254,6 +260,7 @@ describe('PropertiesPage — adding and editing', () => {
     await userEvent.selectOptions(screen.getByLabelText('Borough'), 'Brooklyn')
     await userEvent.type(screen.getByLabelText('Block'), '00555')
     await userEvent.type(screen.getByLabelText('Lot'), '1')
+    await userEvent.type(screen.getByLabelText(/Community Board/), 'BK2')
     await userEvent.type(screen.getByLabelText('Address'), '7 Elm Pl')
     await userEvent.type(screen.getByLabelText(/Violation No\./), 'V-9')
     await userEvent.selectOptions(screen.getByLabelText('Property type'), 'expedited')
@@ -262,10 +269,11 @@ describe('PropertiesPage — adding and editing', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.createProperty).toHaveBeenCalledWith('HWS0023', {
-      kind: 'sidewalk', boro: 'Brooklyn', block: '555', lot: '1', address: '7 Elm Pl', violation_no: 'V-9',
-      property_type: 'expedited', notes: 'Corner lot',
+      kind: 'sidewalk', boro: 'Brooklyn', block: '555', lot: '1', community_board: 'BK2', address: '7 Elm Pl',
+      violation_no: 'V-9', property_type: 'expedited', notes: 'Corner lot',
     })
-    expect(within(rowOf('7 Elm Pl')).getAllByRole('cell').slice(0, 3).map(td => td.textContent)).toEqual(['Brooklyn', '555', '1'])
+    expect(within(rowOf('7 Elm Pl')).getAllByRole('cell').slice(0, 4).map(td => td.textContent))
+      .toEqual(['Brooklyn', '555', '1', 'BK2'])
     expect(within(sidewalks()).getByRole('button', { name: 'Prior Notice Violation Sidewalks (3)' })).toBeInTheDocument()
   })
 
@@ -283,11 +291,11 @@ describe('PropertiesPage — adding and editing', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.createProperty).toHaveBeenCalledWith('HWS0023', {
-      kind: 'ped_ramp', boro: 'Queens', intersection_street_1: 'Main St', intersection_street_2: '37th Ave',
-      quadrant: 'SW', facing_street: 'street_1', ramp_type: 'PARALLEL', notes: null,
+      kind: 'ped_ramp', boro: 'Queens', community_board: null, intersection_street_1: 'Main St',
+      intersection_street_2: '37th Ave', quadrant: 'SW', facing_street: 'street_1', ramp_type: 'PARALLEL', notes: null,
     })
     const cells = within(within(ramps()).getByText('37th Ave').closest('tr')).getAllByRole('cell').map(td => td.textContent)
-    expect(cells.slice(0, 6)).toEqual(['Queens', 'Main St', '37th Ave', 'SW', 'Main St', 'Parallel'])
+    expect(cells.slice(0, 7)).toEqual(['Queens', '—', 'Main St', '37th Ave', 'SW', 'Main St', 'Parallel'])
   })
 
   it('shows a taken borough, block and lot in the dialog and adds no row', async () => {
@@ -316,7 +324,7 @@ describe('PropertiesPage — adding and editing', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(api.updateProperty).toHaveBeenCalledWith(LISTED[2].id, { facing_street: 'street_1' })
-    expect(within(rowOf('Court St')).getAllByRole('cell')[4]).toHaveTextContent('Atlantic Ave')
+    expect(within(rowOf('Court St')).getAllByRole('cell')[5]).toHaveTextContent('Atlantic Ave')
   })
 
   it("shows the backend's refusal of a kind change below the form", async () => {

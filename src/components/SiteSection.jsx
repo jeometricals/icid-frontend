@@ -43,10 +43,12 @@ const KIND_COLUMNS = {
   sidewalk: [
     { heading: 'Block', cell: row => dash(row.block) },
     { heading: 'Lot', cell: row => dash(row.lot) },
+    { heading: 'CB', cell: row => dash(row.community_board) },
     { heading: 'Address', cell: row => siteLink(row, row.address), wide: true },
     { heading: 'Violation No.', cell: row => dash(row.violation_no) },
   ],
   ped_ramp: [
+    { heading: 'CB', cell: row => dash(row.community_board) },
     { heading: 'Intersection 1st Street', cell: row => siteLink(row, row.intersection_street_1), wide: true },
     { heading: 'Intersection 2nd Street', cell: row => row.intersection_street_2, wide: true },
     { heading: 'Quadrant', cell: row => row.quadrant },
@@ -63,7 +65,7 @@ export const siteHeadings = (kind) => ['Borough', ...KIND_COLUMNS[kind].map(colu
  * with its count of live sites, "Prior Notice Violation Sidewalks (12)", which folds the section; then the disabled
  * Bulk Upload button with its tooltip, for everyone; then Add, when onAdd is given), and under it the kind's table or
  * an empty state ("No sidewalks added yet." with a prominent Add when onAdd is given). Open when it mounts.
- * Columns: Borough, the kind's own (a sidewalk's Block, Lot, Address, Violation No.; a ped ramp's two intersection
+ * Columns: Borough, the kind's own (a sidewalk's Block, Lot, CB, Address, Violation No.; a ped ramp's CB, two intersection
  * streets, Quadrant, Facing by street name, Type), Status (SiteStatus; Deleted for a deleted row), Added, Task Order
  * No. and Actions (renderActions(row)). A sidewalk's address and a ped ramp's first street link to the site's page.
  * Block and lot are the site's own, as the backend stores them.

@@ -7,11 +7,12 @@ import { rampTypeLabel } from '../data/propertyKinds'
 import { propertyCount } from '../lib/taskOrders'
 import { siteLabel } from '../lib/properties'
 
-// Whether a property matches the search: a sidewalk's block, lot or address, or a ped ramp's display_address (its
+// Whether a property matches the search: a sidewalk's block, lot, CB or address, a site's CB, or a ped ramp's display_address (its
 // intersection), holds the text, any case
 const matches = (property, text) => {
   const needle = text.trim().toLowerCase()
-  return !needle || [property.block, property.lot, property.display_address].some(text => text?.toLowerCase().includes(needle))
+  return !needle || [property.block, property.lot, property.community_board, property.display_address]
+    .some(text => text?.toLowerCase().includes(needle))
 }
 
 /**
@@ -154,6 +155,9 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
                       onChange={() => toggle(property.id)}
                     />
                     <span className="font-medium text-gray-900 whitespace-nowrap">{siteLabel(property)}</span>
+                    {property.community_board && (
+                      <span className="text-gray-500 whitespace-nowrap">CB {property.community_board}</span>
+                    )}
                     <span className="flex-1 text-gray-700">{property.display_address}</span>
                     <span className="text-gray-500 whitespace-nowrap">{property.kind === 'ped_ramp' ? rampTypeLabel(property.ramp_type) : propertyTypeLabel(property.property_type)}</span>
                   </label>

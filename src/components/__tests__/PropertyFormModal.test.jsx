@@ -66,10 +66,11 @@ describe('PropertyFormModal — adding a sidewalk', () => {
     expect(saveButton()).toBeDisabled()
   })
 
-  it('asks Borough, Block, Lot, Address, Violation No., Property type and Notes, in that order, and no BBL', () => {
+  it('asks Borough, Block, Lot, CB, Address, Violation No., Property type and Notes, in that order, and no BBL', () => {
     renderModal({ kind: 'sidewalk' })
-    expect(fieldOrder()).toEqual(['Borough', 'Block', 'Lot', 'Address', 'Violation No. (optional)', 'Property type',
-      'Notes (optional)'])
+    expect(fieldOrder()).toEqual(['Borough', 'Block', 'Lot', 'Community Board (CB) (optional)', 'Address',
+      'Violation No. (optional)', 'Property type', 'Notes (optional)'])
+    expect(field('Community Board (CB) (optional)')).toHaveAttribute('maxLength', '10')
     expect(screen.queryByText(/BBL/)).not.toBeInTheDocument()
     expect(borough()).toHaveFocus()
   })
@@ -143,9 +144,17 @@ describe('PropertyFormModal — adding a sidewalk', () => {
     await userEvent.type(notes(), '   ')
     await userEvent.click(saveButton())
     expect(onSave).toHaveBeenCalledWith({
-      kind: 'sidewalk', boro: 'Brooklyn', block: '120', lot: '45', address: '12 Main St', violation_no: null,
-      property_type: '4_plus_family', notes: null,
+      kind: 'sidewalk', boro: 'Brooklyn', block: '120', lot: '45', community_board: null, address: '12 Main St',
+      violation_no: null, property_type: '4_plus_family', notes: null,
     })
+  })
+
+  it('passes on a community board, trimmed', async () => {
+    const { onSave } = renderModal({ kind: 'sidewalk' })
+    await fillSidewalk()
+    await userEvent.type(field('Community Board (CB) (optional)'), ' QN13 ')
+    await userEvent.click(saveButton())
+    expect(onSave.mock.calls[0][0].community_board).toBe('QN13')
   })
 })
 
@@ -181,8 +190,9 @@ describe('PropertyFormModal — adding a ped ramp', () => {
     await userEvent.type(notes(), ' Curb cut cracked ')
     await userEvent.click(saveButton())
     expect(onSave).toHaveBeenCalledWith({
-      kind: 'ped_ramp', boro: 'Queens', intersection_street_1: 'Main St', intersection_street_2: '37th Ave',
-      quadrant: 'SE', facing_street: 'street_2', ramp_type: 'CUT_THROUGH', notes: 'Curb cut cracked',
+      kind: 'ped_ramp', boro: 'Queens', community_board: null, intersection_street_1: 'Main St',
+      intersection_street_2: '37th Ave', quadrant: 'SE', facing_street: 'street_2', ramp_type: 'CUT_THROUGH',
+      notes: 'Curb cut cracked',
     })
   })
 

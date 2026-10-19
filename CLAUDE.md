@@ -566,9 +566,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     of live sites ("Prior Notice Violation Sidewalks (12)", `aria-expanded`), which folds the section; then "Bulk
     Upload Sidewalks" / "Bulk Upload Ped Ramps", disabled for everyone with the tooltip "AI import — coming soon"
     (on a wrapper too); then, for a member who isn't a demo user, "Add Sidewalk" / "Add Ped Ramp". Rows are in the backend's order.
-    - Sidewalk columns: Borough, Block, Lot (the site's own `block` and `lot`), Address (a link to
+    - Sidewalk columns: Borough, Block, Lot (the site's own `block` and `lot`), CB (`community_board`, a dash for
+      none), Address (a link to
       the site's page), Violation No., Status, Added, Task Order No., Actions.
-    - Ped ramp columns: Borough, Intersection 1st Street (a link to the site's page), Intersection 2nd Street,
+    - Ped ramp columns: Borough, CB, Intersection 1st Street (a link to the site's page), Intersection 2nd Street,
       Quadrant, Facing (the street's name, `facingStreetName`), Type (the ramp type's label), Status, Added, Task
       Order No., Actions.
     - **Status** (`SiteStatus`): a dash for `none`, a "Task Ordered" pill, or "Constructed YYYY-MM-DD" with the
@@ -586,8 +587,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       at most 5 characters, hint "Block number as it appears on the Prior Notice (no leading zeros).") and Lot (at
       most 4, hint "Lot number (no leading zeros)."), each losing its leading zeros when it loses focus (`"00123"` is
       `"123"`, `"0000"` is `"0"`) and sent that way; one that isn't digits turns its hint into the rule ("A block is 1
-      to 5 digits.") and keeps Save off. Then Address, Violation No. (optional; blank is `null`) and "Property type".
-    - Ped ramp: Borough, Intersection 1st Street, Intersection 2nd Street, Quadrant, Facing (disabled with "Fill in
+      to 5 digits.") and keeps Save off. Then "Community Board (CB)" (optional, at most 10 characters; blank is
+      `null`), Address, Violation No. (optional; blank is `null`) and "Property type".
+    - Ped ramp: Borough, Community Board (CB, as a sidewalk's), Intersection 1st Street, Intersection 2nd Street, Quadrant, Facing (disabled with "Fill in
       both intersection streets to pick the one it faces." until both are in, then the two street names; it sends
       `street_1` / `street_2`) and Type.
     - Save is off until every required field is in and, when editing, something changed. Adding sends `kind` and
@@ -606,9 +608,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     the list is read again and a toast reads "Site <name> deleted." / "Site <name> restored." The backend takes a
     second soft-delete as a no-op and answers 404 to un-deleting a live property. There is no delete forever.
   - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: Site
-    (`siteLabel`: a sidewalk's "Queens Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page),
+    (`siteLabel`: a sidewalk's "Queens Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page), CB
+    (the bundle's own column, a dash for none; the picker's "CB QN13" beside the site, only when set),
     `display_address`, and the property type or ramp type. The picker's search ("Search by block, lot or address")
-    matches a sidewalk's block, lot or address and a ped ramp's `display_address` (its streets).
+    matches a sidewalk's block, lot or address, any site's CB, and a ped ramp's `display_address` (its streets).
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
   admin. One live
   PIR per property; a soft-deleted one frees the property for a new one. A PIR is `{id, property_id, project_id,
@@ -627,7 +630,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     whose answers don't carry it), greyed out and titled "Not in a task order" when it is in none. One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
     "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's block, lot,
-    address, violation no. and type or a ped ramp's intersection, quadrant, facing street and ramp type, then notes
+    CB, address, violation no. and type or a ped ramp's CB, intersection, quadrant, facing street and ramp type, then notes
     and added, with Edit (`PropertyFormModal`) for a member and Delete for an admin; a deleted property reads Deleted, gets no Add PIR
     (the backend refuses a PIR on it with a 400), and is the admin's: they get Un-delete (and Edit PIR on its live
     PIR), anyone else no controls (the backend answers them 400). A demo user gets no controls and the note "Demo
@@ -996,7 +999,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Properties: `GET /v1/projects/{id}/properties?include_deleted=` (anyone on the project; `include_deleted` is
     admin only) · `POST /v1/projects/{id}/properties` · `GET /v1/properties/{id}` · `PATCH /v1/properties/{id}` ·
     `POST /v1/properties/{id}/admin/soft-delete` · `POST /v1/properties/{id}/admin/undelete` (adding and editing
-    for anyone on the project but a demo user, soft-delete and un-delete admin only; body `kind`, `notes` and a
+    for anyone on the project but a demo user, soft-delete and un-delete admin only; body `kind`, `community_board`,
+    `notes` and a
     sidewalk's `{boro, block, lot, address, violation_no, property_type}` or a ped ramp's `{boro, intersection_street_1,
     intersection_street_2, quadrant, facing_street, ramp_type}`; a PATCH sends only what changed and never the kind)
   - Task orders: `GET /v1/projects/{id}/task-orders?include_deleted=` · `POST /v1/projects/{id}/task-orders` ·

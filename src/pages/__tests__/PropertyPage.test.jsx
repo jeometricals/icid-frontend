@@ -224,6 +224,17 @@ describe('PropertyPage — the property', () => {
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/properties')
   })
 
+  it('shows the site\'s community board under CB', async () => {
+    property = { ...property, community_board: 'QN13' }
+    await renderLoaded()
+    expect(valueOf(propertyCard(), 'CB')).toHaveTextContent('QN13')
+  })
+
+  it('reads a dash for a site without a community board', async () => {
+    await renderLoaded()
+    expect(valueOf(propertyCard(), 'CB')).toHaveTextContent('—')
+  })
+
   it('goes back to the task order the site is in', async () => {
     property = { ...property, task_order_id: 'd0000000-0000-4000-8000-000000000001', task_order_no: 'TO-001' }
     await renderLoaded()
