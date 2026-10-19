@@ -13,6 +13,7 @@ import ProjectDashboard from './pages/ProjectDashboard'
 import DraftsListPage from './pages/DraftsListPage'
 import ReportArchivePage from './pages/ReportArchivePage'
 import ProgressPage from './pages/ProgressPage'
+import AssessmentsPage from './pages/AssessmentsPage'
 import PropertiesPage from './pages/PropertiesPage'
 import PropertyPage from './pages/PropertyPage'
 import PirPage from './pages/PirPage'
@@ -59,6 +60,7 @@ function AppRoutes() {
           <Route path="/project/:projectId/drafts" element={<DraftsListPage />} />
           <Route path="/project/:projectId/archive" element={<ReportArchivePage />} />
           <Route path="/project/:projectId/progress" element={<ProgressPage />} />
+          <Route path="/project/:projectId/assessments" element={<AssessmentsPage />} />
           <Route path="/project/:projectId/properties" element={<PropertiesPage />} />
           <Route path="/project/:projectId/properties/:propertyId" element={<PropertyPage />} />
           <Route path="/project/:projectId/properties/:propertyId/pir" element={<PirPage />} />

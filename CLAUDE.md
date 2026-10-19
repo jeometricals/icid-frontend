@@ -21,7 +21,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent, and `formatFlagQuantity`: a flag quantity to two decimals), `idrFlags.js` (an IDR's flags as the pages word them: a flag's site, amount and sketch link, who may exclude or include one, the claim and release sentences; see IDR flags) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `facingStreetName` and `withoutLeadingZeros`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), `contractItems.js` (a `getContractItems` response fixture for the pay-item picker) `idrFlags.js` (`idrFlag` and `idrFlagsData`: a `getIdrFlags` response) and `progress.js` (progress rollups shaped on SE384's walkthrough: `PROJECT_PROGRESS`, `TASK_ORDER_PROGRESS`, `EMPTY_PROGRESS`, `progressItem`).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, the admin import's `SmartPirImportForm` and the IDR page's `IdrFlagsSection`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), As-Builts & Assessments' `SidewalkAssessmentTab`, the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, the admin import's `SmartPirImportForm` and the IDR page's `IdrFlagsSection`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -203,11 +203,24 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Excavated is after Date Constructed; nothing stops the save. For anyone who can't write (a demo user, or anyone
     but an admin on a deleted site) the fields are off and there is no Save. After a save the line and the PIR show
     the saved block, with a "Title block saved" toast.
-- **Assessment Summary** (R1i). "Download Assessment Summary" beside the Progress page's title, for everyone on the
-  project, always on (a project with nothing approved still gets a workbook, one "No activity" tab): the project's
-  monthly .xlsx for DOT, a tab per month of construction. `downloadAssessmentSummary(projectId, { from, to })` in
-  `services/assessmentSummary.js` (`apiFetchFile`, `saveFile`); no range picker yet, so the page asks for every month.
-  A failure shows under the button, as for the Construction Reports.
+- **As-Builts & Assessments** (Slice C). `/project/:projectId/assessments` (`AssessmentsPage`), reached from the
+  "As-Builts & Assessments" link beside the Progress and Assessments page's title, for everyone on the project. A tab
+  bar of report types (`REPORT_TABS`; a new report is one more entry), the tab in `?tab=` (none, or an unknown one, is
+  the first): "Sidewalk Assessment Summary" (`SidewalkAssessmentTab`) and "Pedramp Inspection Report" ("Coming soon").
+  Changing tab drops the other tab's parameters. Back: "Back to Progress and Assessments".
+  - **Sidewalk Assessment Summary:** `getAssessmentSites(projectId, { from, to })` (`GET .../assessment-summary`), a
+    row per constructed site, its figures summed over the date-constructed period (Constructed from / to, `?from=&to=`,
+    YYYY-MM-DD; none to start, every date; From after To says so and asks nothing). A search box (`?q=`) narrows the
+    rows in the page by address, block, lot, block and lot together (`123 45`, `123/45`, `123-45`) or violation no.
+    (`matchesSearch`). Columns as the workbook's: Property Address (a link to the site's page, "Block 123 Lot 45 ·
+    V-77" under it), CB, the 4" and 7" square feet (two decimals, a dash for none) and amounts (a dash without a rate),
+    Grand Total, Remarks, and Construction Report (a "PDF" `DownloadFileButton`, the most recently approved IDR's). A
+    totals row sums the rows shown. "N sites" over the table ("of M" while searching); empty: "No constructed sites
+    yet.", "No sites were constructed in this period." or "No constructed sites match …".
+  - **Downloads** under the table: "Download tailored report" (`downloadTailoredAssessmentSummary`: the period and,
+    while searching, the shown sites' ids; one tab named for the period; off when no row is shown) and "Download
+    accumulative report" (`downloadAssessmentSummary(projectId)`: the whole project's workbook, a tab per month named
+    "Nov 2026", whatever the filters). A failure shows under its button.
 - **Progress from PIR flags** (R1g). How much of the sidewalk work the PIR flags describe is approved (claimed by an
   approved IDR), in flight (attributed to an open IDR) or unclaimed, per pay item a flag can fill. Two places: the top
   of the Progress page (`ProjectFlagProgress`) and the task order page (`TaskOrderProgress`).
@@ -238,7 +251,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     2.03 + 0.97 CY against 3.01, from 3.006); the totals come from the unrounded amounts. It is read again whenever
     the page's task order changes (an edit, bundling, unbundling).
   - Everyone who can read the project sees it, demo users included; there is nothing to change.
-- **Progress.** `/project/:projectId/progress` (`ProgressPage`), the "Progress" tile on the project dashboard:
+- **Progress.** `/project/:projectId/progress` (`ProgressPage`, titled "Progress and Assessments — <id>"), the
+  "Progress and Assessments" tile on the project dashboard, with the "As-Builts & Assessments" link by its title:
   the flags' progress above (see "Progress from PIR flags"), then budget against actual, by contract value. What the pay-item quantities of the project's approved IDRs are worth
   at their contract items' unit prices, beside what those contract items were bid at.
   - **One call:** `listQuantities({ projectId, from, to, cumulative })` in `services/quantities.js`, which is
@@ -989,7 +1003,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     roll-ups; for a user on the project, or an admin)
   - `GET /v1/properties/{id}/construction-report` (a PDF) · `GET /v1/idrs/{id}/construction-reports` (a ZIP): the
     Construction Reports; for anyone on the project
-  - `GET /v1/projects/{id}/assessment-summary.xlsx?from=&to=` (the Progress page's download; anyone on the project)
+  - `GET /v1/projects/{id}/assessment-summary?from=&to=` (the Sidewalk Assessment Summary tab) ·
+    `GET /v1/projects/{id}/assessment-summary/tailored.xlsx?from=&to=&property_id=` (its tailored download) ·
+    `GET /v1/projects/{id}/assessment-summary.xlsx` (its accumulative download); anyone on the project
   - `GET /v1/pir-pages/{id}/annotations` (page 1's title block) · `PATCH /v1/pirs/{id}/title-block` (the editor's save;
     members, not demo users)
   - `GET /v1/projects/{id}/progress-rollup?task_order_id=&property_id=` (the Progress page's flag section) ·

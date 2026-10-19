@@ -146,7 +146,7 @@ export default function ProjectDashboard() {
             onClick={() => navigate(`/project/${projectId}/progress`)}
             className="bg-gray-200 text-gray-700 p-6 rounded-lg hover:bg-gray-300 transition-colors text-center"
           >
-            <h3 className="font-bold text-lg">Progress</h3>
+            <h3 className="font-bold text-lg">Progress and Assessments</h3>
           </button>
           <button
             onClick={() => navigate(`/project/${projectId}/task-orders`)}

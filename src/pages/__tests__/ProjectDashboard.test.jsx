@@ -311,7 +311,7 @@ describe('ProjectDashboard progress button', () => {
     mockAuth()
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Progress' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Progress and Assessments' }))
     expect(mockNavigate).toHaveBeenCalledWith('/project/HWS0023/progress')
   })
 
@@ -319,10 +319,10 @@ describe('ProjectDashboard progress button', () => {
     mockAuth()
     vi.spyOn(api, 'getProjectById').mockResolvedValue(MOCK_PROJECT)
     renderDashboard()
-    const progress = await screen.findByRole('button', { name: 'Progress' })
+    const progress = await screen.findByRole('button', { name: 'Progress and Assessments' })
     const tiles = within(progress.parentElement).getAllByRole('button')
       .map(button => [...button.children].map(line => line.textContent).join(' / '))
-    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress', 'Task Order / for Sidewalk and Ped-Ramp'])
+    expect(tiles).toEqual(['New Inspector Daily Diary', 'Drafts', 'Report Archive', 'Progress and Assessments', 'Task Order / for Sidewalk and Ped-Ramp'])
   })
 })
 

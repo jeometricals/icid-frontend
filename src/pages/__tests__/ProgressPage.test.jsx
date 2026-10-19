@@ -138,7 +138,7 @@ describe('ProgressPage — first load', () => {
   it('shows the title and the range pickers while the quantities load', () => {
     api.listQuantities.mockReturnValue(new Promise(() => {}))
     renderPage()
-    expect(screen.getByRole('heading', { name: 'Progress — HWS0023' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Progress and Assessments — HWS0023' })).toBeInTheDocument()
     expect(fromInput()).toHaveAttribute('type', 'date')
     expect(toInput()).toHaveAttribute('type', 'date')
     expect(cumulativeBox()).toBeChecked()
@@ -711,36 +711,14 @@ describe('ProgressPage — sidewalk progress from PIR flags', () => {
 })
 
 // ---------------------------------------------------------------------------
-// The Assessment Summary download (R1i)
+// The way to As-Builts & Assessments (Slice C), where the Assessment Summary lives now
 // ---------------------------------------------------------------------------
 
-describe('ProgressPage — Assessment Summary', () => {
-  const summaryButton = () => screen.getByRole('button', { name: 'Download Assessment Summary' })
-
-  it('sits beside the title, on from the start', async () => {
+describe('ProgressPage — As-Builts & Assessments', () => {
+  it("links beside the title to the project's As-Builts & Assessments page, in place of the old download", async () => {
     renderPage()
-    expect(summaryButton()).toBeEnabled()
+    expect(screen.getByRole('link', { name: 'As-Builts & Assessments' })).toHaveAttribute('href', '/project/HWS0023/assessments')
+    expect(screen.queryByRole('button', { name: 'Download Assessment Summary' })).not.toBeInTheDocument()
     await screen.findByRole('table')
-  })
-
-  it("downloads the project's workbook on click", async () => {
-    api.downloadAssessmentSummary.mockResolvedValue('HWS0023_assessment_summary_2026-10-12.xlsx')
-    renderPage()
-    await screen.findByRole('table')
-    await userEvent.click(summaryButton())
-    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023')
-  })
-
-  it.each([
-    [403, 'Project access required', 'Download failed: Project access required'],
-    [404, 'Project not found', 'Project not found'],
-    [500, "Failed to read the Assessment Summary's data", "Download failed: Failed to read the Assessment Summary's data"],
-  ])('shows a %i under the button in the backend\'s words', async (status, detail, shown) => {
-    api.downloadAssessmentSummary.mockRejectedValue(Object.assign(new Error(detail), { status }))
-    renderPage()
-    await screen.findByRole('table')
-    await userEvent.click(summaryButton())
-    const alerts = await screen.findAllByRole('alert')
-    expect(alerts.some(alert => alert.textContent.includes(shown))).toBe(true)
   })
 })
