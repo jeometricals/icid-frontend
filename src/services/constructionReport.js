@@ -6,9 +6,10 @@ import { saveFile } from './exports'
 // project, demo users included. The backend answers 404 when no approved IDR covers the property's flags (or the IDR
 // isn't approved, or claimed none) and 422 when a sketch can't go on one sheet.
 
-// The backend's 422 for a sketch too large for one sheet (or on more than one page), word for word
+// The backend's 422 for a one-sheet sketch too large to read, word for word (a report of several sheets prints one per
+// PIR page, R1h.1a)
 export const SKETCH_TOO_LARGE_MESSAGE =
-  "This property's sketch is too large to render on a single sheet. Multi-sheet support ships in R1h.1."
+  "This property's sketch is too large to render on one sheet; split it with a match line onto another PIR page."
 
 /**
  * Downloads a property's Construction Report: of the given IDR, or by default the most recently approved one that
