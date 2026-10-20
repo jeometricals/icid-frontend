@@ -6,7 +6,8 @@
  * project; on a submitted inspection, only an RE; an approved TIF, or one of an approved inspection, nobody ("TIF is
  * approved — no further edits"). An RE (or an admin) signs it with "Sign & Approve": their name as it prints (their own
  * to start) and New York licence number, both required; it uses their ICID signature image, which is not a
- * cryptographic signature. Everyone gets "Download TIF form" (DOT's form filled as it stands); an admin alone gets
+ * cryptographic signature. Everyone gets "Download TIF form" (DOT's form filled as it stands, with ACROBAT_SAVE_NOTE under
+ * the page's head); an admin alone gets
  * Delete (confirmed), which returns to the inspection. Section 8's photos and section 9's site design / layout are
  * PedRampPhotosSection's, under the same lock. Refusals read as the backend words them.
  */
@@ -25,7 +26,7 @@ import DownloadFileButton from '../components/DownloadFileButton'
 import PedRampPhotosSection from '../components/PedRampPhotosSection'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
-import { APPROVED_LOCK, SUBMITTED_LOCK } from './PedRampInspectionPage'
+import { ACROBAT_SAVE_NOTE, APPROVED_LOCK, SUBMITTED_LOCK } from './PedRampInspectionPage'
 
 export const TIF_APPROVED_LOCK = 'TIF is approved — no further edits'
 export const SIGNATURE_NOTE = 'Signed in ICID with your signature image; re-sign in Acrobat if DOT requires a cryptographic signature.'
@@ -215,6 +216,7 @@ export default function PedRampTifPage() {
           </div>
         </div>
 
+        <p className="mb-4 text-sm text-gray-600">{ACROBAT_SAVE_NOTE}</p>
         {lock && (
           <p role="note" className="mb-4 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700">{lock}</p>
         )}

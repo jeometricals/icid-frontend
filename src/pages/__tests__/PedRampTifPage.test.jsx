@@ -3,7 +3,7 @@ import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import PedRampTifPage, { SIGNATURE_NOTE, TIF_APPROVED_LOCK } from '../PedRampTifPage'
-import { APPROVED_LOCK, SUBMITTED_LOCK } from '../PedRampInspectionPage'
+import { ACROBAT_SAVE_NOTE, APPROVED_LOCK, SUBMITTED_LOCK } from '../PedRampInspectionPage'
 import * as api from '../../services/api'
 import * as AuthContext from '../../contexts/AuthContext'
 import { ProjectRolesContext } from '../../contexts/ProjectRolesContext'
@@ -142,6 +142,7 @@ describe('PedRampTifPage', () => {
     renderPage({ user: DEMO_USER, roles: ['inspector'] })
     await loaded()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.getByText(ACROBAT_SAVE_NOTE)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Download TIF form' }))
     expect(api.downloadTifForm).toHaveBeenCalledWith(TIF_ID)
   })

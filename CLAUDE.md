@@ -231,7 +231,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       inspection's draft TIFs first").
     - **Downloads:** "Preview (ICID)" (the ICID inspection report, `downloadInspectionReport`, for everyone) and, once
       approved, "Download DOT form" (`downloadInspectionDotForms`: DOT's fillable forms as filed at approval, through a
-      signed URL; a ZIP when the corner needs several forms or has TIFs), with `DOT_FORM_NOTE` under it.
+      signed URL; a ZIP when the corner needs several forms or has TIFs), with `DOT_FORM_NOTE` under it, which ends with
+      `ACROBAT_SAVE_NOTE` (the forms keep NeedAppearances so they stay fillable: Acrobat may ask to save on close; No is
+      right). The TIF page shows the same note.
   - **TIFs** (Pedramp Phase 3, S3). `services/pedRampTifs.js`: `listInspectionTifs`, `draftTif(inspectionId,
     propertyId)`, `getTif`, `updateTif` (only what changed; null clears), `approveTif(id, {signer_name,
     signer_ny_license_no})`, `deleteTif` (admin) and `downloadTifForm` (DOT's TIF filled as it stands, through a signed

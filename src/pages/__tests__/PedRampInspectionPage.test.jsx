@@ -329,7 +329,7 @@ describe('PedRampInspectionPage — TIFs and downloads', () => {
     expect(api.downloadInspectionReport).toHaveBeenCalledWith(CORNER_ID)
     await userEvent.click(screen.getByRole('button', { name: 'Download DOT form' }))
     expect(api.downloadInspectionDotForms).toHaveBeenCalledWith(DRAFT.id)
-    expect(screen.getByText(/comes as several forms in a ZIP/)).toBeInTheDocument()
+    expect(screen.getByText(/comes as several forms in a ZIP/)).toHaveTextContent('choose No: nothing was edited')
   })
 
   it('has no DOT form before approval', async () => {
