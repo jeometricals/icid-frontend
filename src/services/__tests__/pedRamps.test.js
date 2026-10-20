@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  createCorner, deleteCorner, getCorner, getRampAttributes, listCorners, saveRampAttributes, updateCorner,
+  createCorner, createPedrampSite, deleteCorner, getCorner, getRampAttributes, listCorners, saveRampAttributes, saveRampLabel,
+  updateCorner,
 } from '../pedRamps'
-import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
+import { mockFetch, mockFetchSequence, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -68,5 +69,36 @@ describe('ramp attributes', () => {
     expect(await saveRampAttributes(PROPERTY_ID, { ramp_running_slope_pct: 9.1 })).toEqual(ATTRIBUTES)
     expect(fetchInit().method).toBe('PUT')
     expect(JSON.parse(fetchInit().body)).toEqual({ ramp_running_slope_pct: 9.1 })
+  })
+})
+
+describe('ped ramp sites', () => {
+  it('adds a corner and its ramp in one call', async () => {
+    const site = { corner_id: CORNER_ID, property_id: PROPERTY_ID, corner_reused: true }
+    mockFetch(201, { data: site })
+    const body = { boro: 'Queens', north_south_street: '38th St', east_west_street: '31st Ave', corner_direction: 'SW',
+      quadrant: 'SW', facing_street: 'street_1', ramp_type: 'CUT_THROUGH', ramp_id_label: 'CT-A' }
+    expect(await createPedrampSite('HWS0023', body)).toEqual(site)
+    expect(fetchUrl().pathname).toBe('/v1/projects/HWS0023/pedramp-sites')
+    expect(fetchInit().method).toBe('POST')
+    expect(JSON.parse(fetchInit().body)).toEqual(body)
+  })
+
+  it('sets a Ramp ID keeping the other attributes of its type', async () => {
+    mockFetchSequence([[200, { data: { ...ATTRIBUTES, ramp_id_label: 'R1', comments: 'Kept' } }], [200, { data: ATTRIBUTES }]])
+    await saveRampLabel(PROPERTY_ID, 'PERPENDICULAR', 'R2')
+    const [, put] = fetch.mock.calls
+    expect(put[1].method).toBe('PUT')
+    const sent = JSON.parse(put[1].body)
+    expect(sent).toMatchObject({ ramp_id_label: 'R2', ramp_running_slope_pct: 9.1, comments: 'Kept' })
+    expect(sent).not.toHaveProperty('cut_through_length_in')
+  })
+
+  it('sets a Ramp ID on a ramp with no attributes yet', async () => {
+    mockFetchSequence([[404, { detail: 'Ramp attributes not entered' }], [200, { data: ATTRIBUTES }]])
+    await saveRampLabel(PROPERTY_ID, 'CUT_THROUGH', 'CT-B')
+    const sent = JSON.parse(fetch.mock.calls[1][1].body)
+    expect(sent.ramp_id_label).toBe('CT-B')
+    expect(sent.cut_through_length_in).toBeNull()
   })
 })

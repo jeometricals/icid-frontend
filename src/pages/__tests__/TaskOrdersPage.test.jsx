@@ -164,6 +164,22 @@ describe('TaskOrdersPage — the list', () => {
       .toEqual(['TO-002', '—', '1 site'])
   })
 
+  it('badges each task order with the kinds it bundles: SW, PR or both', async () => {
+    server = [
+      taskOrder(1, 'TO-001', null, 2, { sidewalk_count: 2, ped_ramp_count: 0 }),
+      taskOrder(2, 'TO-002', null, 3, { sidewalk_count: 1, ped_ramp_count: 2 }),
+      taskOrder(3, 'TO-003', null, 1, { sidewalk_count: 0, ped_ramp_count: 1 }),
+      taskOrder(4, 'TO-004', null, 0, { sidewalk_count: 0, ped_ramp_count: 0 }),
+    ]
+    await renderListed()
+    const sites = (number) => within(rowOf(number)).getAllByRole('cell')[2]
+    expect(sites('TO-001')).toHaveTextContent(/^2 sitesSW$/)
+    expect(sites('TO-002')).toHaveTextContent(/^3 sitesSWPR$/)
+    expect(within(sites('TO-002')).getByText('PR')).toHaveAttribute('title', 'Pedestrian ramps: 2')
+    expect(sites('TO-003')).toHaveTextContent(/^1 sitePR$/)
+    expect(sites('TO-004')).toHaveTextContent(/^0 sites$/)
+  })
+
   it('links each number to its task order\'s page', async () => {
     await renderListed()
     await userEvent.click(within(table()).getByRole('link', { name: 'TO-001' }))

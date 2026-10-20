@@ -7,6 +7,13 @@ import { rampTypeLabel } from '../data/propertyKinds'
 import { propertyCount } from '../lib/taskOrders'
 import { siteLabel } from '../lib/properties'
 
+// The kind filter's chips, All first (the default)
+export const KIND_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'sidewalk', label: 'Sidewalks' },
+  { value: 'ped_ramp', label: 'Pedramps' },
+]
+
 // Whether a property matches the search: a sidewalk's block, lot, CB or address, a site's CB, or a ped ramp's display_address (its
 // intersection), holds the text, any case
 const matches = (property, text) => {
@@ -20,7 +27,8 @@ const matches = (property, text) => {
  * aren't in the task order already (read when the dialog opens), each a checkbox row with its block and lot ("Ped
  * ramp" for a ped ramp), address and type. A search box narrows the rows to a block, lot or address holding the text; "Select all shown" ticks every row shown
  * (a ticked row stays ticked when the search hides it). Add bundles the ticked ones one at a time, in the order
- * shown unfiltered, and stops at the first refusal, so nothing after it is tried; then it hands over what happened.
+ * shown unfiltered, and stops at the first refusal. Chips (All / Sidewalks / Pedramps, All to start) narrow the rows to
+ * one kind, together with the search, so nothing after it is tried; then it hands over what happened.
  * Props: taskOrder (with project_id and its properties), onClose, onDone({added, failed, taskOrder}) — added is how
  * many went in, failed {property, message} for the refusal that stopped it (or null), taskOrder the last one the
  * backend returned (or null when none went in).
@@ -31,6 +39,7 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
   const [search, setSearch] = useState('')
+  const [kind, setKind] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
   const [progress, setProgress] = useState(null) // while adding: how many have gone in
 
@@ -46,7 +55,10 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
     return () => { ignore = true }
   }, [taskOrder, attempt])
 
-  const shown = useMemo(() => available.filter(property => matches(property, search)), [available, search])
+  const shown = useMemo(
+    () => available.filter(property => (kind === 'all' || property.kind === kind) && matches(property, search)),
+    [available, search, kind],
+  )
   const busy = progress !== null
   const allShownSelected = shown.length > 0 && shown.every(property => selected.has(property.id))
 
@@ -119,6 +131,23 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
             />
           </div>
 
+          <div role="group" aria-label="Site kind" className="flex flex-wrap gap-2">
+            {KIND_FILTERS.map(filter => (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={kind === filter.value}
+                onClick={() => setKind(filter.value)}
+                disabled={busy}
+                className={`rounded-full border px-3 py-1 text-sm font-medium ${kind === filter.value
+                  ? 'border-construction-600 bg-construction-600 text-white'
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
             <span>{selected.size} selected · {shown.length} of {propertyCount(available.length)} shown</span>
             <div className="flex gap-3">
@@ -142,7 +171,9 @@ export default function PropertyPickerModal({ taskOrder, onClose, onDone }) {
           </div>
 
           {shown.length === 0 ? (
-            <p className="text-gray-600 py-4 text-center">No sites match "{search.trim()}".</p>
+            <p className="text-gray-600 py-4 text-center">
+              {search.trim() ? `No sites match "${search.trim()}".` : 'No sites of this kind to add.'}
+            </p>
           ) : (
             <ul className="max-h-80 overflow-y-auto divide-y divide-gray-200 border border-gray-200 rounded-md">
               {shown.map(property => (

@@ -1,5 +1,6 @@
 import { apiFetch, apiFetchFile } from './apiClient'
 import { saveFile } from './exports'
+import { rampKeys } from '../data/pedRampForm'
 
 // Ped ramp inspection (pedramp 2a): NYC DOT's Pedestrian Ramp Inspection Form as data. A corner is the form's sections
 // 1-3 ({corner_id, project_id, boro, north_south_street, east_west_street, ... , ramps}); its ramps are the ped ramp
@@ -12,6 +13,17 @@ import { saveFile } from './exports'
 export async function listCorners(projectId, { includeDeleted = false } = {}) {
   const query = includeDeleted ? '?include_deleted=true' : ''
   const json = await apiFetch(`/v1/projects/${projectId}/ped-ramp-corners${query}`)
+  return json.data
+}
+
+/**
+ * Adds a ped ramp site (Slice R): a corner and a ramp at it, in one statement. A live corner of the project at the same
+ * borough, streets (any case) and corner_direction is reused as it stands (the corner fields sent are then ignored).
+ * boro, north_south_street, east_west_street, corner_direction, quadrant, facing_street and ramp_type are required;
+ * ramp_id_label and notes are optional. Returns {corner_id, property_id, corner_reused}.
+ */
+export async function createPedrampSite(projectId, data) {
+  const json = await apiFetch(`/v1/projects/${projectId}/pedramp-sites`, { method: 'POST', body: data })
   return json.data
 }
 
@@ -60,6 +72,16 @@ export async function getRampAttributes(propertyId) {
 export async function saveRampAttributes(propertyId, data) {
   const json = await apiFetch(`/v1/properties/${propertyId}/ped-ramp-attributes`, { method: 'PUT', body: data })
   return json.data
+}
+
+/**
+ * Sets a ramp's Ramp ID (ramp_id_label), keeping its other attributes: reads them, then saves them whole with the new
+ * label, sending only the keys of its ramp type (rampType, as it now is). Returns the saved attributes.
+ */
+export async function saveRampLabel(propertyId, rampType, label) {
+  const current = await getRampAttributes(propertyId)
+  const kept = Object.fromEntries(rampKeys(rampType).map(key => [key, current?.[key] ?? null]))
+  return saveRampAttributes(propertyId, { ...kept, ramp_id_label: label })
 }
 
 /** Downloads a corner's inspection report as a PDF. Returns the file name. Throws apiFetch's error. */

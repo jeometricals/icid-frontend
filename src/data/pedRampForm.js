@@ -149,3 +149,37 @@ export const RAMP_COMMENTS_MAX = 2000
 export const rampKeys = (rampType) => [
   ...RAMP_FIELDS[rampType].answers, ...RAMP_FIELDS[rampType].measurements,
 ].map(([key]) => key).concat('comments')
+
+// The Add / Edit Pedramp dialog (Slice R): a corner's fields regrouped into the dialog's sections A to C, from
+// CORNER_SECTIONS' own definitions, then the ramp's own (D). Corner comments close section C
+const CORNER_FIELD = Object.fromEntries(CORNER_SECTIONS.flatMap(section => section.fields).map(field => [field[0], field]))
+const cornerFields = (keys) => keys.map(key => CORNER_FIELD[key])
+
+export const SITE_CORNER_SECTIONS = [
+  {
+    id: 'location',
+    title: 'A. Location & Corner',
+    fields: cornerFields([
+      'boro', 'north_south_street', 'east_west_street', 'corner_direction', 't_intersection', 'traffic_control_ns',
+      'traffic_control_ew', 'corner_type', 'corner_number', 'dot_corner_id', 'number_of_ramps', 'painted_roadway',
+    ]),
+  },
+  {
+    id: 'construction',
+    title: 'B. Construction info',
+    fields: cornerFields([
+      'contractor_name', 'permittee_id', 'fms_id', 'permit_number', 'construction_completion_date', 'contract_type',
+      'curb_material', 'sidewalk_material',
+    ]),
+  },
+  {
+    id: 'inspection',
+    title: 'C. Inspection',
+    fields: cornerFields(['inspected_by', 'inspection_date', 'entity', 'entity_if_other']),
+  },
+]
+export const SITE_RAMP_TITLE = 'D. This Ramp'
+// A site's corner must have these (corner_direction finds a live corner to reuse); its ramp all but its label and notes
+export const SITE_CORNER_REQUIRED = [...CORNER_REQUIRED, 'corner_direction']
+export const SITE_RAMP_REQUIRED = ['quadrant', 'facing_street', 'ramp_type']
+export const RAMP_LABEL_MAX = 50

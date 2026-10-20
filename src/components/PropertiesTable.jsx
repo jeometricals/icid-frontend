@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { shortDate } from '../lib/shortDate'
-import { rampTypeLabel } from '../data/propertyKinds'
+import { facingStreetName, rampTypeLabel } from '../data/propertyKinds'
 import StatusBadge from './StatusBadge'
 import { siteLabel } from '../lib/properties'
 
@@ -18,11 +18,17 @@ const typeText = (row) => (row.kind === 'ped_ramp' ? rampTypeLabel(row.ramp_type
  * sidewalk's property type, a ped ramp's ramp type), added (when the property was added to the project) and, when
  * the caller gives renderActions, an Actions cell it fills. A soft-deleted property is muted, its Site crossed out
  * beside a Deleted badge (the date as a tooltip). Rows are in the order given.
- * Props: properties, renderActions(property) (the Actions cell's content; leave it out for no Actions column, as for
- * a demo user).
+ * With kind 'ped_ramp' (a task order's ped ramps) the columns are a ped ramp's own instead: Intersection (the link),
+ * Quadrant, Facing (the street, by name), Ramp type, Added.
+ * Props: properties, kind (leave it out for the mixed columns above), renderActions(property) (the Actions cell's
+ * content; leave it out for no Actions column, as for a demo user).
  */
-export default function PropertiesTable({ properties, renderActions }) {
-  const headings = ['Site', 'CB', 'Address', 'Type', 'Added', ...(renderActions ? ['Actions'] : [])]
+export default function PropertiesTable({ properties, kind, renderActions }) {
+  const ramps = kind === 'ped_ramp'
+  const headings = [
+    ...(ramps ? ['Intersection', 'Quadrant', 'Facing', 'Ramp type'] : ['Site', 'CB', 'Address', 'Type']),
+    'Added', ...(renderActions ? ['Actions'] : []),
+  ]
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -42,6 +48,23 @@ export default function PropertiesTable({ properties, renderActions }) {
         <tbody className="divide-y divide-gray-200">
           {properties.map(row => {
             const deleted = Boolean(row.deleted_at)
+            const muted = `px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`
+            if (ramps) {
+              return (
+                <tr key={row.id} className="text-gray-900">
+                  <td className="px-6 py-4 text-sm font-medium">
+                    <Link to={propertyPath(row)} title={row.notes || undefined} className="text-construction-700 hover:underline">
+                      {row.intersection_street_1} & {row.intersection_street_2}
+                    </Link>
+                  </td>
+                  <td className={muted}>{row.quadrant}</td>
+                  <td className={muted}>{facingStreetName(row) || '—'}</td>
+                  <td className={muted}>{rampTypeLabel(row.ramp_type)}</td>
+                  <td className={muted}>{shortDate(row.created_at)}</td>
+                  {renderActions && <td className="px-6 py-4 text-sm">{renderActions(row)}</td>}
+                </tr>
+              )
+            }
             return (
               <tr key={row.id} data-deleted={deleted || undefined} className={deleted ? 'bg-gray-50 text-gray-400' : 'text-gray-900'}>
                 <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">

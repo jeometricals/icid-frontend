@@ -6,7 +6,9 @@
  * the project's other properties; Delete (a soft delete) is an admin's alone. Edit shares the list page's dialog;
  * Delete and Unbundle are confirmed first. A deleted task order reads Deleted and can't be changed: an admin gets
  * only "Un-delete", anyone else nothing (the backend refuses them). After each change the page shows the task
- * order the backend returned, and a delete, un-delete, unbundle or batch of additions is announced in a toast. Under
+ * order the backend returned, and a delete, un-delete, unbundle or batch of additions is announced in a toast. The
+ * bundle is shown by kind, in two panels that fold (both open): "Sidewalks (N)" and "Pedestrian Ramps (N)", each with
+ * its kind's columns (a task order may mix both). Under
  * the bundle, a Progress section (TaskOrderProgress): its sites' PIR flags by pay item, overall and site by site. A
  * site's block and lot ("Ped ramp" for a ped ramp) link to the property's page, which is open to anyone on the project. Back returns to the project's
  * task orders; "Go to Project Page" sits beside it. The backend refuses anyone not on the project (403), which
@@ -25,6 +27,7 @@ import { TASK_ORDER_ACTIONS, propertyCount } from '../lib/taskOrders'
 import { useUserNames } from '../lib/useUserNames'
 import ConfirmDialog from '../components/ConfirmDialog'
 import GoToProjectButton from '../components/GoToProjectButton'
+import FoldingPanel from '../components/FoldingPanel'
 import PropertiesTable from '../components/PropertiesTable'
 import PropertyPickerModal from '../components/PropertyPickerModal'
 import StatusBadge from '../components/StatusBadge'
@@ -33,6 +36,12 @@ import TaskOrderProgress from '../components/TaskOrderProgress'
 import Toast from '../components/Toast'
 
 export const EMPTY_TEXT = "No sites bundled yet. Click 'Add sites' to pick from this project."
+
+// The bundle's two panels, in page order
+export const BUNDLE_KINDS = [
+  { kind: 'sidewalk', title: 'Sidewalks', none: 'No sidewalks in this task order.' },
+  { kind: 'ped_ramp', title: 'Pedestrian Ramps', none: 'No pedestrian ramps in this task order.' },
+]
 
 // What the toast says after the picker's batch: how many went in and, when one was refused, which and why
 export function addedMessage({ added, failed }) {
@@ -280,18 +289,35 @@ export default function TaskOrderPage() {
           ) : (
             <>
               <p className="text-sm text-gray-600 mb-3">{propertyCount(properties.length)} bundled</p>
-              <PropertiesTable
-                properties={properties}
-                renderActions={property => (!changeable ? <span className="text-gray-400">—</span> : (
-                  <button
-                    type="button"
-                    onClick={() => open(() => setPending({ kind: 'unbundle', property }))}
-                    className="btn-secondary text-red-600 hover:text-red-700"
+              {BUNDLE_KINDS.map(({ kind, title, none }) => {
+                const ofKind = properties.filter(property => property.kind === kind)
+                return (
+                  <FoldingPanel
+                    key={kind}
+                    title={`${title} (${ofKind.length})`}
+                    className="mb-4"
+                    headingClassName="text-base font-semibold text-gray-900 mb-2"
                   >
-                    Unbundle
-                  </button>
-                ))}
-              />
+                    {ofKind.length === 0 ? (
+                      <div className="bg-white rounded-lg shadow-sm p-4 text-sm text-gray-600">{none}</div>
+                    ) : (
+                      <PropertiesTable
+                        properties={ofKind}
+                        kind={kind}
+                        renderActions={property => (!changeable ? <span className="text-gray-400">—</span> : (
+                          <button
+                            type="button"
+                            onClick={() => open(() => setPending({ kind: 'unbundle', property }))}
+                            className="btn-secondary text-red-600 hover:text-red-700"
+                          >
+                            Unbundle
+                          </button>
+                        ))}
+                      />
+                    )}
+                  </FoldingPanel>
+                )
+              })}
             </>
           )}
         </section>
