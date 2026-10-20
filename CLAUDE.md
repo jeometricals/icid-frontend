@@ -229,6 +229,23 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       editors are off); approved, nobody ("Inspection is approved — no further edits"). Every refusal reads as the
       backend words it, in its dialog ("Signature required before signing an inspection", "Approve or delete this
       inspection's draft TIFs first").
+    - **Downloads:** "Preview (ICID)" (the ICID inspection report, `downloadInspectionReport`, for everyone) and, once
+      approved, "Download DOT form" (`downloadInspectionDotForms`: DOT's fillable forms as filed at approval, through a
+      signed URL; a ZIP when the corner needs several forms or has TIFs), with `DOT_FORM_NOTE` under it.
+  - **TIFs** (Pedramp Phase 3, S3). `services/pedRampTifs.js`: `listInspectionTifs`, `draftTif(inspectionId,
+    propertyId)`, `getTif`, `updateTif` (only what changed; null clears), `approveTif(id, {signer_name,
+    signer_ny_license_no})`, `deleteTif` (admin) and `downloadTifForm` (DOT's TIF filled as it stands, through a signed
+    URL); `getInspectionReport(cornerId)` in `pedRamps.js` reads the ramps' ADA warnings.
+    - On the inspection form, once "Are all ADA requirements met?" is No, each ramp card shows its TIF (a link, with its
+      status) or, for a ramp whose attributes raise ADA warnings, "Draft TIF" (an inspector or an RE while the lock
+      allows; it drafts one, prefilled by the backend, and opens it). Approving waits for every TIF to be approved.
+    - **`PedRampTifPage`** at `/project/:projectId/ped-ramp-tifs/:tifId`: DOT's sections 1-7 (`data/tifForm.js`,
+      `TIF_SECTIONS`) on one page with Save (only what changed); "10. Statement and signature" for an RE (or admin):
+      their name (their own to start) and New York licence number, both required, then "Sign & Approve" (off while
+      there are unsaved changes), under `SIGNATURE_NOTE` (an ICID signature image, not a cryptographic signature);
+      "Download TIF form" for everyone; Delete for an admin (confirmed; back to the ramp's card). The lock: an approved
+      TIF reads "TIF is approved — no further edits"; otherwise the inspection's lock (submitted: the RE only;
+      approved: nobody).
 - **Title block** (R1h.2, R1h.3). The fields the Construction Report prints: page 1's Contract No., Date Notice Issued,
   Date Excavated and Date Constructed, the PIR's North Bearing, and (R1h.3) the streets and widths round its sketch:
   `cross_street_left`, `cross_street_right`, `frontage_street` (the bottom; the top is always the property line, PL),
@@ -1137,6 +1154,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Ped ramp inspections: `GET /v1/ped-ramp-corners/{id}/inspection` · `POST /v1/ped-ramp-corners/{id}/inspection/start` ·
     `PATCH /v1/ped-ramp-inspections/{id}` (`{requirements_met}`) · `POST /v1/ped-ramp-inspections/{id}/submit` · `/return`
     (`{comment}`) · `/approve` (the corner's and its ramps' writes follow the inspection's lock: 403 submitted, 409 approved)
+    · `GET /v1/ped-ramp-inspections/{id}/dot-pdf` (`{url, expires_at, file_name}`) · `GET /v1/ped-ramp-corners/{id}/inspection-report`
+  - Ped ramp TIFs: `GET /v1/ped-ramp-inspections/{id}/tifs` · `POST /v1/ped-ramp-inspections/{id}/ramps/{property_id}/tif`
+    · `GET` / `PATCH` / `DELETE` (admin) `/v1/ped-ramp-tifs/{id}` · `POST /v1/ped-ramp-tifs/{id}/approve`
+    (`{signer_name, signer_ny_license_no}`) · `GET /v1/ped-ramp-tifs/{id}/dot-pdf`
   - PIRs: `GET /v1/properties/{id}/pir` (the live one) · `GET /v1/properties/{id}/pirs?include_deleted=` ·
     `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
     `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the

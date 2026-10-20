@@ -34,7 +34,8 @@ const DRAFT = { id: 'e0000000-0000-4000-8000-000000000001', corner_id: CORNER_ID
 vi.mock('../../services/api', () => ({
   getCorner: vi.fn(), getCornerInspection: vi.fn(), startInspection: vi.fn(), updateInspection: vi.fn(),
   submitInspection: vi.fn(), returnInspection: vi.fn(), approveInspection: vi.fn(), updateCorner: vi.fn(),
-  getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(),
+  getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), listInspectionTifs: vi.fn(), getInspectionReport: vi.fn(),
+  draftTif: vi.fn(), downloadInspectionDotForms: vi.fn(), downloadInspectionReport: vi.fn(),
 }))
 
 let inspection
@@ -45,6 +46,13 @@ beforeEach(() => {
   api.getCorner.mockImplementation(async () => structuredClone(CORNER))
   api.getCornerInspection.mockImplementation(async () => structuredClone(inspection))
   api.getRampAttributes.mockResolvedValue(null)
+  api.listInspectionTifs.mockResolvedValue([])
+  // the first ramp's attributes raise an ADA warning, the second's none
+  api.getInspectionReport.mockResolvedValue({ ramps: [
+    { property_id: RAMP_1, attributes: { warnings: [{ field: 'ramp_running_slope_pct' }] } },
+    { property_id: RAMP_2, attributes: null },
+  ] })
+  api.draftTif.mockResolvedValue({ id: 'f0000000-0000-4000-8000-000000000001' })
   api.startInspection.mockImplementation(async () => { inspection = { ...DRAFT }; return inspection })
   api.updateInspection.mockImplementation(async (id, value) => ({ ...inspection, requirements_met: value }))
   api.submitInspection.mockImplementation(async () => ({ ...inspection, status: 'submitted', inspector_name: 'Ada Admin',
@@ -233,5 +241,56 @@ describe('PedRampInspectionPage — the corner', () => {
     await userEvent.type(within(dialog()).getByLabelText(/Inspected by/), 'X')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
     expect(await within(dialog()).findByText(SUBMITTED_LOCK)).toBeInTheDocument()
+  })
+})
+
+describe('PedRampInspectionPage — TIFs and downloads', () => {
+  it("offers Draft TIF on a warned ramp once the requirements aren't met, and opens it", async () => {
+    inspection = { ...DRAFT, requirements_met: false }
+    renderPage({ user: MEMBER, roles: ['inspector'] })
+    await loaded()
+    const first = screen.getByRole('region', { name: 'Ramp R1' })
+    await waitFor(() => expect(within(first).getByRole('button', { name: 'Draft TIF' })).toBeInTheDocument())
+    expect(within(screen.getByRole('region', { name: 'Ramp 2' })).queryByText(/needs a TIF/)).not.toBeInTheDocument()
+    await userEvent.click(within(first).getByRole('button', { name: 'Draft TIF' }))
+    expect(api.draftTif).toHaveBeenCalledWith(DRAFT.id, RAMP_1)
+    expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/ped-ramp-tifs/f0000000-0000-4000-8000-000000000001')
+  })
+
+  it("shows a ramp's TIF with its status instead, and nothing while the requirements are met", async () => {
+    inspection = { ...DRAFT, requirements_met: false }
+    api.listInspectionTifs.mockResolvedValue([{ id: 'f1', property_id: RAMP_1, status: 'approved' }])
+    renderPage()
+    await loaded()
+    const first = screen.getByRole('region', { name: 'Ramp R1' })
+    const link = await within(first).findByRole('link', { name: 'Technical Infeasibility Form' })
+    expect(link).toHaveAttribute('href', '/project/HWS0023/ped-ramp-tifs/f1')
+    expect(within(first).getByText('Approved')).toBeInTheDocument()
+  })
+
+  it('gives a demo user no Draft TIF', async () => {
+    inspection = { ...DRAFT, requirements_met: false }
+    renderPage({ user: DEMO_USER, roles: ['inspector'] })
+    await loaded()
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Ramp R1' })).getByText(/needs a TIF/)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Draft TIF' })).not.toBeInTheDocument()
+  })
+
+  it('downloads the ICID preview for anyone and the DOT form once approved, with the note on several files', async () => {
+    inspection = { ...DRAFT, status: 'approved', has_dot_pdf: true, re_signed_at: '2026-10-21T15:00:00Z' }
+    renderPage({ user: DEMO_USER })
+    await loaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Preview (ICID)' }))
+    expect(api.downloadInspectionReport).toHaveBeenCalledWith(CORNER_ID)
+    await userEvent.click(screen.getByRole('button', { name: 'Download DOT form' }))
+    expect(api.downloadInspectionDotForms).toHaveBeenCalledWith(DRAFT.id)
+    expect(screen.getByText(/comes as several forms in a ZIP/)).toBeInTheDocument()
+  })
+
+  it('has no DOT form before approval', async () => {
+    inspection = { ...DRAFT, status: 'submitted' }
+    renderPage()
+    await loaded()
+    expect(screen.queryByRole('button', { name: 'Download DOT form' })).not.toBeInTheDocument()
   })
 })
