@@ -4,6 +4,8 @@
  * and weather show as a read-only context line, and a submitted IDR (including a 409 mid-edit) locks the form.
  * On top of the shared sections it has the Operation line (Structural, Subcontractor), the SWCB Detailed Activity table
  * and the Inspection Matrix. Its equipment rows follow the DDC form, which has no Excavator or Pavement Cutter row.
+ * Its Imported sites (Slice U2) are the sites whose PIR flags and curb segments the IDR covers; the description can be
+ * written from them ("Regenerate from sites", and on the first import into an empty description).
  * Load / save / layout: useReportForm + ReportPageShell.
  */
 import { useParams } from 'react-router-dom'
@@ -19,6 +21,9 @@ import PayItemsSection from '../../components/reports/PayItemsSection'
 import WorkforceEquipmentCard from '../../components/reports/WorkforceEquipmentCard'
 import SafetyChecklistSection from '../../components/reports/SafetyChecklistSection'
 import CommentsSection from '../../components/reports/CommentsSection'
+import ImportedSitesSection from '../../components/reports/ImportedSitesSection'
+import useReportSites from '../../lib/useReportSites'
+import { descriptionFromSites } from '../../lib/reportSites'
 
 const DESCRIPTION_SUBHEADING =
   'Specify for Each Operation: Item No., Subcontractor (if any), Location, Nature of Work, Hot/Cold weather Protection and Details.'
@@ -106,6 +111,16 @@ export default function SWCBReportPage() {
     formDataFromReport,
   })
   const { formData, isReadOnly, updateForm } = form
+  const sites = useReportSites(idrId, reportId)
+
+  const writeDescription = (rows) => form.handleInputChange('description', descriptionFromSites(rows))
+
+  // The first sites imported into an empty description write it; a description already there is left as it is
+  const handleImported = (added) => {
+    const empty = !formData.description.trim()
+    sites.added(added)
+    if (empty) writeDescription([...sites.rows, ...added])
+  }
 
   const handleActivityChange = (row, field, value) => {
     updateForm(prev => ({
@@ -134,6 +149,8 @@ export default function SWCBReportPage() {
         onChange={(value) => form.handleInputChange('description', value)}
         subheading={DESCRIPTION_SUBHEADING}
         disabled={isReadOnly}
+        onRegenerate={() => writeDescription(sites.rows)}
+        regenerateDisabled={sites.rows.length === 0}
       />
 
       {/* Operation: Structural and Subcontractor */}
@@ -149,6 +166,9 @@ export default function SWCBReportPage() {
 
       {/* Inspection Matrix */}
       <SWCBInspectionMatrix matrix={formData.inspectionMatrix} onChange={handleMatrixChange} disabled={isReadOnly} />
+
+      {/* Imported sites: their PIR flags and curb segments are the IDR's */}
+      <ImportedSitesSection form={form} sites={sites} onImported={handleImported} onChanged={sites.changed} onRemoved={sites.removed} />
 
       {/* Pay Items */}
       <PayItemsSection

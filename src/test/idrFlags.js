@@ -27,7 +27,7 @@ export function idrFlag(overrides = {}) {
     amount: 50,
     state: 'attributed',
     override: null,
-    in_task_order: true,
+    on_imported_site: true,
     claimed_by_idr_id: null,
     claimed_by_idr_number: null,
     is_constructed: false,

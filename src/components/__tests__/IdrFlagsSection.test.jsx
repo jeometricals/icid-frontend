@@ -222,7 +222,7 @@ function segment(overrides = {}) {
     lot: '45', address: '12 Main St', intersection_street_1: null, intersection_street_2: null, quadrant: null,
     facing_street: null, display_address: '12 Main St', pay_item_id: 'item-aa', pay_item_ref: '4.08 AA',
     budget_code: 'HW-200(S)', pay_item_description: 'Concrete Curb', unit: 'LF', amount: 20, state: 'attributed',
-    override: null, in_task_order: true, claimed_by_idr_id: null, claimed_by_idr_number: null, constructed_on: null,
+    override: null, on_imported_site: true, claimed_by_idr_id: null, claimed_by_idr_number: null, constructed_on: null,
     deleted_at: null, ...overrides,
   }
 }

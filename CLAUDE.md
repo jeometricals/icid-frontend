@@ -1067,10 +1067,33 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `onDone({added, failed, taskOrder})` hands the page the count, the refusal (`{property, message}`) and the last
     task order the backend returned; the page shows that and a toast: "Added 3 sites." or "Added 1 site.
     Couldn't add <name>: <message> The rest weren't tried."
+- **Imported sites (Slice U2).** A report imports the sites (properties of the IDR's project) whose PIR flags and curb
+  segments the IDR covers, each with the work done there; the description can be written from them.
+  - **Service:** `services/reportSites.js`: `listReportSites(idrId, reportId)`, `importReportSite(idrId, reportId,
+    {property_id, work_type, work_type_other})`, `updateReportSite(idrId, reportId, siteId, {work_type,
+    work_type_other})` and `removeReportSite`. `work_type` is `concrete`, `excavation`, `pavement_restoration` or
+    `other` (with its text, at most 200). A site is in one report of an IDR at most (409 with `existing_report_id`);
+    an import is also 409 when a report holds by hand a pay item the site's flags or segments fill. Who changes them:
+    as for an IDR's flags (the backend's `attribution_editor`); the UI offers them on a draft only.
+  - **Where:** SWCB only for the pilot (the backend also takes General, AC, Conc Mix and Conc Cyl, not DSP).
+    `ImportedSitesSection` (in `components/reports/`), above Pay Items, loaded by `lib/useReportSites.js`: a row per
+    site with an SW / PR badge, its `display_address` linking to the site page with `?returnTo=` the report, the work
+    (a select; Other shows a Specify box, saved when it loses focus with text in it) and Remove (confirmed: "Its PIR
+    flags and curb segments leave this IDR."). Read-only past draft.
+  - **Picker:** `ReportSitePickerModal`: the project's sites, a search (address, intersection, block, lot, CB), kind
+    chips, a task-order filter (the IDR's own to start, "All task orders" otherwise) and the work to record for all
+    picked. A site any report of the IDR already imported is disabled, titled "Already in General (page 1) on this
+    IDR." Imports one at a time and stops at the first refusal.
+  - **Description** (`lib/reportSites.js`, `descriptionFromSites`): a sentence per site, joined by ". ", ending ".":
+    "Sidewalk concrete was placed at {address}" / "Ped ramp concrete was placed at {quadrant} corner of
+    {street 1}/{street 2}"; "Excavation at ..."; "Pavement restoration at ..."; "{other text} at ...". The first import
+    into an empty description writes it; otherwise the description is left alone. "Regenerate from sites", above the
+    textarea (`DescriptionSection`'s `onRegenerate`), replaces it on click. Removing a site or changing its work
+    doesn't touch the description. The text is saved with the report as any edit is.
 - **IDR flags (R1f).** An IDR's sidewalk quantities come from the PIR flags it covers, as a live rollup, beside its
   reports' hand-entered pay items.
-  - **Scope.** An IDR names a task order (`task_order_id`, saved through `saveIdrHeader` on a draft); it covers the
-    live flags on that task order's sites, without one none. Per-IDR overrides change that: `exclude` leaves a flag
+  - **Scope (Slice U).** An IDR covers the live flags on the sites its reports imported (see Imported sites), without
+    one none; the task order (`task_order_id`) no longer sets it. Per-IDR overrides change that: `exclude` leaves a flag
     out, `include` brings one in (the backend also lets an include bring a flag in from elsewhere in the project;
     the UI has no picker for that yet, so it only re-includes listed flags).
   - **Service:** `services/idrSegments.js` (curb billing): `getIdrSegments`, `excludeIdrSegment`,
@@ -1235,6 +1258,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     admin/unlock, admin/delete and admin/undelete add `flags_claimed` / `flags_dropped` / `flags_released`, and the
     same for curb segments (`segments_claimed` / `segments_dropped` / `segments_released`), which the approval toast
     and the admin IDR list's toasts add ("18 flags and 3 curb segments released.").
+  - Report sites: `GET` / `POST /v1/idrs/{id}/reports/{report_id}/sites` · `PATCH` / `DELETE .../sites/{site_id}`
+    (see Imported sites).
   - IDR curb segments: `GET /v1/idrs/{id}/attributed-segments` · `POST .../attributed-segments/{segment_id}/exclude`
     · `POST .../attributed-segments/{segment_id}/include` (who: as for flags).
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·

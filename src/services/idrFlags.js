@@ -1,14 +1,14 @@
 import { apiFetch } from './apiClient'
 
 // An IDR's flags (R1f): the PIR flags it covers and what they come to per pay item. An IDR covers by default the live
-// flags on its task order's properties (its task_order_id; none without one), changed by per-IDR overrides. Each
+// flags on the sites its reports imported (services/reportSites.js; none without one), changed by per-IDR overrides. Each
 // call answers with the same shape, {idr_id, status, task_order_id, frozen, counts: {attributed, excluded,
 // claimed_elsewhere, total}, flags: [...], pay_items: [...], unmapped}:
 // - a flag is {flag_id, pir_id, pir_page_id, page_number, display_order, shape, surveyed_thickness, property_id,
 //   property_kind, boro, block, lot, address, intersection_street_1, intersection_street_2, quadrant, facing_street,
 //   display_address, pay_item_id, pay_item_ref, budget_code, pay_item_description, unit, quantity_sf, amount (in the
 //   unit; null without a pay item or in a unit a flag can't measure), state ('attributed' | 'excluded' | 'claimed' |
-//   'claimed_elsewhere'), override ('exclude' | 'include' | null), in_task_order, claimed_by_idr_id,
+//   'claimed_elsewhere'), override ('exclude' | 'include' | null), on_imported_site, claimed_by_idr_id,
 //   claimed_by_idr_number, is_constructed, constructed_on, deleted_at};
 // - a pay item is {pay_item_id, pay_item_ref, budget_code, description, unit, amount, flag_count} (the id and count
 //   are null once the IDR is approved: the line is then the quantity row frozen at approval);
