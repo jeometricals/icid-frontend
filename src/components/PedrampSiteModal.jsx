@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Modal from './Modal'
+import ConfirmDialog from './ConfirmDialog'
 import FoldingPanel from './FoldingPanel'
-import { BOROUGHS, QUADRANTS, RAMP_TYPES } from '../data/propertyKinds'
+import { BOROUGHS, QUADRANTS, RAMP_TYPES, rampTypeLabel } from '../data/propertyKinds'
 import {
   CORNER_COMMENTS_MAX, RAMP_LABEL_MAX, SITE_CORNER_REQUIRED, SITE_CORNER_SECTIONS, SITE_RAMP_REQUIRED, SITE_RAMP_TITLE,
+  measurementsDropped,
 } from '../data/pedRampForm'
+import { getRampAttributes } from '../services/api'
 import { MAX_NOTES_LENGTH } from './PropertyFormModal'
 import { formErrors } from '../lib/formErrors'
 
@@ -37,7 +40,8 @@ const cleaned = (values) => Object.fromEntries(KEYS.map(key => [key, sent(key, v
 const pick = (values, keys) => Object.fromEntries(keys.map(key => [key, values[key]]))
 const changed = (now, before, keys) => Object.fromEntries(keys.filter(key => now[key] !== before[key]).map(key => [key, now[key]]))
 
-const TITLES = { add: 'Add Pedramp', 'add-ramp': 'Add another ramp at this corner', edit: 'Edit Pedramp' }
+const TITLES = { add: 'Add Pedramp', 'add-ramp': 'Add another ramp at this corner', edit: 'Edit Pedramp', 'edit-ramp': 'Edit Pedramp' }
+export const CORNER_LOCKED_NOTE = "Sections A to C are this corner's: edit them from Site Info."
 
 /**
  * The one dialog for a ped ramp site (Slice R): a corner and one ramp at it, in four sections that fold. A. Location &
@@ -50,15 +54,31 @@ const TITLES = { add: 'Add Pedramp', 'add-ramp': 'Add another ramp at this corne
  * mode 'edit': the corner and the ramp given fill every section, all open, one scrolling page; A-C apply to the corner
  * and so to all its ramps (said above them when it has more than one); Save hands over {corner, ramp, label}, each the
  * changes to that part only (empty when none), label the new Ramp ID or undefined when it didn't change.
+ * mode 'edit-ramp' (the site page's Edit): as edit, but A-C are locked and folded, with a note to edit them from Site
+ * Info; its corner changes are always empty.
+ * Editing either way reads the ramp's saved attributes; switching its ramp type to one that doesn't take some of their
+ * measurements asks first ("Switching from Perpendicular to Parallel will drop these measurements: ..."), and Cancel
+ * keeps the type it had.
  * Save is off until the required fields are in and, when editing, something changed. The caller runs the save: busy
  * while it works, error (the thrown error) when it failed; a 422's messages read under the fields they name.
- * Props: mode, corner (its fields; for add-ramp and edit), ramp ({quadrant, facing_street, ramp_type, notes,
- * ramp_id_label}; for edit), onSave(values), onCancel, busy, error.
+ * Props: mode, corner (its fields; for add-ramp and the edits), ramp ({id, quadrant, facing_street, ramp_type, notes,
+ * ramp_id_label}; for the edits), onSave(values), onCancel, busy, error.
  */
 export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, onCancel, busy = false, error = null }) {
   const [values, setValues] = useState(() => startingValues(corner, ramp))
-  const editing = mode === 'edit'
-  const locked = mode === 'add-ramp' // the corner's sections can't be changed
+  const editing = mode === 'edit' || mode === 'edit-ramp'
+  const locked = mode === 'add-ramp' || mode === 'edit-ramp' // the corner's sections can't be changed
+  const [attributes, setAttributes] = useState(null) // the ramp's saved attributes, when editing and they could be read
+  const [typeSwitch, setTypeSwitch] = useState(null) // {to, dropped}: a ramp type change waiting to be confirmed
+  const rampId = editing ? ramp?.id : undefined
+
+  useEffect(() => {
+    if (!rampId) return undefined
+    let ignore = false
+    // Unreadable attributes ask nothing: the switch then goes through as any other change
+    getRampAttributes(rampId).then(found => { if (!ignore) setAttributes(found) }).catch(() => {})
+    return () => { ignore = true }
+  }, [rampId])
   const sending = cleaned(values)
   const before = cleaned(startingValues(corner, ramp))
   const cornerChanges = changed(sending, before, CORNER_KEYS)
@@ -72,6 +92,12 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
   const rampCount = corner?.ramps?.length ?? 0
 
   const set = (key, value) => setValues(current => ({ ...current, [key]: value }))
+  // A new ramp type, confirmed first when the saved attributes hold measurements it doesn't take
+  const setRampType = (to) => {
+    const dropped = to ? measurementsDropped(attributes, to) : []
+    if (dropped.length > 0) setTypeSwitch({ to, dropped })
+    else set('ramp_type', to)
+  }
   const handleSubmit = (e) => {
     e.preventDefault()
     if (busy || !ready) return
@@ -122,7 +148,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
     <Modal
       title={TITLES[mode]}
       onClose={onCancel}
-      busy={busy}
+      busy={busy || Boolean(typeSwitch)} // the type switch's own dialog has Escape while it is open
       size="lg"
       footer={
         <>
@@ -134,12 +160,13 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
       }
     >
       <form id="site-form" onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4">
-        {locked && (
+        {mode === 'add-ramp' && (
           <p className="text-sm text-gray-600">
             Sections A to C are this corner's and can't be changed here; fill in the new ramp in section D.
           </p>
         )}
-        {editing && rampCount > 1 && (
+        {mode === 'edit-ramp' && <p className="text-sm text-gray-600">{CORNER_LOCKED_NOTE}</p>}
+        {mode === 'edit' && rampCount > 1 && (
           <p className="text-sm text-gray-600">
             Sections A to C are the corner's: changes there apply to all {rampCount} ramps at it. Section D is this ramp's alone.
           </p>
@@ -178,7 +205,12 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
                 )}
               </select>
             ))}
-            {field('ramp_type', 'Ramp type', choice('ramp_type', RAMP_TYPES))}
+            {field('ramp_type', 'Ramp type', (
+              <select {...control('ramp_type')} onChange={(e) => setRampType(e.target.value)}>
+                <option value="" disabled>Choose…</option>
+                {RAMP_TYPES.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            ))}
             {field('ramp_id_label', 'Ramp ID', (
               <input type="text" maxLength={RAMP_LABEL_MAX} placeholder="e.g. CT-A" {...control('ramp_id_label')} />
             ))}
@@ -190,6 +222,22 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
 
         {general && <p role="alert" className="text-sm text-red-600">{general}</p>}
       </form>
+
+      {typeSwitch && (
+        <ConfirmDialog
+          title="Change the ramp type?"
+          message={`Switching from ${rampTypeLabel(values.ramp_type)} to ${rampTypeLabel(typeSwitch.to)} will drop these measurements:`}
+          items={typeSwitch.dropped}
+          note="Continue?"
+          confirmLabel="Continue"
+          cancelLabel="Cancel"
+          onConfirm={() => {
+            set('ramp_type', typeSwitch.to)
+            setTypeSwitch(null)
+          }}
+          onCancel={() => setTypeSwitch(null)}
+        />
+      )}
     </Modal>
   )
 }

@@ -25,7 +25,7 @@ vi.mock('../../services/api', () => ({
   listAdminUsers: vi.fn(), listUsers: vi.fn(),
   listPirPages: vi.fn(),
   listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
-  listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(),
+  listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), saveRampLabel: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -240,6 +240,49 @@ describe('PropertyPage — the property', () => {
     await waitFor(() => expect(valueOf(propertyCard(), 'Inspection corner')).toHaveTextContent('Court St & Atlantic Ave (NE)'))
     expect(api.listCorners).toHaveBeenCalledWith('HWS0023')
     expect(api.getRampAttributes).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it("edits a ped ramp at a corner in the Pedramp dialog, its corner locked, and asks before a type switch drops measurements", async () => {
+    const CORNER_ID = 'd0000000-0000-4000-8000-000000000001'
+    api.listCorners.mockResolvedValue([{ corner_id: CORNER_ID, boro: 'Brooklyn', north_south_street: 'Atlantic Ave',
+      east_west_street: 'Court St', corner_direction: 'NE', deleted_at: null,
+      ramps: [{ property_id: PROPERTY_ID, ramp_type: 'PERPENDICULAR', ramp_id_label: 'R1' }] }])
+    api.getRampAttributes.mockResolvedValue({ property_id: PROPERTY_ID, ramp_type: 'PERPENDICULAR', ramp_width_in: 40,
+      landing_length_in: 48, ramp_running_slope_pct: null, gutter_cross_slope_pct: 1.5, warnings: [] })
+    property = {
+      ...property, kind: 'ped_ramp', boro: 'Brooklyn', block: null, lot: null, address: null, property_type: null, violation_no: null,
+      intersection_street_1: 'Atlantic Ave', intersection_street_2: 'Court St', quadrant: 'NE', facing_street: 'street_2',
+      ramp_type: 'PERPENDICULAR', corner_id: CORNER_ID, display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
+    }
+    renderPage()
+    await waitFor(() => expect(valueOf(propertyCard(), 'Inspection corner')).toHaveTextContent('Atlantic Ave & Court St (NE)'))
+    await userEvent.click(within(propertyCard().closest('main') ?? document.body).getByRole('button', { name: 'Edit' }))
+
+    expect(dialog()).toHaveAccessibleName('Edit Pedramp')
+    expect(within(dialog()).getByText("Sections A to C are this corner's: edit them from Site Info.")).toBeInTheDocument()
+    const location = within(dialog()).getByRole('button', { name: 'A. Location & Corner' })
+    expect(location).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(location)
+    expect(within(dialog()).getByLabelText('North-south street')).toBeDisabled()
+    expect(within(dialog()).getByLabelText(/Ramp ID/)).toHaveDisplayValue('R1')
+    await waitFor(() => expect(api.getRampAttributes).toHaveBeenCalledTimes(2)) // the section's read and the dialog's
+
+    // Parallel takes neither a ramp width nor a landing length; the gutter slope stays, and an empty slope isn't listed
+    await userEvent.selectOptions(within(screen.getByRole('dialog', { name: 'Edit Pedramp' })).getByLabelText('Ramp type'), 'PARALLEL')
+    const ask = await screen.findByRole('dialog', { name: 'Change the ramp type?' })
+    expect(ask).toHaveTextContent('Switching from Perpendicular to Parallel will drop these measurements:')
+    expect(within(ask).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Ramp width', 'Landing length'])
+    await userEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    expect(within(screen.getByRole('dialog', { name: 'Edit Pedramp' })).getByLabelText('Ramp type')).toHaveDisplayValue('Perpendicular')
+    expect(screen.getByRole('dialog', { name: 'Edit Pedramp' })).toBeInTheDocument()
+
+    await userEvent.selectOptions(within(screen.getByRole('dialog', { name: 'Edit Pedramp' })).getByLabelText('Ramp type'), 'PARALLEL')
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Change the ramp type?' })).getByRole('button', { name: 'Continue' }))
+    expect(within(screen.getByRole('dialog', { name: 'Edit Pedramp' })).getByLabelText('Ramp type')).toHaveDisplayValue('Parallel')
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Edit Pedramp' })).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.updateProperty).toHaveBeenCalledWith(PROPERTY_ID, { ramp_type: 'PARALLEL' })
+    expect(api.saveRampLabel).not.toHaveBeenCalled()
   })
 
   it('reads no corners or attributes for a sidewalk', async () => {

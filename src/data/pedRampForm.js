@@ -183,3 +183,22 @@ export const SITE_RAMP_TITLE = 'D. This Ramp'
 export const SITE_CORNER_REQUIRED = [...CORNER_REQUIRED, 'corner_direction']
 export const SITE_RAMP_REQUIRED = ['quadrant', 'facing_street', 'ramp_type']
 export const RAMP_LABEL_MAX = 50
+
+// Every ramp field's [label, type] by key, across the ramp types
+const RAMP_FIELD = Object.fromEntries(Object.values(RAMP_FIELDS)
+  .flatMap(({ answers, measurements }) => [...answers, ...measurements])
+  .map(([key, label, type]) => [key, { label, type }]))
+
+/**
+ * The measurements (slopes and inches) a ramp's saved attributes hold that its new ramp type doesn't take: what the
+ * next save of its attributes would drop. Takes the saved attributes (null for none) and the new ramp type.
+ * Returns their labels, in the form's order ([] when nothing would go).
+ */
+export function measurementsDropped(attributes, rampType) {
+  if (!attributes) return []
+  const kept = new Set(rampKeys(rampType))
+  return Object.entries(RAMP_FIELD)
+    .filter(([key, { type }]) => (type === 'pct' || type === 'in') && !kept.has(key)
+      && attributes[key] !== null && attributes[key] !== undefined)
+    .map(([, { label }]) => label)
+}
