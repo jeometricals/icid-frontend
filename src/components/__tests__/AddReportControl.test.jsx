@@ -10,11 +10,11 @@ function renderControl(props = {}) {
 }
 
 describe('AddReportControl', () => {
-  it('lists the 16 main report types, with only General, SWCB, AC and DSP enabled and the rest "coming soon"', () => {
+  it('lists the 15 main report types, with only General, SWCB and AC enabled and the rest "coming soon"', () => {
     renderControl()
     const options = screen.getAllByRole('option')
-    expect(options).toHaveLength(16)
-    const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete', 'Daily Site Patrol']
+    expect(options).toHaveLength(15)
+    const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete']
     for (const option of options) {
       if (available.includes(option.textContent)) {
         expect(option).toBeEnabled()
@@ -26,7 +26,6 @@ describe('AddReportControl', () => {
     expect(options.filter(o => o.disabled)).toHaveLength(12)
     expect(screen.getByRole('option', { name: 'Sidewalk, Curb, Concrete Base' })).toHaveValue('SWCB')
     expect(screen.getByRole('option', { name: 'Asphaltic Concrete' })).toHaveValue('AC')
-    expect(screen.getByRole('option', { name: 'Daily Site Patrol' })).toHaveValue('DSP')
     expect(screen.getByRole('option', { name: 'Sewer (coming soon)' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Field Order (coming soon)' })).toBeInTheDocument()
   })
@@ -39,7 +38,8 @@ describe('AddReportControl', () => {
       expect(labels.some(l => l.startsWith(addendum))).toBe(false)
     }
     expect(screen.getByRole('option', { name: 'Water Main (Sheet 1) (coming soon)' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Daily Site Patrol' })).toBeEnabled()  // a main report, not an addendum
+    // A DSP is only ever an addendum: Add DSP on its parent report
+    expect(labels.some(l => l.startsWith('Daily Site Patrol'))).toBe(false)
   })
 
   it('starts on General', () => {

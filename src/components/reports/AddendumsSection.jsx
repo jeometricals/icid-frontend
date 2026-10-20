@@ -1,6 +1,7 @@
 /**
  * The "Addendums" card on a main report: lists the addendums attached to this report (Open / Delete) and adds new
- * ones of any addendum type that has a form page, then opens the new addendum. Takes the IDR's reports from the page
+ * ones of any addendum type that has a form page, then opens the new addendum; a General, SWCB, AC, Conc Mix or Conc Cyl
+ * also gets Add DSP (AddDspButton), the IDR's one Daily Site Patrol. Takes the IDR's reports from the page
  * instead of fetching them. Props: projectId, idrId, reportId, reports (every report in the IDR), onChanged (refetch the IDR
  * after a delete), navigateSafely(action) (runs a navigation after saving the parent's unsaved edits; Open and Add go
  * through it, so a failed parent save neither navigates nor creates the addendum), disabled (IDR submitted or report
@@ -10,12 +11,15 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import { addReport, deleteReport } from '../../services/api'
-import { REPORT_TYPES, isAddendumType, isReportTypeAvailable, reportTypeLabel, reportTypeRoute } from '../../data/reportTypes'
+import {
+  REPORT_TYPES, isAddendumType, isReportTypeAvailable, reportPagePath, reportTypeLabel, reportTypeRoute, takesDsp,
+} from '../../data/reportTypes'
 import { listOrigin } from '../../lib/listOrigin'
 import ConfirmDialog from '../ConfirmDialog'
+import AddDspButton from './AddDspButton'
 
-// Addendum types with a form page, in catalog order
-const ADDABLE_TYPES = REPORT_TYPES.filter(({ code }) => isAddendumType(code) && isReportTypeAvailable(code))
+// Addendum types with a form page, in catalog order; a DSP has its own button
+const ADDABLE_TYPES = REPORT_TYPES.filter(({ code }) => isAddendumType(code) && isReportTypeAvailable(code) && code !== 'DSP')
 
 // Without a navigateSafely from the page, navigate straight away
 const navigateNow = (action) => action()
@@ -39,13 +43,11 @@ export default function AddendumsSection({
   const [deleteError, setDeleteError] = useState(null)
 
   const addendums = reports.filter(r => r.parent_report_id === reportId)
+  const canTakeDsp = takesDsp(reports.find(r => r.report_id === reportId))
 
   // Keep the list the IDR was opened from, so Back to IDR from the addendum still returns there
   const goToAddendum = (addendum) => {
-    const segment = reportTypeRoute(addendum.report_type)
-    navigate(`/project/${projectId}/idr/${idrId}/${segment}/${addendum.report_id}`, {
-      state: listOrigin(location),
-    })
+    navigate(reportPagePath(projectId, idrId, addendum), { state: listOrigin(location) })
   }
 
   const handleAdd = async (reportType) => {
@@ -90,17 +92,25 @@ export default function AddendumsSection({
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="form-section-title mb-0">Addendums</h3>
-        {!disabled && ADDABLE_TYPES.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setPickerOpen(open => !open)}
-            disabled={adding}
-            aria-expanded={pickerOpen}
-            className="btn-primary flex items-center space-x-1"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{adding ? 'Adding...' : 'Add addendum'}</span>
-          </button>
+        {!disabled && (
+          <div className="flex items-start gap-2">
+            {canTakeDsp && (
+              <AddDspButton projectId={projectId} idrId={idrId} parentReportId={reportId} reports={reports}
+                navigateSafely={navigateSafely} />
+            )}
+            {ADDABLE_TYPES.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(open => !open)}
+                disabled={adding}
+                aria-expanded={pickerOpen}
+                className="btn-primary flex items-center space-x-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{adding ? 'Adding...' : 'Add addendum'}</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
 
