@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import {
-  LISTING_PAGE_SIZE, bulkDownloadPedRampInspections, downloadFile, getInspectionDotPdf, listPedRampInspections, listUsers,
+  LISTING_PAGE_SIZE, bulkDownloadPedRampInspections, downloadFile, downloadInspectionDotForms, listPedRampInspections, listUsers,
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { personName } from '../lib/personName'
@@ -34,8 +34,7 @@ function DotPdfButton({ inspectionId }) {
     setBusy(true)
     setError(null)
     try {
-      const { url, file_name: fileName } = await getInspectionDotPdf(inspectionId)
-      downloadFile(url, fileName)
+      await downloadInspectionDotForms(inspectionId)
     } catch (err) {
       setError(err.message)
     } finally {

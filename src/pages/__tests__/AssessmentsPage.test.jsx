@@ -10,7 +10,7 @@ import { TEST_USER } from '../../test/users'
 vi.mock('../../services/api', () => ({
   getAssessmentSites: vi.fn(), downloadAssessmentSummary: vi.fn(), downloadTailoredAssessmentSummary: vi.fn(),
   downloadConstructionReport: vi.fn(),
-  listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), getInspectionDotPdf: vi.fn(),
+  listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), downloadInspectionDotForms: vi.fn(),
   listUsers: vi.fn(), downloadFile: vi.fn(), LISTING_PAGE_SIZE: 30,
 }))
 

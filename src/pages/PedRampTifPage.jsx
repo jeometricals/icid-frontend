@@ -7,7 +7,8 @@
  * approved — no further edits"). An RE (or an admin) signs it with "Sign & Approve": their name as it prints (their own
  * to start) and New York licence number, both required; it uses their ICID signature image, which is not a
  * cryptographic signature. Everyone gets "Download TIF form" (DOT's form filled as it stands); an admin alone gets
- * Delete (confirmed), which returns to the inspection. Refusals read as the backend words them.
+ * Delete (confirmed), which returns to the inspection. Section 8's photos and section 9's site design / layout are
+ * PedRampPhotosSection's, under the same lock. Refusals read as the backend words them.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -21,6 +22,7 @@ import { rampTypeLabel } from '../data/propertyKinds'
 import { TIF_FIELDS, TIF_SECTIONS } from '../data/tifForm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DownloadFileButton from '../components/DownloadFileButton'
+import PedRampPhotosSection from '../components/PedRampPhotosSection'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 import { APPROVED_LOCK, SUBMITTED_LOCK } from './PedRampInspectionPage'
@@ -224,6 +226,8 @@ export default function PedRampTifPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{section.fields.map(input)}</div>
           </section>
         ))}
+
+        <PedRampPhotosSection parent={{ type: 'tif', id: tif.id }} canEdit={canEdit} kinds={['photo', 'layout']} />
 
         {canEdit && (
           <div className="flex justify-end mb-6">

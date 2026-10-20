@@ -21,6 +21,19 @@ const DRAFT = {
   why_requirements_cannot_be_achieved: null, project_category: null, signer_name: null, signed_at: null,
 }
 
+// The photo section is tested on its own; here it reports the form's photos as photosOnForm says
+let photosOnForm = []
+vi.mock('../../components/PedRampPhotosSection', async () => {
+  const { useEffect } = await import('react')
+  return {
+    NO_PHOTOS_WARNING: 'No photos yet: DOT asks for at least four of each ramp. You can still submit for the pilot.',
+    default: function PhotosStub({ parent, propertyId, canEdit, onPhotosChange }) {
+      useEffect(() => { onPhotosChange?.(photosOnForm) }, [onPhotosChange])
+      return <div data-testid="photos" data-parent={`${parent.type}:${parent.id}`} data-ramp={propertyId ?? ''} data-can-edit={String(canEdit)} />
+    },
+  }
+})
+
 vi.mock('../../services/api', () => ({
   getTif: vi.fn(), updateTif: vi.fn(), approveTif: vi.fn(), deleteTif: vi.fn(), downloadTifForm: vi.fn(),
 }))
@@ -116,6 +129,13 @@ describe('PedRampTifPage', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(api.deleteTif).toHaveBeenCalledWith(TIF_ID))
     expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/ped-ramp-corners/${CORNER_ID}/inspection#ramp-${RAMP_ID}`)
+  })
+
+  it("has the TIF's photos and site layout, editable while the TIF is", async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByTestId('photos').dataset.parent).toBe(`tif:${TIF_ID}`)
+    expect(screen.getByTestId('photos').dataset.canEdit).toBe('true')
   })
 
   it('downloads its DOT form for anyone, a demo user reading only', async () => {

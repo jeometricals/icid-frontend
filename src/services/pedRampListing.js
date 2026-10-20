@@ -38,9 +38,3 @@ export async function bulkDownloadPedRampInspections(projectId, filters = {}) {
   })
   return json.data
 }
-
-/** Signs a URL to an approved inspection's stored DOT PDF (or its ZIP with the TIFs). Returns {url, expires_at, file_name}. */
-export async function getInspectionDotPdf(inspectionId) {
-  const json = await apiFetch(`/v1/ped-ramp-inspections/${inspectionId}/dot-pdf`)
-  return json.data
-}
