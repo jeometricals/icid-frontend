@@ -1,0 +1,344 @@
+/**
+ * A ped ramp corner's As-Built Inspection Form (Pedramp Phase 3, S1), at
+ * /project/:projectId/ped-ramp-corners/:cornerId/inspection, reached from "As-Built Inspection Form" on a corner's
+ * heading row, on each of its ramp rows (with #ramp-<property id>, which scrolls to that ramp's card) and on a ped
+ * ramp's site page. One scrolling page: the DOT form's sections 1-4 (the corner, read here and changed through the
+ * Pedramp dialog's "Edit corner"), "Are all ADA requirements met?", and section 5 as a card per ramp
+ * (RampAttributesSection, each saving its own).
+ * The inspection's status heads the page (Not started / Draft / Returned / Submitted / Approved) with who signed it,
+ * and the actions the signed-in user's roles on the project allow (an admin stands in for either): Start inspection
+ * (an inspector or an RE), Submit (an inspector, on a draft; signs with their signature), Return (an RE, on a
+ * submitted one; a comment is required) and Approve (an RE; signs). A returned draft shows the RE's comment. Who may
+ * change the fields follows the backend's lock: a draft, anyone on the project who isn't a demo user; submitted,
+ * only an RE ("Inspection is submitted — only the RE can edit"); approved, nobody ("Inspection is approved — no
+ * further edits"); the message reads above the form. Every refusal reads as the backend words it.
+ */
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { format, parseISO } from 'date-fns'
+import { AlertTriangle, ArrowLeft, Pencil } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { useProjectRoles } from '../contexts/ProjectRolesContext'
+import {
+  approveInspection, getCorner, getCornerInspection, returnInspection, startInspection, submitInspection,
+  updateCorner, updateInspection,
+} from '../services/api'
+import { isAdmin } from '../lib/reviewRoles'
+import { BOROUGHS, facingStreetName, rampTypeLabel } from '../data/propertyKinds'
+import { SITE_CORNER_SECTIONS } from '../data/pedRampForm'
+import ConfirmDialog from '../components/ConfirmDialog'
+import PedrampSiteModal from '../components/PedrampSiteModal'
+import RampAttributesSection from '../components/RampAttributesSection'
+import ReturnCommentModal from '../components/ReturnCommentModal'
+import StatusBadge from '../components/StatusBadge'
+import Toast from '../components/Toast'
+
+export const APPROVED_LOCK = 'Inspection is approved — no further edits'
+export const SUBMITTED_LOCK = 'Inspection is submitted — only the RE can edit'
+export const NOT_STARTED = 'Not started'
+
+/** How a corner field reads on the form: a choice's words, Yes / No, the value, or a dash. */
+function shownValue(type, extra, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (type === 'select') return extra.find(option => option.value === value)?.label ?? value
+  if (type === 'yesno') return value ? 'Yes' : 'No'
+  if (type === 'boro') return BOROUGHS.includes(value) ? value : String(value)
+  return String(value)
+}
+
+const when = (iso) => format(parseISO(iso), 'MMM d, yyyy')
+
+// The confirmed moves: what each asks and does
+const MOVES = {
+  submit: {
+    title: 'Submit inspection?',
+    message: 'It goes to the RE for review, signed with your signature. Until it is returned, only the RE can change it.',
+    confirmLabel: 'Submit',
+    run: inspection => submitInspection(inspection.id),
+    done: 'Inspection submitted.',
+  },
+  approve: {
+    title: 'Approve inspection?',
+    message: 'It is signed with your signature and frozen: nobody can change it afterwards.',
+    confirmLabel: 'Approve',
+    run: inspection => approveInspection(inspection.id),
+    done: 'Inspection approved.',
+  },
+}
+
+export default function PedRampInspectionPage() {
+  const { projectId, cornerId } = useParams()
+  const navigate = useNavigate()
+  const { hash } = useLocation()
+  const { user } = useAuth()
+  const { rolesByProject } = useProjectRoles()
+  const admin = isAdmin(user)
+  const roles = rolesByProject?.[projectId] ?? []
+  const writer = !user?.is_demo
+  const inspector = writer && (admin || roles.includes('inspector'))
+  const re = writer && (admin || roles.includes('re'))
+
+  const [corner, setCorner] = useState(null)
+  const [inspection, setInspection] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [attempt, setAttempt] = useState(0) // bump to retry
+  const [dialog, setDialog] = useState(null) // 'submit' | 'approve' | 'return' | 'corner'
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState(null) // the open dialog's (or the page's) failed action
+  const [toast, setToast] = useState(null)
+
+  useEffect(() => {
+    let ignore = false
+    setLoading(true)
+    setLoadError(null)
+    Promise.all([getCorner(cornerId), getCornerInspection(cornerId)])
+      .then(([foundCorner, foundInspection]) => {
+        if (ignore) return
+        setCorner(foundCorner)
+        setInspection(foundInspection)
+      })
+      .catch(err => { if (!ignore) setLoadError(err.message) })
+      .finally(() => { if (!ignore) setLoading(false) })
+    return () => { ignore = true }
+  }, [cornerId, attempt])
+
+  // A ramp row's link lands on its card once the form is there
+  useEffect(() => {
+    if (!loading && corner && hash) document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: 'start' })
+  }, [loading, corner, hash])
+
+  const status = inspection?.status ?? null
+  const lock = status === 'approved' ? APPROVED_LOCK : status === 'submitted' && !re ? SUBMITTED_LOCK : null
+  const canEdit = writer && !lock
+  const canAnswer = status === 'draft' ? inspector || re : status === 'submitted' && re
+
+  // Runs an action; a refusal stays in the open dialog (or above the form), else the dialog closes
+  const run = async (action, done) => {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await action()
+      setDialog(null)
+      if (done) setToast(done)
+    } catch (err) {
+      setActionError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const open = (name) => {
+    setActionError(null)
+    setDialog(name)
+  }
+
+  const start = () => run(async () => setInspection(await startInspection(cornerId)), 'Inspection started.')
+  const answer = (value) => run(async () => setInspection(await updateInspection(inspection.id, value)))
+  const move = () => run(async () => setInspection(await MOVES[dialog].run(inspection)), MOVES[dialog].done)
+  const sendBack = (comment) => run(async () => setInspection(await returnInspection(inspection.id, comment)),
+    'Inspection returned to the inspector.')
+  const saveCorner = ({ corner: changes }) => run(async () => setCorner(await updateCorner(cornerId, changes)),
+    'Corner saved.')
+
+  const back = (
+    <button
+      onClick={() => navigate(`/project/${projectId}/properties`)}
+      className="flex items-center space-x-2 text-construction-700 hover:text-construction-800 mb-6"
+    >
+      <ArrowLeft className="h-5 w-5" />
+      <span className="font-medium">Back to Site Info</span>
+    </button>
+  )
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {back}
+          <div className="flex justify-center py-12">
+            <div role="status" className="animate-spin rounded-full h-12 w-12 border-b-2 border-construction-600"></div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex-1 bg-gray-50">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {back}
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
+            <p className="text-red-600 mb-4">Couldn't load the inspection: {loadError}</p>
+            <button onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  const name = `${corner.north_south_street} & ${corner.east_west_street}${corner.corner_direction ? ` — ${corner.corner_direction}` : ''}`
+  const pageError = !dialog && actionError
+
+  return (
+    <div className="flex-1 bg-gray-50">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {back}
+
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">As-Built Inspection Form — {name}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+              {inspection
+                ? <StatusBadge status={status} returned={Boolean(inspection.return_comment)} />
+                : <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">{NOT_STARTED}</span>}
+              {inspection?.submitted_at && (
+                <span>Submitted by {inspection.inspector_name ?? 'the inspector'} on {when(inspection.submitted_at)}</span>
+              )}
+              {status === 'approved' && inspection.re_signed_at && (
+                <span>Approved by {inspection.re_name ?? 'the RE'} on {when(inspection.re_signed_at)}</span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {!inspection && (inspector || re) && (
+              <button type="button" onClick={start} disabled={busy} className="btn-primary">Start inspection</button>
+            )}
+            {status === 'draft' && inspector && (
+              <button type="button" onClick={() => open('submit')} className="btn-primary">Submit</button>
+            )}
+            {status === 'submitted' && re && (
+              <>
+                <button type="button" onClick={() => open('return')} className="btn-secondary">Return</button>
+                <button type="button" onClick={() => open('approve')} className="btn-primary">Approve</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {status === 'draft' && inspection.return_comment && (
+          <div role="note" className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-medium">
+              Returned by {inspection.returned_by_name ?? 'the RE'}
+              {inspection.returned_at ? ` on ${when(inspection.returned_at)}` : ''}
+            </p>
+            <p className="mt-1 whitespace-pre-line">{inspection.return_comment}</p>
+          </div>
+        )}
+        {lock && (
+          <p role="note" className="mb-4 rounded-md border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700">
+            {lock}
+          </p>
+        )}
+        {pageError && <p role="alert" className="mb-4 text-sm text-red-600">{pageError.message}</p>}
+
+        <section aria-label="Corner" className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Sections 1-4 — the corner</h3>
+            {canEdit && (
+              <button type="button" onClick={() => open('corner')} className="btn-secondary inline-flex items-center space-x-2">
+                <Pencil className="h-4 w-4" />
+                <span>Edit corner</span>
+              </button>
+            )}
+          </div>
+          {SITE_CORNER_SECTIONS.map(section => (
+            <div key={section.id} className="mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">{section.title}</h4>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                {section.fields.map(([key, label, type, extra]) => (
+                  <div key={key}>
+                    <dt className="text-gray-500">{label}</dt>
+                    <dd className="text-gray-900">{shownValue(type, extra, corner[key])}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+          <p className="text-sm text-gray-600">
+            Ramp types at this corner: {[...new Set(corner.ramps.map(ramp => rampTypeLabel(ramp.ramp_type)))].join(', ') || '—'}
+          </p>
+        </section>
+
+        {inspection && (
+          <section aria-label="ADA requirements" className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <fieldset disabled={!canAnswer || busy}>
+              <legend className="text-sm font-semibold text-gray-900">Are all ADA requirements met?</legend>
+              <div className="mt-2 flex gap-6 text-sm">
+                {[[true, 'Yes'], [false, 'No']].map(([value, label]) => (
+                  <label key={label} className="inline-flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="requirements-met"
+                      checked={inspection.requirements_met === value}
+                      onChange={() => answer(value)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {inspection.requirements_met === false && (
+              <p className="mt-3 flex items-start gap-2 text-sm text-amber-800">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+                <span>A ramp that doesn't meet the ADA standards needs a Technical Infeasibility Form (TIF).</span>
+              </p>
+            )}
+          </section>
+        )}
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Section 5 — the ramps ({corner.ramps.length})</h3>
+        {corner.ramps.length === 0 && (
+          <p className="bg-white rounded-lg shadow-sm p-6 text-sm text-gray-600">No ramps at this corner yet.</p>
+        )}
+        {corner.ramps.map((ramp, index) => (
+          <section key={ramp.property_id} id={`ramp-${ramp.property_id}`} aria-label={`Ramp ${ramp.ramp_id_label ?? index + 1}`} className="mb-6 scroll-mt-4">
+            <h4 className="text-base font-semibold text-gray-900 mb-2">
+              Ramp {ramp.ramp_id_label ?? index + 1}
+              <span className="font-normal text-gray-600">
+                {' '}— {rampTypeLabel(ramp.ramp_type)} · {ramp.quadrant} · facing {facingStreetName(ramp) ?? '—'}
+              </span>
+            </h4>
+            <RampAttributesSection property={{ id: ramp.property_id, ramp_type: ramp.ramp_type }} canEdit={canEdit} />
+          </section>
+        ))}
+
+        {(dialog === 'submit' || dialog === 'approve') && (
+          <ConfirmDialog
+            title={MOVES[dialog].title}
+            message={MOVES[dialog].message}
+            confirmLabel={MOVES[dialog].confirmLabel}
+            cancelLabel="Cancel"
+            confirmClassName="btn-primary"
+            onConfirm={move}
+            onCancel={() => setDialog(null)}
+            busy={busy}
+            error={actionError?.message ?? null}
+          />
+        )}
+        {dialog === 'return' && (
+          <ReturnCommentModal
+            title="Return inspection"
+            recipient="the inspector"
+            onConfirm={sendBack}
+            onCancel={() => setDialog(null)}
+            busy={busy}
+            error={actionError?.message ?? null}
+          />
+        )}
+        {dialog === 'corner' && (
+          <PedrampSiteModal
+            mode="edit-corner"
+            corner={corner}
+            onSave={saveCorner}
+            onCancel={() => setDialog(null)}
+            busy={busy}
+            error={actionError}
+          />
+        )}
+
+        <Toast message={toast} onDone={() => setToast(null)} />
+      </main>
+    </div>
+  )
+}

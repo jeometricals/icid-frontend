@@ -46,13 +46,13 @@ describe('RampAttributesSection', () => {
     const slope = await screen.findByLabelText(/Ramp running slope/)
     await user.clear(slope)
     await user.type(slope, '7.5')
-    await user.selectOptions(screen.getByLabelText('DWS color'), 'yellow')
+    await user.selectOptions(screen.getByLabelText('DWS color'), 'dark_on_light')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByText(WITHIN)).toBeInTheDocument())
     const sent = api.saveRampAttributes.mock.calls[0][1]
     expect(Object.keys(sent).sort()).toEqual(rampKeys('PERPENDICULAR').sort())
     expect(sent).toMatchObject({ ramp_id_label: 'R1', ramp_running_slope_pct: 7.5, is_there_ponding: false,
-      dws_color: 'yellow', ramp_width_in: null, comments: null })
+      dws_color: 'dark_on_light', ramp_width_in: null, comments: null })
   })
 
   it('keeps Save off while a measurement isn\'t a number', async () => {

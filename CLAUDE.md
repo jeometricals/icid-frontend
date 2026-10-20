@@ -204,7 +204,31 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     under the card `RampAttributesSection`: its type's answers left and measurements right (slopes %, lengths in), then
     comments; the backend's ADA warnings listed above ("N ADA warning(s) (saved anyway)") and their fields marked
     `(ADA)`; they never stop a save. Whoever can change the site saves the whole set (off until something changed or
-    while a measurement isn't a number); everyone else reads it.
+    while a measurement isn't a number); everyone else reads it. A ped ramp at a corner also gets "As-Built Inspection
+    Form" beside Edit. `RampAttributesSection` scopes its element ids with `useId`, since the inspection form shows one
+    per ramp.
+  - **DOT's choice lists** (backend migration 048, one-way): `ENTITIES` is DOT's 13, `CURB_MATERIALS` has no
+    cobblestone, `DWS_COLORS` red / white / dark on light / light on dark / other, `DWS_MATERIALS` preformed plastic
+    (embedded) / (surface applied), cast in place (surface applied), cast iron, stone, concrete tile.
+  - **The inspection workflow** (Pedramp Phase 3, S1). `services/pedRampInspections.js`: `getCornerInspection(cornerId)`
+    (null when none was started), `startInspection`, `updateInspection(id, requirementsMet)`, `submitInspection`,
+    `returnInspection(id, comment)`, `approveInspection`. Two stages: an inspector submits (signing), an RE approves
+    (signing) or returns it to draft with a comment; an admin stands in for either; roles from `useProjectRoles`.
+    - **`PedRampInspectionPage`** at `/project/:projectId/ped-ramp-corners/:cornerId/inspection`, from "As-Built
+      Inspection Form" on a corner's heading row, on each of its ramp rows (`#ramp-<property id>`, scrolled to that
+      ramp's card; `inspectionPath` in `PedRampsSection`) and on a ped ramp's site page. One scrolling page: the status
+      (Not started / Draft / Returned / Submitted / Approved, with who submitted and approved it when), the moves the
+      user's roles allow (Start inspection: an inspector or RE; Submit: an inspector, confirmed; Return: an RE, through
+      `ReturnCommentModal`, a comment required; Approve: an RE, confirmed), a returned draft's comment, sections 1-4
+      (the corner, read-only, with "Edit corner": the Pedramp dialog in mode `edit-corner`, A-C only, saving through
+      `updateCorner`), "Are all ADA requirements met?" (Yes / No, saved at once; No notes that a failing ramp needs a
+      TIF), and section 5 as a card per ramp (`RampAttributesSection`, each saving its own). There is no page-wide
+      Save Draft: each part saves itself.
+    - **The lock**, as the backend's: a draft (or no inspection) is anyone's on the project but a demo user's;
+      submitted, only an RE edits ("Inspection is submitted — only the RE can edit" reads above the form, and the
+      editors are off); approved, nobody ("Inspection is approved — no further edits"). Every refusal reads as the
+      backend words it, in its dialog ("Signature required before signing an inspection", "Approve or delete this
+      inspection's draft TIFs first").
 - **Title block** (R1h.2, R1h.3). The fields the Construction Report prints: page 1's Contract No., Date Notice Issued,
   Date Excavated and Date Constructed, the PIR's North Bearing, and (R1h.3) the streets and widths round its sketch:
   `cross_street_left`, `cross_street_right`, `frontage_street` (the bottom; the top is always the property line, PL),
@@ -1110,6 +1134,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `PATCH /v1/ped-ramp-corners/{id}` (a new borough or street carries onto its live ramps) ·
     `DELETE /v1/ped-ramp-corners/{id}` (admin) · `GET /v1/ped-ramp-corners/{id}/inspection-report.pdf` ·
     `GET` / `PUT /v1/properties/{id}/ped-ramp-attributes` (anyone on the project reads; members but demo users write)
+  - Ped ramp inspections: `GET /v1/ped-ramp-corners/{id}/inspection` · `POST /v1/ped-ramp-corners/{id}/inspection/start` ·
+    `PATCH /v1/ped-ramp-inspections/{id}` (`{requirements_met}`) · `POST /v1/ped-ramp-inspections/{id}/submit` · `/return`
+    (`{comment}`) · `/approve` (the corner's and its ramps' writes follow the inspection's lock: 403 submitted, 409 approved)
   - PIRs: `GET /v1/properties/{id}/pir` (the live one) · `GET /v1/properties/{id}/pirs?include_deleted=` ·
     `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
     `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the
