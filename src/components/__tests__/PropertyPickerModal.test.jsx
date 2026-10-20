@@ -47,6 +47,29 @@ describe('PropertyPickerModal', () => {
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
   })
 
+  it('narrows to one kind with its chips, All to start, together with the search', async () => {
+    const ramp = { ...property(5, null, null, '38 St & 31 Ave — SW Quadrant (Facing 31 Ave)'), kind: 'ped_ramp',
+      ramp_type: 'CUT_THROUGH', property_type: null }
+    api.listProperties.mockResolvedValue([ELM, MAIN, ramp])
+    await renderPicker()
+    const chip = (name) => screen.getByRole('button', { name })
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3)
+    await userEvent.click(chip('Pedramps'))
+    expect(chip('Pedramps')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    expect(screen.getByRole('checkbox').closest('label')).toHaveTextContent('Cut-through')
+    await userEvent.click(chip('Sidewalks'))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    await userEvent.type(search(), 'elm')
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    await userEvent.clear(search())
+    await userEvent.click(chip('Pedramps'))
+    await userEvent.click(screen.getByRole('checkbox'))
+    await userEvent.click(screen.getByRole('button', { name: 'Add 1 site' }))
+    await waitFor(() => expect(api.bundleProperty).toHaveBeenCalledWith(TASK_ORDER.id, ramp.id))
+  })
+
   it('filters by block, lot or address, any case', async () => {
     await renderPicker()
     await userEvent.type(search(), 'MAIN')

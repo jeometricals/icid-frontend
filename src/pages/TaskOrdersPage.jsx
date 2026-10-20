@@ -1,7 +1,8 @@
 /**
  * One project's task orders (route param :projectId), at /project/:projectId/task-orders, reached from the
  * project page's "Task Order" tile. A "Site Info" link in the header leads to the project's properties (the sites
- * a task order bundles). For anyone on the project: a table (number, issued, how many properties) in the
+ * a task order bundles). For anyone on the project: a table (number, issued, how many properties, with an SW and / or
+ * PR badge for the kinds it bundles) in the
  * backend's order, which is by number. A number opens its task order's page. A member who isn't a demo user also
  * gets "Add task order" beside the heading and Edit on each row; both share one dialog. The destructive controls
  * are an admin's alone: Delete (a soft delete) on each row, and "Show deleted" (off to start), which asks the
@@ -20,6 +21,7 @@ import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
 import { TASK_ORDER_ACTIONS, propertyCount } from '../lib/taskOrders'
 import ConfirmDialog from '../components/ConfirmDialog'
+import SiteKindBadges from '../components/SiteKindBadges'
 import StatusBadge from '../components/StatusBadge'
 import TaskOrderFormModal from '../components/TaskOrderFormModal'
 import Toast from '../components/Toast'
@@ -227,7 +229,10 @@ export default function TaskOrdersPage() {
                             {row.issued_date ? shortDate(row.issued_date) : '—'}
                           </td>
                           <td className={`px-6 py-4 text-sm whitespace-nowrap ${deleted ? '' : 'text-gray-600'}`}>
-                            {propertyCount(row.property_count)}
+                            <span className="inline-flex items-center gap-2">
+                              {propertyCount(row.property_count)}
+                              <SiteKindBadges taskOrder={row} />
+                            </span>
                           </td>
                           {writer && (
                             <td className="px-6 py-4 text-sm">

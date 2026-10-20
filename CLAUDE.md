@@ -21,7 +21,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent, and `formatFlagQuantity`: a flag quantity to two decimals), `idrFlags.js` (an IDR's flags as the pages word them: a flag's site, amount and sketch link, who may exclude or include one, the claim and release sentences; see IDR flags) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `facingStreetName` and `withoutLeadingZeros`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels, and `dspForm.js`: the Daily Site Patrol's checklist items and questions, its blank `report_data` and its save check).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), `contractItems.js` (a `getContractItems` response fixture for the pay-item picker) `idrFlags.js` (`idrFlag` and `idrFlagsData`: a `getIdrFlags` response) and `progress.js` (progress rollups shaped on SE384's walkthrough: `PROJECT_PROGRESS`, `TASK_ORDER_PROGRESS`, `EMPTY_PROGRESS`, `progressItem`).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), As-Builts & Assessments' `SidewalkAssessmentTab`, the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, `PedRampCornersSection` and `PedRampCornerFormModal`, the property page's `RampAttributesSection`, the admin import's `SmartPirImportForm` and the IDR page's `IdrFlagsSection`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), As-Builts & Assessments' `SidewalkAssessmentTab`, the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, `PedRampsSection` and `PedrampSiteModal`, `FoldingPanel` (a titled panel that folds), the task order list's `SiteKindBadges`, the property page's `RampAttributesSection`, the admin import's `SmartPirImportForm` and the IDR page's `IdrFlagsSection`); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -189,16 +189,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Ped ramp inspection** (pedramp 2a). NYC DOT's Pedestrian Ramp Inspection Form as data, and the backend's own
   inspection report of it (DOT's fillable PDF, photos and the email export are 2b, not built).
   - **Service:** `services/pedRamps.js`: `listCorners(projectId, {includeDeleted})`, `getCorner`, `createCorner`,
-    `updateCorner`, `deleteCorner` (admin), `getRampAttributes(propertyId)` (null for the backend's 404 `Ramp attributes
-    not entered`), `saveRampAttributes` (a PUT of the whole set) and `downloadInspectionReport(cornerId)` (the PDF,
-    through `apiFetchFile` and `saveFile`). The form's choices, labels and each ramp type's fields are
-    `data/pedRampForm.js` (`CORNER_SECTIONS`, `RAMP_FIELDS`, `rampKeys`), mirroring the backend's.
-  - **Site Info:** "Ped Ramp Corners" (`PedRampCornersSection`) follows "Pedestrian Ramps", read with the sites:
-    Intersection, Borough, Direction, Corner No., Ramps (each ramp placed there by type and Ramp ID), Inspected, and
-    Actions: "Inspection Report" (`DownloadFileButton`, everyone), Edit (a member who isn't a demo user) and Delete (an
-    admin, confirmed). Add Corner opens `PedRampCornerFormModal`: the form's sections 1-3 and comments; borough and both
-    streets required; adding sends every field, editing what changed (a choice put back to none is `null`). A ped
-    ramp's `PropertyFormModal` offers the live corners as "Inspection corner" (optional; `corner_id`, none is `null`).
+    `updateCorner`, `deleteCorner` (admin), `createPedrampSite(projectId, data)` (Slice R: a corner and a ramp at it in
+    one call; returns `{corner_id, property_id, corner_reused}`), `getRampAttributes(propertyId)` (null for the
+    backend's 404 `Ramp attributes not entered`), `saveRampAttributes` (a PUT of the whole set), `saveRampLabel(propertyId,
+    rampType, label)` (reads the attributes, then PUTs them whole with the new Ramp ID, only its ramp type's keys) and
+    `downloadInspectionReport(cornerId)` (the PDF, through `apiFetchFile` and `saveFile`). The form's choices, labels
+    and each ramp type's fields are `data/pedRampForm.js` (`CORNER_SECTIONS`, `RAMP_FIELDS`, `rampKeys`, and the
+    Pedramp dialog's `SITE_CORNER_SECTIONS`), mirroring the backend's. `createCorner` is no longer called by a page.
+  - **Site Info (Slice R): the corner is not an entity of its own in the UI.** An inspection is a corner with its
+    ramps, so "Pedestrian Ramps" (`PedRampsSection`) is the one section: a row per ped ramp site, stacked under its
+    corner. See "Two sections" under Properties.
   - **Property page:** a ped ramp's Site card adds "Inspection corner" (its streets and direction, or a dash), and
     under the card `RampAttributesSection`: its type's answers left and measurements right (slopes %, lengths in), then
     comments; the backend's ADA warnings listed above ("N ADA warning(s) (saved anyway)") and their fields marked
@@ -600,27 +600,52 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Service:** `services/properties.js`: `listProperties(projectId, { includeDeleted })` (both kinds; the
     backend's `?kind=` isn't used), `getProperty`, `createProperty(projectId, data)`, `updateProperty(propertyId,
     data)`, `softDeleteProperty` and `undeleteProperty`. `include_deleted` from a non-admin is ignored by the backend.
-  - **Load:** one `listProperties`, split by `kind` into the two sections; the heading is "Site Info — <project_id>".
+  - **Load:** `listProperties` and `listCorners` together, the sites split by `kind` into the two sections; the
+    heading is "Site Info — <project_id>".
     A failure is the load error with Retry.
-  - **Two sections** (`SiteSection`, in page order): "Prior Notice Violation Sidewalks" and "Pedestrian Ramps", both
+  - **Two sections** (`SiteSection` and `PedRampsSection`, in page order): "Prior Notice Violation Sidewalks" and "Pedestrian Ramps", both
     open on every load (nothing remembers a fold). The header: a button with a chevron and the title with its count
     of live sites ("Prior Notice Violation Sidewalks (12)", `aria-expanded`), which folds the section; then "Bulk
     Upload Sidewalks" / "Bulk Upload Ped Ramps", disabled for everyone with the tooltip "AI import — coming soon"
-    (on a wrapper too); then, for a member who isn't a demo user, "Add Sidewalk" / "Add Ped Ramp". Rows are in the backend's order.
+    (on a wrapper too); then, for a member who isn't a demo user, "Add Sidewalk" / "Add Pedramp". Rows are in the backend's order.
     - Sidewalk columns: Borough, Block, Lot (the site's own `block` and `lot`), CB (`community_board`, a dash for
       none), Address (a link to
       the site's page), Violation No., Status, Added, Task Order No., Actions.
-    - Ped ramp columns: Borough, CB, Intersection 1st Street (a link to the site's page), Intersection 2nd Street,
-      Quadrant, Facing (the street's name, `facingStreetName`), Type (the ramp type's label), Status, Added, Task
-      Order No., Actions.
+    - **Ped ramps, grouped by corner** (Slice R): the corners in the backend's order (by their streets), each a
+      heading row (`tr[data-corner]`): "Atlantic Ave & Court St — NE · Brooklyn · 2 ramps", then "Inspection Report"
+      (`DownloadFileButton`, everyone) and, for a member who isn't a demo user, "Add another ramp at this corner" (off,
+      with the tooltip "Set this corner's direction first (Edit one of its ramps).", for a corner without a direction:
+      the backend reuses a corner by its direction). A live corner with no ramps keeps its heading (so a ramp can be
+      added). Ramps whose corner isn't in the list come last under "No corner". Under each heading its ramps:
+      Intersection (street 1 & street 2, a link to the site's page), Direction (the ramp's quadrant), Ramp type, Ramp
+      label (its Ramp ID, read off the corner's `ramps`), Status, Actions. A cut-through's two ramps are two rows,
+      told apart by their Ramp IDs ("CT-A" / "CT-B").
     - **Status** (`SiteStatus`): a dash for `none`, a "Task Ordered" pill, or "Constructed YYYY-MM-DD" with the
       server's date as sent; a deleted row reads Deleted instead. Added is `created_at` through `lib/shortDate.js`;
       a dash for no task order or violation.
     - **Actions:** View (a link to the site's sketch workspace, `/project/<id>/properties/<id>/pir`) for everyone;
       Edit for a member who isn't a demo user; Delete for an admin; a deleted row has only Un-delete (an admin's).
-    - **Empty:** "No sidewalks added yet." / "No pedestrian ramps added yet.", with a prominent Add for a member
-      who isn't a demo user.
-  - **Add and Edit** share `PropertyFormModal` (`mode`, `kind`, `initial`; "Add sidewalk" / "Add ped ramp" / "Edit
+    - **Empty:** "No sidewalks added yet." / "No pedestrian ramps added yet." (no ramps and no live corner), with a
+      prominent Add for a member who isn't a demo user.
+  - **The Pedramp dialog** (`PedrampSiteModal`, Slice R; "Add Pedramp" / "Add another ramp at this corner" / "Edit
+    Pedramp"): one modal, four sections that fold (`FoldingPanel`): A. Location & Corner (borough, the two streets,
+    corner direction, T-intersection, traffic control, corner type, corner No., corner ID, number of ramps, painted
+    roadway), B. Construction info, C. Inspection (and the corner's comments) and D. This Ramp (quadrant, facing
+    street, ramp type, Ramp ID at most 50, notes). Required: borough, both streets, corner direction, quadrant,
+    facing street, ramp type. The facing street's options are the two streets' names as typed in A (sent as
+    `street_1` = the north-south street, `street_2` = the east-west), disabled until both are in.
+    - **Add:** everything open and empty; Save sends every field, flat, to `createPedrampSite`. The backend reuses a
+      live corner at the same borough, streets (any case) and direction, as it stands.
+    - **Add another ramp:** the corner fills A-C, locked and folded; only D is filled in; Save as Add (the corner's
+      own values make the backend reuse it).
+    - **Edit** (a ramp row's Edit): one scrolling page, every section open, the corner's and the ramp's values (its
+      Ramp ID from the corner's `ramps`). When the corner has more than one ramp a note says A-C apply to all of them.
+      Save runs, in turn, `updateCorner` with A-C's changes (the backend writes a new borough or street onto every live
+      ramp at it), `updateProperty` with the ramp's own changes and `saveRampLabel` when the Ramp ID changed; each
+      only when it has something. A ped ramp without a corner is edited in `PropertyFormModal` instead.
+    - **Delete** (an admin's, as for any site) deletes just that ramp. When it was the last live ramp at its live
+      corner, a second dialog asks "Delete the corner too?" ("Delete corner" / "Keep corner"; `deleteCorner`).
+  - **A sidewalk's Add and Edit** (and Edit of a ped ramp without a corner) use `PropertyFormModal` (`mode`, `kind`, `initial`; "Add sidewalk" / "Add ped ramp" / "Edit
     sidewalk" / "Edit ped ramp"), which branches on the kind (the section's when adding, the property's when
     editing; editing shows it as the fixed line "Site type: Sidewalk" / "Site type: Pedestrian Ramp"). Both kinds
     end with Notes (optional, at most 2,000 characters; blank is `null`, which clears them).
@@ -651,7 +676,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **A task order's bundle** (`PropertiesTable`) and **the picker** (`PropertyPickerModal`) list both kinds: Site
     (`siteLabel`: a sidewalk's "Queens Block 123 Lot 45", "Ped ramp" for a ped ramp; the link to its page), CB
     (the bundle's own column, a dash for none; the picker's "CB QN13" beside the site, only when set),
-    `display_address`, and the property type or ramp type. The picker's search ("Search by block, lot or address")
+    `display_address`, and the property type or ramp type. A task order may mix both kinds (Slice R); its page splits
+    the bundle by kind, and the picker filters by kind. The picker's search ("Search by block, lot or address")
     matches a sidewalk's block, lot or address, any site's CB, and a ped ramp's `display_address` (its streets).
 - **PIRs.** A property's PIR: the DOT survey sheet its inspector signed, digitized by a project member or an
   admin. One live
@@ -890,7 +916,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Task orders.** A project's task orders, each a bundle of its properties (a property can be in several, once
   in each). A project-level feature since S1: any member of the project uses them; only the destructive controls are
   an admin's. A task order is `{id, project_id, task_order_number, issued_date ('YYYY-MM-DD' or null),
-  estimate_notes, created_at, updated_at, created_by, deleted_at, deleted_by}`; a list row adds `property_count`,
+  estimate_notes, created_at, updated_at, created_by, deleted_at, deleted_by}`; a list row adds `property_count`
+  (and `sidewalk_count` and `ped_ramp_count`, Slice R),
   and one read on its own adds `properties` (its bundled properties that aren't deleted, by address).
   - **Who does what** (the backend enforces all of it; the pages only hide what it would refuse):
     - Any member of the project (inspector, OE, RE) and an admin: list, read, add, edit, bundle and unbundle.
@@ -909,7 +936,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     returns to the dashboard. "Task Orders — <project_id>" (no project name, as on Progress); on its right a
     plain "Site Info" link (small construction-coloured text, not a button) to `/project/<id>/properties`, for
     everyone, demo users included, then "Add task order". The table, in the backend's order (by number): Number (a link to the task order's page), Issued
-    (`shortDate`, or a dash), Sites (`propertyCount`: "24 sites", "1 site") and Edit (and Delete, for an admin).
+    (`shortDate`, or a dash), Sites (`propertyCount`: "24 sites", "1 site", then `SiteKindBadges`: an "SW" pill when it
+    bundles live sidewalks, a "PR" pill for ped ramps, both for a mixed one, each with its count as a tooltip) and
+    Edit (and Delete, for an admin).
     "Show deleted", the muted deleted rows with Un-delete, the confirm dialogs, the toasts ("Task order <number>
     deleted." / "restored."), reading the list again after every change and the load error are as on the
     properties page. No task orders reads "No task orders yet. Click 'Add task order' to start." ("No task orders
@@ -925,8 +954,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     project under this URL is refused as "Task order not found in project <id>". "Task order <number>" with Edit
     (and Delete, for an admin); a card with Issued, Estimate notes (line breaks kept) and Created ("Sep 1, 2026 by
     <name>"; the name comes from `useUserNames`, and when that fails or doesn't have them the card gives the date
-    alone). Then "Bundled sites": "N sites bundled", `PropertiesTable` with Unbundle on each row, and
-    "Add sites". A site's block and lot ("Ped ramp" for a ped ramp) link to the property's page (`/project/<project_id>/properties/<id>`), which is open
+    alone). Then "Bundled sites": "N sites bundled", then two panels that fold (`FoldingPanel`, both open):
+    "Sidewalks (N)" (`PropertiesTable` as before) and "Pedestrian Ramps (N)" (`PropertiesTable kind="ped_ramp"`:
+    Intersection, Quadrant, Facing, Ramp type, Added), each with Unbundle on each row and its own empty line ("No
+    sidewalks in this task order." / "No pedestrian ramps in this task order."), and "Add sites". A site's block and lot ("Ped ramp" for a ped ramp) link to the property's page (`/project/<project_id>/properties/<id>`), which is open
     to anyone on the project. Nothing bundled reads "No sites bundled yet. Click 'Add sites' to pick from this
     project." Its Added column is when the property was added to the project: the response doesn't carry when it
     was bundled.
@@ -941,7 +972,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       `property_count` by the backend, so it disappears from the page until it is un-deleted.
   - **`PropertyPickerModal`** (`taskOrder`, `onClose`, `onDone`), from Add sites (its title too): reads the project's live
     properties (`listProperties`, which any member may) and leaves out those already in this task order. One
-    checkbox row each (block and lot, address, type). The search box keeps the rows whose block, lot or address holds the text, any
+    checkbox row each (block and lot, address, type). Chips "All" / "Sidewalks" / "Pedramps" (`aria-pressed`, All to
+    start) narrow the rows to one kind, together with the search. The search box keeps the rows whose block, lot or address holds the text, any
     case. "Select all shown" ticks every row shown; a ticked row stays ticked while the search hides it, and Clear
     selection unticks all. "Add N sites" bundles the ticked ones **one at a time** (never in parallel), in
     list order, and stops at the first refusal, so nothing after it is tried. Then the picker closes and
@@ -1061,7 +1093,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `GET /v1/task-orders/{id}` · `PATCH /v1/task-orders/{id}` · `POST /v1/task-orders/{id}/admin/soft-delete` ·
     `POST /v1/task-orders/{id}/admin/undelete` · `POST /v1/task-orders/{id}/properties/{property_id}` (bundle) ·
     `DELETE /v1/task-orders/{id}/properties/{property_id}` (unbundle) (anyone on the project reads, adds, edits,
-    bundles and unbundles, a demo user only reads; soft-delete and un-delete are admin only; body `{task_order_number, issued_date, estimate_notes}`, all optional on a PATCH)
+    bundles and unbundles, a demo user only reads; soft-delete and un-delete are admin only; body `{task_order_number, issued_date, estimate_notes}`, all optional on a PATCH; a list row carries `sidewalk_count` and `ped_ramp_count`)
+  - Ped ramps: `GET /v1/projects/{id}/ped-ramp-corners?include_deleted=` · `POST /v1/projects/{id}/pedramp-sites` (a
+    corner and a ramp at it, one call; a live corner at the same borough, streets and direction is reused) ·
+    `PATCH /v1/ped-ramp-corners/{id}` (a new borough or street carries onto its live ramps) ·
+    `DELETE /v1/ped-ramp-corners/{id}` (admin) · `GET /v1/ped-ramp-corners/{id}/inspection-report.pdf` ·
+    `GET` / `PUT /v1/properties/{id}/ped-ramp-attributes` (anyone on the project reads; members but demo users write)
   - PIRs: `GET /v1/properties/{id}/pir` (the live one) · `GET /v1/properties/{id}/pirs?include_deleted=` ·
     `POST /v1/properties/{id}/pir` · `GET /v1/pirs/{id}` · `PATCH /v1/pirs/{id}` ·
     `POST /v1/pirs/{id}/admin/soft-delete` · `POST /v1/pirs/{id}/admin/undelete` (reading for anyone on the

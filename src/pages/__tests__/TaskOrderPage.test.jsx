@@ -264,6 +264,38 @@ describe('TaskOrderPage — bundled properties', () => {
     expect(queryRowOf('4007770007')).toBeNull()
   })
 
+  it("splits a mixed bundle into Sidewalks and Pedestrian Ramps, each with its kind's columns", async () => {
+    const ramp = {
+      id: 'c0000000-0000-4000-8000-000000000009', project_id: 'HWS0023', kind: 'ped_ramp', boro: 'Queens',
+      intersection_street_1: '38 St', intersection_street_2: '31 Ave', quadrant: 'SW', facing_street: 'street_2',
+      ramp_type: 'CUT_THROUGH', display_address: '38 St & 31 Ave — SW Quadrant (Facing 31 Ave)', notes: null,
+      created_at: `${YEAR}-09-14T12:00:00`, deleted_at: null,
+    }
+    api.getTaskOrder.mockImplementation(async () => ({ ...detail(), properties: [...detail().properties, ramp] }))
+    await renderLoaded()
+    expect(within(bundled()).getByText('3 sites bundled')).toBeInTheDocument()
+    const sidewalkPanel = within(bundled()).getByRole('region', { name: 'Sidewalks (2)' })
+    const rampPanel = within(bundled()).getByRole('region', { name: 'Pedestrian Ramps (1)' })
+    expect(within(sidewalkPanel).getAllByRole('columnheader').map(th => th.textContent))
+      .toEqual(['Site', 'CB', 'Address', 'Type', 'Added', 'Actions'])
+    expect(within(rampPanel).getAllByRole('columnheader').map(th => th.textContent))
+      .toEqual(['Intersection', 'Quadrant', 'Facing', 'Ramp type', 'Added', 'Actions'])
+    expect(within(within(rampPanel).getByText('38 St & 31 Ave').closest('tr')).getAllByRole('cell').map(td => td.textContent))
+      .toEqual(['38 St & 31 Ave', 'SW', '31 Ave', 'Cut-through', 'Sep 14', 'Unbundle'])
+    expect(within(sidewalkPanel).queryByText('38 St & 31 Ave')).not.toBeInTheDocument()
+
+    const fold = within(rampPanel).getByRole('button', { name: 'Pedestrian Ramps (1)' })
+    expect(fold).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(fold)
+    expect(within(rampPanel).queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('says a kind has nothing bundled in its own panel', async () => {
+    await renderLoaded()
+    expect(within(within(bundled()).getByRole('region', { name: 'Pedestrian Ramps (0)' }))
+      .getByText('No pedestrian ramps in this task order.')).toBeInTheDocument()
+  })
+
   it('shows the empty state when nothing is bundled', async () => {
     bundle = []
     await renderLoaded()
