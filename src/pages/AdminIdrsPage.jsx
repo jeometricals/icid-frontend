@@ -9,6 +9,8 @@
  * the PIR flags it claimed (R1f): its dialog reads how many first (getIdrFlags) and says so, and the toast after
  * repeats the count the backend gives; an un-delete back to approved says how many it claimed back. Anyone who isn't
  * an admin is told so instead.
+ * Unlocking an approved IDR (Slice T2) lists in its dialog what reopens and what stays, as the ped ramp inspection's
+ * unlock does; an IDR an admin has unlocked shows "Last unlocked ... by ..." under its actions.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -51,6 +53,13 @@ const ACTIONS = {
     run: idrId => adminUnlockIdr(idrId),
     title: () => 'Unlock IDR',
     message: 'This returns the IDR to RE Review and clears the RE signature. The RE must re-approve to lock it again.',
+    // What an approved IDR's unlock reopens, and what stays
+    items: idr => (idr.status === 'approved' ? [
+      "The RE's approval and signature: any RE on the project can accept it again from the queue",
+      'Its pay-item quantities: removed, and written afresh when it is approved again',
+      'The PIR flags and curb segments it claimed: released, and claimed again at the next approval',
+    ] : null),
+    stays: "What stays: its IDR number, its reports, the inspector's signature and the OE's acceptance.",
     confirmLabel: 'Unlock',
     confirmClassName: 'btn-primary',
     failure: "Couldn't unlock the IDR",
@@ -272,6 +281,11 @@ export default function AdminIdrsPage() {
           </button>
         </>
       )}
+      {idr.last_unlocked_at && (
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          Last unlocked {format(parseISO(idr.last_unlocked_at), 'MMM d, yyyy')}{idr.last_unlocked_by_name ? ` by ${idr.last_unlocked_by_name}` : ''}
+        </span>
+      )}
     </div>
   )
 
@@ -333,7 +347,9 @@ export default function AdminIdrsPage() {
           <ConfirmDialog
             title={ACTIONS[pending.action].title(pending.idr)}
             message={`${ACTIONS[pending.action].message}${releaseText}`}
-            note={`IDR: ${describeIdr(pending.idr)}`}
+            items={ACTIONS[pending.action].items?.(pending.idr) ?? null}
+            note={[ACTIONS[pending.action].items?.(pending.idr) && ACTIONS[pending.action].stays, `IDR: ${describeIdr(pending.idr)}`]
+              .filter(Boolean).join(' ')}
             confirmLabel={ACTIONS[pending.action].confirmLabel}
             cancelLabel="Cancel"
             confirmClassName={ACTIONS[pending.action].confirmClassName}

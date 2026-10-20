@@ -84,7 +84,7 @@ beforeEach(() => {
   ))
   api.adminUnlockIdr.mockImplementation(async (idrId) => change(idrId, {
     status: 'stage2_review', re_reviewer_uuid: null, re_reviewer_name: null, stage2_accepted_at: null,
-    re_signature_path: null,
+    re_signature_path: null, last_unlocked_at: '2026-10-22T10:00:00Z', last_unlocked_by_name: 'Ada Admin',
   }))
   api.adminDeleteIdr.mockImplementation(async (idrId) => change(idrId, {
     status: 'deleted', deleted_at: '2026-10-06T12:00:00Z',
@@ -619,6 +619,24 @@ describe('AdminIdrsPage — unlock', () => {
     expect(dialog()).toHaveTextContent(
       'This returns the IDR to RE Review and clears the RE signature. The RE must re-approve to lock it again.')
     expect(api.adminUnlockIdr).not.toHaveBeenCalled()
+  })
+
+  it("lists, for an approved IDR, what the unlock reopens and what stays", async () => {
+    renderPage()
+    await ready()
+    await clickUnlock('Sep 16, 2026')
+    expect(within(dialog()).getByText(/Its pay-item quantities: removed/)).toBeInTheDocument()
+    expect(within(dialog()).getByText(/any RE on the project can accept it again/)).toBeInTheDocument()
+    expect(dialog()).toHaveTextContent("What stays: its IDR number, its reports, the inspector's signature and the OE's acceptance.")
+  })
+
+  it('shows when an IDR was last unlocked, and by whom', async () => {
+    renderPage()
+    await ready()
+    expect(within(rowFor('Sep 16, 2026')).queryByText(/Last unlocked/)).not.toBeInTheDocument()
+    await clickUnlock('Sep 16, 2026')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    expect(await within(rowFor('Sep 16, 2026')).findByText('Last unlocked Oct 22, 2026 by Ada Admin')).toBeInTheDocument()
   })
 
   it('unlocks an approved IDR: it reads RE Review, with no reviewer, and the task count is refreshed', async () => {

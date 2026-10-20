@@ -47,6 +47,15 @@ export async function approveInspection(inspectionId) {
 }
 
 /**
+ * Admin only: unlocks an approved inspection, back to draft with its approval undone and its approved TIFs back to
+ * draft, and returns it (with last_unlocked_at / last_unlocked_by_name). 409 for one that isn't approved.
+ */
+export async function unlockInspection(inspectionId) {
+  const json = await apiFetch(`/v1/ped-ramp-inspections/${inspectionId}/admin/unlock`, { method: 'POST' })
+  return json.data
+}
+
+/**
  * Downloads an approved inspection's DOT forms as filed at approval, through their signed URL: one PDF, or a ZIP of the
  * form's copies (a corner of more ramps than one DOT form holds) and its approved TIFs. Returns the file name.
  */

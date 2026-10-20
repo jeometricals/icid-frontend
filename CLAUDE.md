@@ -229,6 +229,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       editors are off); approved, nobody ("Inspection is approved — no further edits"). Every refusal reads as the
       backend words it, in its dialog ("Signature required before signing an inspection", "Approve or delete this
       inspection's draft TIFs first").
+    - **Admin unlock** (Slice T1): an admin sees "Admin: Unlock inspection" on an approved inspection
+      (`unlockInspection`); its confirm lists what reopens (the RE's approval and the submit, the requirements answer,
+      every approved TIF, the link to the filed DOT forms) and what stays (the corner, measurements, photos, the
+      inspector's signature; the filed forms kept in Storage). It returns to draft; "Last unlocked by ... on ..." then
+      reads in the status line.
     - **Downloads:** "Preview (ICID)" (the ICID inspection report, `downloadInspectionReport`, for everyone) and, once
       approved, "Download DOT form" (`downloadInspectionDotForms`: DOT's fillable forms as filed at approval, through a
       signed URL; a ZIP when the corner needs several forms or has TIFs), with `DOT_FORM_NOTE` under it, which ends with
@@ -482,6 +487,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Unlock** on an IDR in RE Review that no RE has accepted (no `re_reviewer_uuid`) sends nothing and shows
     the toast "Already unlocked — IDR is in RE Review"; once an RE has accepted it, Unlock still asks and goes
     through, since that takes the IDR off them.
+  - **Unlocking an approved IDR** (Slice T2) is how one is corrected: its dialog lists what reopens (the RE's approval
+    and signature, picked up again from the queue by any RE on the project; its pay-item quantities; the flags and
+    curb segments it claimed) and what stays (its number, reports, the inspector's signature, the OE's acceptance). An
+    IDR an admin has unlocked shows "Last unlocked <date> by <name>" under its actions (`last_unlocked_at`,
+    `last_unlocked_by_name`).
   - **Un-delete** (`undeleteIdr`): "Un-delete IDR <number>?" in `ConfirmDialog`. The backend gives the IDR back
     the status it had when it was deleted (a draft when that isn't on record); the toast reads "IDR <number>
     restored to <status>." from the IDR the call returns. It answers 409 when another IDR has since taken the
@@ -1176,6 +1186,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - Ped ramp photos: `GET` / `POST /v1/ped-ramp-inspections/{id}/photos` (with `/upload-request`) · the same under
     `/v1/ped-ramp-tifs/{id}/photos` · `PATCH` / `DELETE /v1/ped-ramp-photos/{id}`
   - Ped ramp listing: `GET /v1/projects/{id}/ped-ramp-inspections` · `POST /v1/projects/{id}/ped-ramp-inspections/bulk-download`
+  - `POST /v1/ped-ramp-inspections/{id}/admin/unlock` (admin)
   - Ped ramp TIFs: `GET /v1/ped-ramp-inspections/{id}/tifs` · `POST /v1/ped-ramp-inspections/{id}/ramps/{property_id}/tif`
     · `GET` / `PATCH` / `DELETE` (admin) `/v1/ped-ramp-tifs/{id}` · `POST /v1/ped-ramp-tifs/{id}/approve`
     (`{signer_name, signer_ny_license_no}`) · `GET /v1/ped-ramp-tifs/{id}/dot-pdf`

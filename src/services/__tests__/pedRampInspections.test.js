@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  approveInspection, getCornerInspection, returnInspection, startInspection, submitInspection, updateInspection,
+  approveInspection, getCornerInspection, returnInspection, startInspection, submitInspection, unlockInspection,
+  updateInspection,
 } from '../pedRampInspections'
 import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
 
@@ -41,6 +42,7 @@ describe('ped ramp inspections', () => {
       [() => submitInspection(INSPECTION_ID), 'submit', undefined],
       [() => returnInspection(INSPECTION_ID, 'Check slopes'), 'return', { comment: 'Check slopes' }],
       [() => approveInspection(INSPECTION_ID), 'approve', undefined],
+      [() => unlockInspection(INSPECTION_ID), 'admin/unlock', undefined],
     ]) {
       mockFetch(200, { data: INSPECTION })
       await call()
