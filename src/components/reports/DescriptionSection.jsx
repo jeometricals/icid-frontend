@@ -1,16 +1,25 @@
 /**
  * The "Description of Work Performed and Inspected" card: a subheading (the report type's DDC wording) and a textarea.
- * Stateless. Props: value (string), onChange(value), subheading (string), disabled (makes the textarea natively disabled).
+ * Stateless. Props: value (string), onChange(value), subheading (string), disabled (makes the textarea natively disabled),
+ * onRegenerate (optional: shows "Regenerate from sites" above the textarea, which calls it) and regenerateDisabled.
  * Reviewer edits of the description are drawn as a redline.
  */
 import RedlinedField from '../RedlinedField'
 
-export default function DescriptionSection({ value, onChange, subheading, disabled = false }) {
+export default function DescriptionSection({ value, onChange, subheading, disabled = false, onRegenerate = null, regenerateDisabled = false }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
       <div className="form-section">
         <h3 className="form-section-title">Description of Work Performed and Inspected</h3>
         <p className="text-sm text-gray-600 mb-2">{subheading}</p>
+        {onRegenerate && !disabled && (
+          <div className="mb-2 flex justify-end">
+            <button type="button" className="btn-secondary" onClick={onRegenerate} disabled={regenerateDisabled}
+              title="Writes the description from the imported sites, replacing what is there">
+              Regenerate from sites
+            </button>
+          </div>
+        )}
         <RedlinedField path="description" value={value} label="Description of Work" type="textarea">
           <textarea
             className="input-field min-h-[200px]"

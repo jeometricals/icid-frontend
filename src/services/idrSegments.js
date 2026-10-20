@@ -1,13 +1,13 @@
 import { apiFetch } from './apiClient'
 
 // An IDR's curb segments (curb billing), as its flags (services/idrFlags.js): the PIR curb segments it covers and the
-// length they come to per pay item. An IDR covers by default the live segments on its task order's properties,
+// length they come to per pay item. An IDR covers by default the live segments on the sites its reports imported,
 // changed by per-IDR overrides. Each call answers with the same shape, {idr_id, status, task_order_id, frozen, counts:
 // {attributed, excluded, claimed_elsewhere, total}, segments: [...], pay_items: [...], unmapped}:
 // - a segment is {segment_id, pir_id, pir_page_id, page_number, segment_type, length_ft (null while its page has no
 //   scale), note, property_id, property_kind, boro, block, lot, address, ..., display_address, pay_item_id,
 //   pay_item_ref, budget_code, pay_item_description, unit, amount (its length for a pay item in LF; else null), state,
-//   override, in_task_order, claimed_by_idr_id, claimed_by_idr_number, constructed_on, deleted_at};
+//   override, on_imported_site, claimed_by_idr_id, claimed_by_idr_number, constructed_on, deleted_at};
 // - a pay item is {pay_item_id, pay_item_ref, budget_code, description, unit, amount, segment_count} (the id and count
 //   are null once the IDR is approved);
 // - unmapped counts the attributed (or claimed) segments that add nothing: no pay item in LF, or no length.

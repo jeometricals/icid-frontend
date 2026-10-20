@@ -59,6 +59,7 @@ function idrAt(status) {
 vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(), addTruck: vi.fn(),
+  listReportSites: vi.fn(),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
 
@@ -67,6 +68,7 @@ let nextEdit
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.listReportSites.mockResolvedValue([])
   nextEdit = 0
   server = idrAt('stage1_review')
   api.getIdr.mockImplementation(async () => structuredClone(server))
