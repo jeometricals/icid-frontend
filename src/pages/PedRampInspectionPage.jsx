@@ -15,6 +15,8 @@
  * TIFs (S3): once "Are all ADA requirements met?" is No, each ramp card shows its TIF (a link to its page, Draft or
  * Approved) or, for a ramp whose attributes raise ADA warnings, "Draft TIF" (an inspector or an RE, while the lock
  * allows), which drafts one and opens it. Approving waits for every TIF to be approved.
+ * Photos (S4): each ramp card has its photos (PedRampPhotosSection: number, caption, upload, under the same lock);
+ * submitting a form with none warns (NO_PHOTOS_WARNING) but doesn't stop it for the pilot.
  * Downloads: "Preview (ICID)" (the ICID inspection report, for everyone) and, once approved, "Download DOT form"
  * (DOT's fillable forms as filed at approval, a ZIP when there are several), with a note on why there can be several
  * and on the TIFs' signature images.
@@ -36,6 +38,7 @@ import { SITE_CORNER_SECTIONS } from '../data/pedRampForm'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DownloadFileButton from '../components/DownloadFileButton'
 import PedrampSiteModal from '../components/PedrampSiteModal'
+import PedRampPhotosSection, { NO_PHOTOS_WARNING } from '../components/PedRampPhotosSection'
 import RampAttributesSection from '../components/RampAttributesSection'
 import ReturnCommentModal from '../components/ReturnCommentModal'
 import StatusBadge from '../components/StatusBadge'
@@ -100,6 +103,7 @@ export default function PedRampInspectionPage() {
   const [tifs, setTifs] = useState([]) // the inspection's TIFs
   const [tifError, setTifError] = useState(null)
   const [warned, setWarned] = useState(() => new Set()) // the ramps whose attributes raise ADA warnings
+  const [formPhotos, setFormPhotos] = useState(null) // every photo on the form, once its photo sections have read them
 
   useEffect(() => {
     let ignore = false
@@ -364,6 +368,14 @@ export default function PedRampInspectionPage() {
               />
             )}
             <RampAttributesSection property={{ id: ramp.property_id, ramp_type: ramp.ramp_type }} canEdit={canEdit} />
+            {inspection && (
+              <PedRampPhotosSection
+                parent={{ type: 'inspection', id: inspection.id }}
+                propertyId={ramp.property_id}
+                canEdit={canEdit}
+                onPhotosChange={setFormPhotos}
+              />
+            )}
           </section>
         ))}
 
@@ -371,6 +383,7 @@ export default function PedRampInspectionPage() {
           <ConfirmDialog
             title={MOVES[dialog].title}
             message={MOVES[dialog].message}
+            note={dialog === 'submit' && formPhotos?.length === 0 ? NO_PHOTOS_WARNING : null}
             confirmLabel={MOVES[dialog].confirmLabel}
             cancelLabel="Cancel"
             confirmClassName="btn-primary"

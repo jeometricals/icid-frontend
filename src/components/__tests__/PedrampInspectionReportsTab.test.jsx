@@ -9,7 +9,7 @@ import { DEMO_USER, TEST_USER } from '../../test/users'
 
 vi.mock('../../services/api', async (importOriginal) => ({
   ...(await importOriginal()),
-  listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), getInspectionDotPdf: vi.fn(),
+  listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), downloadInspectionDotForms: vi.fn(),
   listUsers: vi.fn(), downloadFile: vi.fn(),
 }))
 
@@ -111,12 +111,11 @@ describe('PedrampInspectionReportsTab', () => {
   it("downloads one corner's DOT PDF, and says why it can't", async () => {
     const user = userEvent.setup()
     api.listPedRampInspections.mockResolvedValue(listing([ROW]))
-    api.getInspectionDotPdf.mockResolvedValueOnce({ url: 'https://s/p.pdf', expires_at: 'x', file_name: '3rd.pdf' })
+    api.downloadInspectionDotForms.mockResolvedValueOnce('3rd.pdf')
       .mockRejectedValueOnce(new Error('No DOT PDF stored for this inspection'))
     renderTab()
     await user.click(await screen.findByRole('button', { name: 'Download' }))
-    await waitFor(() => expect(api.downloadFile).toHaveBeenCalledWith('https://s/p.pdf', '3rd.pdf'))
-    expect(api.getInspectionDotPdf).toHaveBeenCalledWith(INSPECTION_ID)
+    await waitFor(() => expect(api.downloadInspectionDotForms).toHaveBeenCalledWith(INSPECTION_ID))
     await user.click(screen.getByRole('button', { name: 'Download' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No DOT PDF stored for this inspection')
   })

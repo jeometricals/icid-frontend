@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { bulkDownloadPedRampInspections, getInspectionDotPdf, listPedRampInspections } from '../pedRampListing'
+import { bulkDownloadPedRampInspections, listPedRampInspections } from '../pedRampListing'
 import { mockFetch, fetchUrl, fetchInit } from '../../test/mockFetch'
 
 beforeEach(() => {
@@ -35,10 +35,7 @@ describe('the ped ramp listing', () => {
     expect(JSON.parse(fetchInit().body)).toEqual({ has_tif: 'yes' })
   })
 
-  it("signs an inspection's DOT PDF, and throws the backend's refusal", async () => {
-    mockFetch(200, { data: { url: 'https://s/p.pdf', expires_at: 'x', file_name: 'a.pdf' } })
-    expect((await getInspectionDotPdf(INSPECTION_ID)).file_name).toBe('a.pdf')
-    expect(fetchUrl().pathname).toBe(`/v1/ped-ramp-inspections/${INSPECTION_ID}/dot-pdf`)
+  it("throws the backend's refusal of a bulk ZIP", async () => {
     mockFetch(400, { detail: 'More than 100 corners match: narrow the filters to download at most 100' })
     await expect(bulkDownloadPedRampInspections('HWS0023')).rejects.toMatchObject({ status: 400 })
   })

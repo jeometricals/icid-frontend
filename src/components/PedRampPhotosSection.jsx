@@ -10,7 +10,8 @@ import ConfirmDialog from './ConfirmDialog'
 export const NO_PHOTOS_WARNING = 'No photos yet: DOT asks for at least four of each ramp. You can still submit for the pilot.'
 
 const numberTaken = (number) => `Photo number ${number} is already used on this form`
-const FORM_FULL = `A form takes at most ${MAX_PHOTOS_PER_FORM} photos`
+// Built when used: the cap is read from the services module, which some tests mock without it
+const formFull = () => `A form takes at most ${MAX_PHOTOS_PER_FORM} photos`
 
 /** Reads a typed photo number: a whole number from 1 up, else null. */
 function parseNumber(text) {
@@ -133,7 +134,7 @@ function PhotoUploadForm({ kind, photos, full, onUpload }) {
   const submit = async (event) => {
     event.preventDefault()
     setError(null)
-    if (full) return setError(FORM_FULL)
+    if (full) return setError(formFull())
     if (!file) return setError('Choose a photo first.')
     const fileProblem = validatePhotoFile(file)
     if (fileProblem) return setError(fileProblem)
@@ -174,7 +175,7 @@ function PhotoUploadForm({ kind, photos, full, onUpload }) {
         <Upload className="h-4 w-4" /><span>{busy ? 'Uploading...' : kind === 'layout' ? 'Upload layout' : 'Upload'}</span>
       </button>
       {error && <p role="alert" className="w-full text-sm text-red-700">{error}</p>}
-      {full && !error && <p className="w-full text-sm text-gray-600">{FORM_FULL}</p>}
+      {full && !error && <p className="w-full text-sm text-gray-600">{formFull()}</p>}
     </form>
   )
 }

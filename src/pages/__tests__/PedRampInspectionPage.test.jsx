@@ -31,6 +31,19 @@ const CORNER = {
 const DRAFT = { id: 'e0000000-0000-4000-8000-000000000001', corner_id: CORNER_ID, status: 'draft',
   requirements_met: null, return_comment: null, tif_count: 0, draft_tif_count: 0 }
 
+// The photo section is tested on its own; here it reports the form's photos as photosOnForm says
+let photosOnForm = []
+vi.mock('../../components/PedRampPhotosSection', async () => {
+  const { useEffect } = await import('react')
+  return {
+    NO_PHOTOS_WARNING: 'No photos yet: DOT asks for at least four of each ramp. You can still submit for the pilot.',
+    default: function PhotosStub({ parent, propertyId, canEdit, onPhotosChange }) {
+      useEffect(() => { onPhotosChange?.(photosOnForm) }, [onPhotosChange])
+      return <div data-testid="photos" data-parent={`${parent.type}:${parent.id}`} data-ramp={propertyId ?? ''} data-can-edit={String(canEdit)} />
+    },
+  }
+})
+
 vi.mock('../../services/api', () => ({
   getCorner: vi.fn(), getCornerInspection: vi.fn(), startInspection: vi.fn(), updateInspection: vi.fn(),
   submitInspection: vi.fn(), returnInspection: vi.fn(), approveInspection: vi.fn(), updateCorner: vi.fn(),
@@ -42,6 +55,7 @@ let inspection
 
 beforeEach(() => {
   vi.clearAllMocks()
+  photosOnForm = []
   inspection = null
   api.getCorner.mockImplementation(async () => structuredClone(CORNER))
   api.getCornerInspection.mockImplementation(async () => structuredClone(inspection))
@@ -241,6 +255,37 @@ describe('PedRampInspectionPage — the corner', () => {
     await userEvent.type(within(dialog()).getByLabelText(/Inspected by/), 'X')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
     expect(await within(dialog()).findByText(SUBMITTED_LOCK)).toBeInTheDocument()
+  })
+})
+
+describe('PedRampInspectionPage — photos', () => {
+  it("puts each ramp's photos on its card, editable while the form is", async () => {
+    inspection = { ...DRAFT }
+    renderPage({ user: MEMBER, roles: ['inspector'] })
+    await loaded()
+    const stubs = screen.getAllByTestId('photos')
+    expect(stubs.map(stub => stub.dataset.ramp)).toEqual([RAMP_1, RAMP_2])
+    expect(stubs[0].dataset.parent).toBe(`inspection:${DRAFT.id}`)
+    expect(stubs[0].dataset.canEdit).toBe('true')
+  })
+
+  it('warns, without stopping it, before submitting a form with no photos', async () => {
+    inspection = { ...DRAFT }
+    renderPage({ user: MEMBER, roles: ['inspector'] })
+    await loaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(within(dialog()).getByText(/No photos yet: DOT asks for at least four/)).toBeInTheDocument()
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(api.submitInspection).toHaveBeenCalled())
+  })
+
+  it('says nothing about photos when the form has some, and shows none before a start', async () => {
+    photosOnForm = [{ id: 'p1', photo_number: 1 }]
+    inspection = { ...DRAFT }
+    renderPage({ user: MEMBER, roles: ['inspector'] })
+    await loaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(within(dialog()).queryByText(/No photos yet/)).not.toBeInTheDocument()
   })
 })
 
