@@ -4,10 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import AssessmentsPage from '../AssessmentsPage'
 import * as api from '../../services/api'
+import * as AuthContext from '../../contexts/AuthContext'
+import { TEST_USER } from '../../test/users'
 
 vi.mock('../../services/api', () => ({
   getAssessmentSites: vi.fn(), downloadAssessmentSummary: vi.fn(), downloadTailoredAssessmentSummary: vi.fn(),
   downloadConstructionReport: vi.fn(),
+  listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), getInspectionDotPdf: vi.fn(),
+  listUsers: vi.fn(), downloadFile: vi.fn(), LISTING_PAGE_SIZE: 30,
 }))
 
 const MAIN = 'a0000000-0000-4000-8000-000000000001'
@@ -77,32 +81,36 @@ const lastCall = () => api.getAssessmentSites.mock.calls.at(-1)
 beforeEach(() => {
   vi.clearAllMocks()
   api.getAssessmentSites.mockResolvedValue(FOUND)
+  api.listPedRampInspections.mockResolvedValue({ total: 0, page: 1, page_size: 30, rows: [] })
+  api.listUsers.mockResolvedValue([])
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: TEST_USER })
 })
 
 describe('AssessmentsPage — the tabs', () => {
   it('opens on the Sidewalk Assessment Summary, with the pedramp report beside it', async () => {
     renderPage()
     expect(screen.getByRole('heading', { name: 'As-Builts & Assessments — HWS0023' })).toBeInTheDocument()
-    expect(tabs().map(tab => tab.textContent)).toEqual(['Sidewalk Assessment Summary', 'Pedramp Inspection Report'])
+    expect(tabs().map(tab => tab.textContent)).toEqual(['Sidewalk Assessment Summary', 'Pedramp Inspection Reports'])
     expect(tabs()[0]).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Sidewalk Assessment Summary')
     await table()
   })
 
-  it('shows "Coming soon" on the pedramp tab, and puts the tab in the URL', async () => {
+  it('shows the pedramp inspection reports on their tab, and puts the tab in the URL', async () => {
     renderPage()
     await table()
-    await userEvent.click(screen.getByRole('tab', { name: 'Pedramp Inspection Report' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Pedramp Inspection Reports' }))
     expect(url()).toBe('?tab=ped-ramp')
-    expect(screen.getByText('Coming soon')).toBeInTheDocument()
+    expect(await screen.findByText('No corner has an inspection yet.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(api.listPedRampInspections).toHaveBeenCalledWith('HWS0023', expect.objectContaining({ page: 1 }))
     await userEvent.click(screen.getByRole('tab', { name: 'Sidewalk Assessment Summary' }))
     expect(url()).toBe('')
   })
 
   it('opens the tab a link names, and the first for an unknown one', async () => {
     const linked = renderPage('?tab=ped-ramp')
-    expect(screen.getByRole('tab', { name: 'Pedramp Inspection Report' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Pedramp Inspection Reports' })).toHaveAttribute('aria-selected', 'true')
     expect(api.getAssessmentSites).not.toHaveBeenCalled()
     linked.unmount()
     renderPage('?tab=nope')
