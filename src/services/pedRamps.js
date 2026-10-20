@@ -84,6 +84,15 @@ export async function saveRampLabel(propertyId, rampType, label) {
   return saveRampAttributes(propertyId, { ...kept, ramp_id_label: label })
 }
 
+/**
+ * Fetches a corner's inspection report as data: {corner, ramp_types, ramps: [{property_id, ..., attributes}]}, each
+ * ramp's attributes with their ADA warnings ({field, value, limit, message}), null when not entered.
+ */
+export async function getInspectionReport(cornerId) {
+  const json = await apiFetch(`/v1/ped-ramp-corners/${cornerId}/inspection-report`)
+  return json.data
+}
+
 /** Downloads a corner's inspection report as a PDF. Returns the file name. Throws apiFetch's error. */
 export async function downloadInspectionReport(cornerId) {
   return saveFile(await apiFetchFile(`/v1/ped-ramp-corners/${cornerId}/inspection-report.pdf`,

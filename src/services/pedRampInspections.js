@@ -1,4 +1,5 @@
 import { apiFetch } from './apiClient'
+import { downloadFile } from './exports'
 
 // A ped ramp corner's inspection (Pedramp Phase 3): the review and signature wrapper around the corner and its ramps'
 // attributes, which keep their own routes (pedRamps.js). draft -> submitted (an inspector signs) -> approved (an RE
@@ -43,4 +44,14 @@ export async function returnInspection(inspectionId, comment) {
 export async function approveInspection(inspectionId) {
   const json = await apiFetch(`/v1/ped-ramp-inspections/${inspectionId}/approve`, { method: 'POST' })
   return json.data
+}
+
+/**
+ * Downloads an approved inspection's DOT forms as filed at approval, through their signed URL: one PDF, or a ZIP of the
+ * form's copies (a corner of more ramps than one DOT form holds) and its approved TIFs. Returns the file name.
+ */
+export async function downloadInspectionDotForms(inspectionId) {
+  const json = await apiFetch(`/v1/ped-ramp-inspections/${inspectionId}/dot-pdf`)
+  downloadFile(json.data.url, json.data.file_name)
+  return json.data.file_name
 }

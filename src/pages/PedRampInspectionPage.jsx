@@ -12,21 +12,29 @@
  * change the fields follows the backend's lock: a draft, anyone on the project who isn't a demo user; submitted,
  * only an RE ("Inspection is submitted — only the RE can edit"); approved, nobody ("Inspection is approved — no
  * further edits"); the message reads above the form. Every refusal reads as the backend words it.
+ * TIFs (S3): once "Are all ADA requirements met?" is No, each ramp card shows its TIF (a link to its page, Draft or
+ * Approved) or, for a ramp whose attributes raise ADA warnings, "Draft TIF" (an inspector or an RE, while the lock
+ * allows), which drafts one and opens it. Approving waits for every TIF to be approved.
+ * Downloads: "Preview (ICID)" (the ICID inspection report, for everyone) and, once approved, "Download DOT form"
+ * (DOT's fillable forms as filed at approval, a ZIP when there are several), with a note on why there can be several
+ * and on the TIFs' signature images.
  */
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { AlertTriangle, ArrowLeft, Pencil } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import {
-  approveInspection, getCorner, getCornerInspection, returnInspection, startInspection, submitInspection,
-  updateCorner, updateInspection,
+  approveInspection, downloadInspectionDotForms, downloadInspectionReport, draftTif, getCorner, getCornerInspection,
+  getInspectionReport, listInspectionTifs, returnInspection, startInspection, submitInspection, updateCorner,
+  updateInspection,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { BOROUGHS, facingStreetName, rampTypeLabel } from '../data/propertyKinds'
 import { SITE_CORNER_SECTIONS } from '../data/pedRampForm'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DownloadFileButton from '../components/DownloadFileButton'
 import PedrampSiteModal from '../components/PedrampSiteModal'
 import RampAttributesSection from '../components/RampAttributesSection'
 import ReturnCommentModal from '../components/ReturnCommentModal'
@@ -36,6 +44,8 @@ import Toast from '../components/Toast'
 export const APPROVED_LOCK = 'Inspection is approved — no further edits'
 export const SUBMITTED_LOCK = 'Inspection is submitted — only the RE can edit'
 export const NOT_STARTED = 'Not started'
+export const DOT_FORM_NOTE = "DOT's fillable form, with the approved TIFs. A corner with more ramps than one DOT form holds comes as several forms in a ZIP. TIF signatures are ICID signature images: re-sign in Acrobat if DOT requires a cryptographic signature."
+export const TIF_LIST_ERROR = "Couldn't load this inspection's TIFs"
 
 /** How a corner field reads on the form: a choice's words, Yes / No, the value, or a dash. */
 function shownValue(type, extra, value) {
@@ -59,7 +69,7 @@ const MOVES = {
   },
   approve: {
     title: 'Approve inspection?',
-    message: 'It is signed with your signature and frozen: nobody can change it afterwards.',
+    message: "It is signed with your signature and frozen: nobody can change it afterwards. DOT's forms are filed with it, the approved TIFs included.",
     confirmLabel: 'Approve',
     run: inspection => approveInspection(inspection.id),
     done: 'Inspection approved.',
@@ -87,6 +97,9 @@ export default function PedRampInspectionPage() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null) // the open dialog's (or the page's) failed action
   const [toast, setToast] = useState(null)
+  const [tifs, setTifs] = useState([]) // the inspection's TIFs
+  const [tifError, setTifError] = useState(null)
+  const [warned, setWarned] = useState(() => new Set()) // the ramps whose attributes raise ADA warnings
 
   useEffect(() => {
     let ignore = false
@@ -103,15 +116,45 @@ export default function PedRampInspectionPage() {
     return () => { ignore = true }
   }, [cornerId, attempt])
 
+  // The inspection's TIFs, read again when it moves
+  const inspectionId = inspection?.id
+  const status = inspection?.status ?? null
+  useEffect(() => {
+    if (!inspectionId) {
+      setTifs([])
+      return undefined
+    }
+    let ignore = false
+    setTifError(null)
+    listInspectionTifs(inspectionId)
+      .then(found => { if (!ignore) setTifs(found) })
+      .catch(err => { if (!ignore) setTifError(`${TIF_LIST_ERROR}: ${err.message}`) })
+    return () => { ignore = true }
+  }, [inspectionId, status])
+
+  // Which ramps need a TIF: those whose attributes raise ADA warnings, read once the requirements are answered No
+  const requirementsFailed = inspection?.requirements_met === false
+  useEffect(() => {
+    if (!requirementsFailed) return undefined
+    let ignore = false
+    getInspectionReport(cornerId)
+      .then(report => {
+        if (ignore) return
+        setWarned(new Set(report.ramps.filter(ramp => ramp.attributes?.warnings?.length).map(ramp => ramp.property_id)))
+      })
+      .catch(err => { if (!ignore) setTifError(`Couldn't read the ramps' ADA warnings: ${err.message}`) })
+    return () => { ignore = true }
+  }, [cornerId, requirementsFailed])
+
   // A ramp row's link lands on its card once the form is there
   useEffect(() => {
     if (!loading && corner && hash) document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: 'start' })
   }, [loading, corner, hash])
 
-  const status = inspection?.status ?? null
   const lock = status === 'approved' ? APPROVED_LOCK : status === 'submitted' && !re ? SUBMITTED_LOCK : null
   const canEdit = writer && !lock
   const canAnswer = status === 'draft' ? inspector || re : status === 'submitted' && re
+  const canDraftTif = (inspector || re) && !lock && Boolean(inspection) && status !== 'approved'
 
   // Runs an action; a refusal stays in the open dialog (or above the form), else the dialog closes
   const run = async (action, done) => {
@@ -137,6 +180,10 @@ export default function PedRampInspectionPage() {
   const move = () => run(async () => setInspection(await MOVES[dialog].run(inspection)), MOVES[dialog].done)
   const sendBack = (comment) => run(async () => setInspection(await returnInspection(inspection.id, comment)),
     'Inspection returned to the inspector.')
+  const startTif = (propertyId) => run(async () => {
+    const tif = await draftTif(inspection.id, propertyId)
+    navigate(`/project/${projectId}/ped-ramp-tifs/${tif.id}`)
+  })
   const saveCorner = ({ corner: changes }) => run(async () => setCorner(await updateCorner(cornerId, changes)),
     'Corner saved.')
 
@@ -200,7 +247,11 @@ export default function PedRampInspectionPage() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-start gap-3">
+            <DownloadFileButton label="Preview (ICID)" download={() => downloadInspectionReport(cornerId)} />
+            {status === 'approved' && inspection.has_dot_pdf && (
+              <DownloadFileButton label="Download DOT form" download={() => downloadInspectionDotForms(inspection.id)} />
+            )}
             {!inspection && (inspector || re) && (
               <button type="button" onClick={start} disabled={busy} className="btn-primary">Start inspection</button>
             )}
@@ -230,7 +281,11 @@ export default function PedRampInspectionPage() {
             {lock}
           </p>
         )}
+        {status === 'approved' && inspection.has_dot_pdf && (
+          <p className="mb-4 text-sm text-gray-600">{DOT_FORM_NOTE}</p>
+        )}
         {pageError && <p role="alert" className="mb-4 text-sm text-red-600">{pageError.message}</p>}
+        {tifError && <p role="alert" className="mb-4 text-sm text-red-600">{tifError}</p>}
 
         <section aria-label="Corner" className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -299,6 +354,15 @@ export default function PedRampInspectionPage() {
                 {' '}— {rampTypeLabel(ramp.ramp_type)} · {ramp.quadrant} · facing {facingStreetName(ramp) ?? '—'}
               </span>
             </h4>
+            {requirementsFailed && (
+              <TifLine
+                tif={tifs.find(item => item.property_id === ramp.property_id)}
+                warned={warned.has(ramp.property_id)}
+                projectId={projectId}
+                onDraft={canDraftTif ? () => startTif(ramp.property_id) : undefined}
+                busy={busy}
+              />
+            )}
             <RampAttributesSection property={{ id: ramp.property_id, ramp_type: ramp.ramp_type }} canEdit={canEdit} />
           </section>
         ))}
@@ -340,5 +404,31 @@ export default function PedRampInspectionPage() {
         <Toast message={toast} onDone={() => setToast(null)} />
       </main>
     </div>
+  )
+}
+
+
+/**
+ * A ramp card's TIF line, once the requirements are answered No: its TIF (a link to its page, with its status), or
+ * "Draft TIF" for a ramp whose attributes raise ADA warnings (when onDraft is given), or a note that it needs one.
+ * A ramp without warnings shows nothing.
+ */
+function TifLine({ tif, warned, projectId, onDraft, busy }) {
+  if (tif) {
+    return (
+      <p className="mb-2 flex items-center gap-2 text-sm">
+        <Link to={`/project/${projectId}/ped-ramp-tifs/${tif.id}`} className="font-medium text-construction-700 hover:underline">
+          Technical Infeasibility Form
+        </Link>
+        <StatusBadge status={tif.status} />
+      </p>
+    )
+  }
+  if (!warned) return null
+  return (
+    <p className="mb-2 flex flex-wrap items-center gap-3 text-sm text-amber-800">
+      <span>This ramp has ADA warnings and needs a TIF.</span>
+      {onDraft && <button type="button" onClick={onDraft} disabled={busy} className="btn-secondary">Draft TIF</button>}
+    </p>
   )
 }
