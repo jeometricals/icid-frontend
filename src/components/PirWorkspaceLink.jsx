@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PenTool } from 'lucide-react'
 import { listPirPages } from '../services/api'
+import { withReturnTo } from '../lib/returnTo'
 
 /**
  * The PIR card's way into the sketch workspace (PirPage): how many pages the PIR has ("3 pages", "No pages uploaded
  * yet") and "Open sketch workspace". The count is read with the PIR's pages; while it loads the line reads
  * "Loading pages...", and if it fails it says so, the button still working.
- * Props: pir (id), projectId, propertyId.
+ * Props: pir (id), projectId, propertyId, returnTo (the IDR report the site page was opened from, carried along; optional).
  */
-export default function PirWorkspaceLink({ pir, projectId, propertyId }) {
+export default function PirWorkspaceLink({ pir, projectId, propertyId, returnTo = null }) {
   const navigate = useNavigate()
   const [count, setCount] = useState(null)
   const [error, setError] = useState(null)
@@ -34,7 +35,7 @@ export default function PirWorkspaceLink({ pir, projectId, propertyId }) {
       <p className={`text-sm ${error ? 'text-red-600' : 'text-gray-700'}`}>{line}</p>
       <button
         type="button"
-        onClick={() => navigate(`/project/${projectId}/properties/${propertyId}/pir`)}
+        onClick={() => navigate(withReturnTo(`/project/${projectId}/properties/${propertyId}/pir`, returnTo))}
         className="btn-primary inline-flex items-center space-x-2"
       >
         <PenTool className="h-4 w-4" />

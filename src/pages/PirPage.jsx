@@ -9,10 +9,11 @@
  * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
  * heading names the site by its display_address (a ped ramp's intersection), Back by siteName. The backend refuses
  * anyone not on the project (403), which shows as the load error.
- * ?flag=<id> selects that flag to start (the IDR page's "View in sketch"), and a flag's "IDR #042" badge opens
+ * ?flag=<id> selects that flag to start (sketchLink in lib/idrFlags.js), and a flag's "IDR #042" badge opens
  * the IDR that claimed it. Under the heading, the title block the Construction Report prints, in one line ("Contract:
  * HWS0023 · Constructed: 2026-10-05 · ↑ NE", from page 1's title block and the PIR), with "Edit title block"
- * (TitleBlockEditor; read-only for anyone who can't write here).
+ * (TitleBlockEditor; read-only for anyone who can't write here). Opened with `?returnTo=` (an IDR report page;
+ * lib/returnTo.js), it also offers Back to report (BackToReportButton), and Back to Site carries it along.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -24,6 +25,8 @@ import {
 import { isAdmin } from '../lib/reviewRoles'
 import { PIR_DEMO_NOTE } from '../lib/pirs'
 import { siteName } from '../lib/properties'
+import { readReturnTo, withReturnTo } from '../lib/returnTo'
+import BackToReportButton from '../components/BackToReportButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import GoToProjectButton from '../components/GoToProjectButton'
 import PageScaleModal from '../components/PageScaleModal'
@@ -193,13 +196,14 @@ export default function PirPage() {
   const header = (
     <div className="flex flex-wrap items-center gap-x-8 gap-y-2 mb-6">
       <button
-        onClick={() => navigate(`/project/${projectId}/properties/${propertyId}`)}
+        onClick={() => navigate(withReturnTo(`/project/${projectId}/properties/${propertyId}`, readReturnTo(searchParams)))}
         className="flex items-center space-x-2 text-construction-700 hover:text-construction-800"
       >
         <ArrowLeft className="h-5 w-5" />
         <span className="font-medium">Back to Site{property ? ` ${siteName(property)}` : ''}</span>
       </button>
       <GoToProjectButton onClick={() => navigate(`/project/${projectId}`)} />
+      <BackToReportButton />
     </div>
   )
 

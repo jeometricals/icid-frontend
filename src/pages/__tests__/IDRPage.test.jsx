@@ -1333,9 +1333,8 @@ describe('IDRPage — back to a filtered archive', () => {
 // The PIR flags it covers (R1f)
 // ---------------------------------------------------------------------------
 
-describe('IDRPage — flags attributed', () => {
+describe('IDRPage — flags (no section since U3)', () => {
   const OLIVE = { ...TEST_USER, uuid: '5246b39d-87fe-4e21-92a3-2804c899e8b3', first_name: 'Olive', last_name: 'Engineer' }
-  const panel = () => screen.getByRole('region', { name: 'Flags attributed' })
   const FLAGS = [idrFlag(), idrFlag({ flag_id: 'flag-2', display_order: 2, state: 'excluded' })]
 
   function renderAs(user, roles = []) {
@@ -1353,78 +1352,25 @@ describe('IDRPage — flags attributed', () => {
     )
   }
 
-  it("reads the IDR's flags with it and heads the panel with how many are attributed", async () => {
+  it("reads the IDR's flags with it, but shows no Flags attributed section or task order picker", async () => {
     server = draftIdr({ task_order_id: 'to-1' })
     api.getIdrFlags.mockResolvedValue(idrFlagsData(FLAGS))
     renderPage()
     await ready()
-    expect(api.getIdrFlags).toHaveBeenCalledWith(IDR_ID)
-    expect(await within(panel()).findByRole('button', { name: 'Flags attributed (1 of 2)' })).toBeInTheDocument()
+    await waitFor(() => expect(api.getIdrFlags).toHaveBeenCalledWith(IDR_ID))
+    expect(screen.queryByRole('region', { name: 'Flags attributed' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Flags attributed/)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Task order')).not.toBeInTheDocument()
+    expect(api.listTaskOrders).not.toHaveBeenCalled()
+    expect(api.getIdrSegments).not.toHaveBeenCalled()
   })
 
-  it('saves a picked task order on its own through the header, then reads the flags again', async () => {
-    renderPage()
-    await ready()
-    const select = await within(panel()).findByLabelText('Task order')
-    await waitFor(() => expect(within(select).getByRole('option', { name: 'TO-7' })).toBeInTheDocument())
-    api.getIdrFlags.mockResolvedValue(idrFlagsData(FLAGS))
-
-    await userEvent.selectOptions(select, 'to-1')
-    expect(api.saveIdrHeader).toHaveBeenCalledWith(IDR_ID, { task_order_id: 'to-1' })
-    expect(await within(panel()).findByRole('button', { name: 'Flags attributed (1 of 2)' })).toBeInTheDocument()
-    expect(select).toHaveValue('to-1')
-  })
-
-  it("shows a refused task order in the panel", async () => {
-    api.saveIdrHeader.mockRejectedValue(new Error('Task order is deleted'))
-    renderPage()
-    await ready()
-    const select = await within(panel()).findByLabelText('Task order')
-    await waitFor(() => expect(within(select).getByRole('option', { name: 'TO-7' })).toBeInTheDocument())
-    await userEvent.selectOptions(select, 'to-1')
-    expect(await within(panel()).findByText("Couldn't change the task order: Task order is deleted")).toBeInTheDocument()
-  })
-
-  it('lets the inspector exclude a flag on their own draft, and shows the flags the call answers with', async () => {
-    server = draftIdr({ task_order_id: 'to-1' })
-    api.getIdrFlags.mockResolvedValue(idrFlagsData(FLAGS))
-    api.excludeIdrFlag.mockResolvedValue(idrFlagsData(FLAGS.map(flag => ({ ...flag, state: 'excluded' }))))
-    renderPage()
-    await ready()
-    await userEvent.click(await within(panel()).findByRole('checkbox', { name: 'Attribute flag #1 at Queens Block 123 Lot 45' }))
-    expect(api.excludeIdrFlag).toHaveBeenCalledWith(IDR_ID, 'flag-1')
-    expect(await within(panel()).findByRole('button', { name: 'Flags attributed (0 of 2)' })).toBeInTheDocument()
-  })
-
-  it('gives a demo user the flags to read, with no checkboxes', async () => {
-    server = draftIdr({ task_order_id: 'to-1', reporter_uuid: DEMO_USER.uuid })
-    api.getIdrFlags.mockResolvedValue(idrFlagsData(FLAGS))
-    renderAs(DEMO_USER)
-    await ready()
-    expect(await within(panel()).findByText('Attributed')).toBeInTheDocument()
-    expect(within(panel()).queryByRole('checkbox')).not.toBeInTheDocument()
-  })
-
-  it('gives a reviewer who has not accepted the IDR no checkboxes', async () => {
-    server = draftIdr({
-      task_order_id: 'to-1', status: 'stage1_review', submitted_at: '2026-09-25T16:05:00Z', total_pages: 1,
-      idr_number: '005', stage1_reviewer_uuid: 'someone-else', field_edits: [],
-    })
-    api.getIdrFlags.mockResolvedValue(idrFlagsData(FLAGS, { status: 'stage1_review' }))
-    renderAs(OLIVE, ['oe'])
-    await ready()
-    expect(await within(panel()).findByText('Attributed')).toBeInTheDocument()
-    expect(within(panel()).queryByRole('checkbox')).not.toBeInTheDocument()
-  })
-
-  it("shows a failure to read the flags in the panel, and leaves the rest of the page alone", async () => {
+  it('leaves the page alone when the flags cannot be read', async () => {
     api.getIdrFlags.mockRejectedValueOnce(new Error('Network error'))
     renderPage()
     await ready()
-    expect(await within(panel()).findByText("Couldn't load this IDR's flags: Network error")).toBeInTheDocument()
     expect(reportRows()).toHaveLength(1)
-    await userEvent.click(within(panel()).getByRole('button', { name: 'Retry' }))
-    expect(await within(panel()).findByText("Pick a task order to bring in its sites' flags.")).toBeInTheDocument()
+    expect(screen.queryByText(/Network error/)).not.toBeInTheDocument()
   })
 
   it("sums up what approving claims in the RE's Final Approve & Sign dialog", async () => {
@@ -1439,10 +1385,10 @@ describe('IDRPage — flags attributed', () => {
     ], { status: 'stage2_review' }))
     renderAs(OLIVE, ['re'])
     await ready()
-    await within(panel()).findByRole('button', { name: 'Flags attributed (2 of 2)' })
+    await waitFor(() => expect(api.getIdrFlags).toHaveBeenCalled())
     await userEvent.click(screen.getByRole('button', { name: 'Final Approve & Sign' }))
     const dialog = screen.getByRole('dialog')
-    expect(dialog).toHaveTextContent('This will claim 2 flags across 2 sites. Total: 50 SF 4", 30 SF 7".')
+    await waitFor(() => expect(dialog).toHaveTextContent('This will claim 2 flags across 2 sites. Total: 50 SF 4", 30 SF 7".'))
     expect(dialog).toHaveTextContent('608-01 4" Concrete Sidewalk: 80 SF')
   })
 })

@@ -95,13 +95,19 @@ beforeEach(() => {
 })
 
 function CurrentUrl() {
-  return <div data-testid="url">{useLocation().pathname}</div>
+  const location = useLocation()
+  return (
+    <>
+      <div data-testid="url">{location.pathname}</div>
+      <div data-testid="search">{location.search}</div>
+    </>
+  )
 }
 
-function renderPage(user = ADMIN) {
+function renderPage(user = ADMIN, search = '') {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user })
   return render(
-    <MemoryRouter initialEntries={[`/project/HWS0023/properties/${PROPERTY_ID}`]}>
+    <MemoryRouter initialEntries={[`/project/HWS0023/properties/${PROPERTY_ID}${search}`]}>
       <Routes>
         <Route path="/project/:projectId/properties/:propertyId" element={<PropertyPage />} />
         <Route path="*" element={<CurrentUrl />} />
@@ -110,10 +116,13 @@ function renderPage(user = ADMIN) {
   )
 }
 
-async function renderLoaded(user) {
-  renderPage(user)
+async function renderLoaded(user, search) {
+  renderPage(user, search)
   await screen.findByRole('heading', { name: /HWS0023 · 12 Main St/ })
 }
+
+const REPORT_URL = '/project/HWS0023/idr/idr-1/swcb/rep-1'
+const RETURN_TO = `?returnTo=${encodeURIComponent(REPORT_URL)}`
 
 const propertyCard = () => screen.getByRole('region', { name: 'Site' })
 const pirCard = () => screen.getByRole('region', { name: /^PIR/ })
@@ -377,6 +386,31 @@ describe('PropertyPage — the property', () => {
 })
 
 describe('PropertyPage — the way into the sketch workspace', () => {
+  it('offers no Back to report without a returnTo', async () => {
+    await renderLoaded()
+    expect(screen.queryByRole('button', { name: 'Back to report' })).not.toBeInTheDocument()
+  })
+
+  it('goes back to the report it was opened from, keeping its own back buttons', async () => {
+    await renderLoaded(ADMIN, RETURN_TO)
+    expect(screen.getByRole('button', { name: 'Back to Site Info — HWS0023' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to report' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(REPORT_URL)
+  })
+
+  it('ignores a returnTo outside the app', async () => {
+    await renderLoaded(ADMIN, `?returnTo=${encodeURIComponent('//evil.example/project/x')}`)
+    expect(screen.queryByRole('button', { name: 'Back to report' })).not.toBeInTheDocument()
+  })
+
+  it('carries returnTo into the sketch workspace', async () => {
+    pirs = [pir(1)]
+    await renderLoaded(ADMIN, RETURN_TO)
+    await userEvent.click(within(pirCard()).getByRole('button', { name: 'Open sketch workspace' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${PROPERTY_ID}/pir`)
+    expect(screen.getByTestId('search')).toHaveTextContent(RETURN_TO)
+  })
+
   it("opens the PIR card with the page count and \"Open sketch workspace\", above the PIR's details", async () => {
     pirs = [pir(1)]
     await renderLoaded()

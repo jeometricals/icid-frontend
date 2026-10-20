@@ -14,7 +14,8 @@
  * too, gets "Download Construction Report" (DownloadFileButton), on once an approved IDR has claimed one
  * of the live PIR's flags (when the flags can't be read the button stays on, and the backend's 404 says why). Back returns to the project's
  * properties; Back to task order to the latest live task order the site is in (the property's task_order_id), and is
- * off, titled "Not in a task order", when it is in none. The backend refuses anyone not on the
+ * off, titled "Not in a task order", when it is in none. Opened from an IDR report with `?returnTo=` (lib/returnTo.js),
+ * it also offers Back to report (BackToReportButton), and the way into the sketch workspace carries it along. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  * A ped ramp (pedramp 2a) also shows its inspection corner in the Site card (its streets and direction, or a dash), and
  * "As-Built Inspection Form" beside Edit (a ped ramp at a corner: its corner's inspection, at this ramp), and
@@ -25,7 +26,7 @@
  * corners.
  */
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -38,8 +39,10 @@ import { shortDate } from '../lib/shortDate'
 import { PIR_ACTIONS, PIR_DEMO_NOTE } from '../lib/pirs'
 import { PROPERTY_ACTIONS } from '../lib/properties'
 import { useUserNames } from '../lib/useUserNames'
+import { readReturnTo } from '../lib/returnTo'
 import { propertyTypeLabel } from '../data/propertyTypes'
 import { facingStreetName, rampTypeLabel } from '../data/propertyKinds'
+import BackToReportButton from '../components/BackToReportButton'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DownloadFileButton from '../components/DownloadFileButton'
 import PirFormModal from '../components/PirFormModal'
@@ -74,6 +77,7 @@ const ACTIONS = {
 export default function PropertyPage() {
   const { projectId, propertyId } = useParams()
   const navigate = useNavigate()
+  const returnTo = readReturnTo(useLocation().search)
   const { user } = useAuth()
   const admin = isAdmin(user)
   const writer = !user?.is_demo // the backend keeps demo users read-only on properties and PIRs
@@ -236,6 +240,7 @@ export default function PropertyPage() {
         <ArrowLeft className="h-5 w-5" />
         <span className="font-medium">Back to task order{property?.task_order_no ? ` ${property.task_order_no}` : ''}</span>
       </button>
+      <BackToReportButton />
     </div>
   )
 
@@ -407,7 +412,7 @@ export default function PropertyPage() {
 
         {livePir ? (
           <>
-            <PirWorkspaceLink pir={livePir} projectId={projectId} propertyId={property.id} />
+            <PirWorkspaceLink pir={livePir} projectId={projectId} propertyId={property.id} returnTo={returnTo} />
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
               <Detail term="Inspector initials">{livePir.inspector_initials}</Detail>
               <Detail term="Signed on">{shortDate(livePir.inspector_sign_date)}</Detail>
