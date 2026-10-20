@@ -199,7 +199,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Site Info (Slice R): the corner is not an entity of its own in the UI.** An inspection is a corner with its
     ramps, so "Pedestrian Ramps" (`PedRampsSection`) is the one section: a row per ped ramp site, stacked under its
     corner. See "Two sections" under Properties.
-  - **Property page:** a ped ramp's Site card adds "Inspection corner" (its streets and direction, or a dash), and
+  - **Property page:** Edit on a ped ramp at a corner opens the Pedramp dialog in mode `edit-ramp` (see "The Pedramp
+    dialog" under Properties). A ped ramp's Site card adds "Inspection corner" (its streets and direction, or a dash), and
     under the card `RampAttributesSection`: its type's answers left and measurements right (slopes %, lengths in), then
     comments; the backend's ADA warnings listed above ("N ADA warning(s) (saved anyway)") and their fields marked
     `(ADA)`; they never stop a save. Whoever can change the site saves the whole set (off until something changed or
@@ -643,6 +644,16 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       Save runs, in turn, `updateCorner` with A-C's changes (the backend writes a new borough or street onto every live
       ramp at it), `updateProperty` with the ramp's own changes and `saveRampLabel` when the Ramp ID changed; each
       only when it has something. A ped ramp without a corner is edited in `PropertyFormModal` instead.
+    - **Edit from the site page** (`PropertyPage`'s Edit on a ped ramp at a corner, R.1): mode `edit-ramp`, as Edit but
+      A-C locked and folded under "Sections A to C are this corner's: edit them from Site Info.", so a ramp's streets
+      never part from its corner's. Save runs `updateProperty` and `saveRampLabel`, then reads the corners again. A ped
+      ramp without a corner (or whose corner couldn't be read) keeps `PropertyFormModal`.
+    - **Switching the ramp type** (R.2): editing reads the ramp's saved attributes (`getRampAttributes`); choosing a
+      type that doesn't take some of their filled measurements (`_pct` / `_in`; `measurementsDropped` in
+      `data/pedRampForm.js`) first asks "Change the ramp type?": "Switching from Perpendicular to Parallel will drop
+      these measurements:" with the list, Continue / Cancel. Cancel keeps the type it had. The drop itself happens at
+      the next save of the attributes (they are saved whole, only the new type's keys). Attributes that can't be read
+      ask nothing.
     - **Delete** (an admin's, as for any site) deletes just that ramp. When it was the last live ramp at its live
       corner, a second dialog asks "Delete the corner too?" ("Delete corner" / "Keep corner"; `deleteCorner`).
   - **A sidewalk's Add and Edit** (and Edit of a ped ramp without a corner) use `PropertyFormModal` (`mode`, `kind`, `initial`; "Add sidewalk" / "Add ped ramp" / "Edit

@@ -57,7 +57,7 @@ vi.mock('../../services/api', () => ({
   listProperties: vi.fn(), createProperty: vi.fn(), updateProperty: vi.fn(),
   softDeleteProperty: vi.fn(), undeleteProperty: vi.fn(),
   listCorners: vi.fn(), updateCorner: vi.fn(), deleteCorner: vi.fn(), createPedrampSite: vi.fn(),
-  saveRampLabel: vi.fn(), downloadInspectionReport: vi.fn(),
+  saveRampLabel: vi.fn(), downloadInspectionReport: vi.fn(), getRampAttributes: vi.fn(async () => null),
 }))
 
 const conflict = () => Object.assign(new Error('A site at Queens Block 123 Lot 45 already exists in this project.'), {

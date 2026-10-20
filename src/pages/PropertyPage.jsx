@@ -17,8 +17,11 @@
  * off, titled "Not in a task order", when it is in none. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  * A ped ramp (pedramp 2a) also shows its inspection corner in the Site card (its streets and direction, or a dash), and
- * offers the project's live corners in its edit form; and under the Site card, its Ramp Attributes
- * (RampAttributesSection), which whoever may change the site saves and everyone else reads.
+ * under the Site card, its Ramp Attributes (RampAttributesSection), which whoever may change the site saves and
+ * everyone else reads. A ped ramp at a corner is edited in the Pedramp dialog (PedrampSiteModal, mode 'edit-ramp'): its
+ * own fields and Ramp ID, the corner's sections locked (they are edited from Site Info, so its streets never part from
+ * its corner's); one without a corner (or whose corner couldn't be read) in PropertyFormModal, which offers the live
+ * corners.
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -26,7 +29,8 @@ import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  createPir, downloadConstructionReport, getProperty, listCorners, listFlags, listPirs, updatePir, updateProperty,
+  createPir, downloadConstructionReport, getProperty, listCorners, listFlags, listPirs, saveRampLabel, updatePir,
+  updateProperty,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { shortDate } from '../lib/shortDate'
@@ -40,6 +44,7 @@ import DownloadFileButton from '../components/DownloadFileButton'
 import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PirWorkspaceLink from '../components/PirWorkspaceLink'
+import PedrampSiteModal from '../components/PedrampSiteModal'
 import PropertyFormModal from '../components/PropertyFormModal'
 import RampAttributesSection from '../components/RampAttributesSection'
 import StatusBadge from '../components/StatusBadge'
@@ -173,6 +178,23 @@ export default function PropertyPage() {
     return () => { ignore = true }
   }, [rampProject])
   const corner = corners?.find(item => item.corner_id === property?.corner_id) ?? null
+
+  // The Pedramp dialog's save: the ramp's own changes, then its Ramp ID; then the corners again, for its Ramp ID
+  const saveRamp = async ({ ramp, label }) => {
+    const saved = await run(async () => {
+      const written = Object.keys(ramp).length > 0 ? await updateProperty(property.id, ramp) : property
+      if (label !== undefined) await saveRampLabel(property.id, ramp.ramp_type ?? property.ramp_type, label)
+      return written
+    }, async (written) => {
+      setWritten(written)
+      try {
+        setCorners(await listCorners(property.project_id))
+      } catch {
+        // the Site card keeps the corner it had; the next load reads it again
+      }
+    })
+    if (saved) setForm(null)
+  }
 
   const save = async (values) => {
     const saved = form.kind === 'property'
@@ -431,7 +453,19 @@ export default function PropertyPage() {
         )}
       </section>
 
-      {form?.kind === 'property' && (
+      {form?.kind === 'property' && corner && (
+        <PedrampSiteModal
+          mode="edit-ramp"
+          corner={corner}
+          ramp={{ ...property, ramp_id_label: corner.ramps.find(item => item.property_id === property.id)?.ramp_id_label }}
+          onSave={saveRamp}
+          onCancel={() => setForm(null)}
+          busy={busy}
+          error={actionError}
+        />
+      )}
+
+      {form?.kind === 'property' && !corner && (
         <PropertyFormModal
           mode="edit"
           initial={property}
