@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import PedRampInspectionPage, { APPROVED_LOCK, SUBMITTED_LOCK } from '../PedRampInspectionPage'
@@ -48,7 +48,7 @@ vi.mock('../../services/api', () => ({
   getCorner: vi.fn(), getCornerInspection: vi.fn(), startInspection: vi.fn(), updateInspection: vi.fn(),
   submitInspection: vi.fn(), returnInspection: vi.fn(), approveInspection: vi.fn(), updateCorner: vi.fn(),
   getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), listInspectionTifs: vi.fn(), getInspectionReport: vi.fn(),
-  draftTif: vi.fn(), downloadInspectionDotForms: vi.fn(), downloadInspectionReport: vi.fn(),
+  draftTif: vi.fn(), downloadInspectionDotForms: vi.fn(), downloadInspectionReport: vi.fn(), unlockInspection: vi.fn(),
 }))
 
 let inspection
@@ -110,7 +110,7 @@ describe('PedRampInspectionPage — the form', () => {
     expect(within(corner).getByText('Ramp types at this corner: Perpendicular, Parallel')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Ramp R1' })).toHaveTextContent('Perpendicular · NE · facing 3rd Ave')
     expect(screen.getByRole('region', { name: 'Ramp 2' })).toHaveTextContent('Parallel · NE · facing 38 Street')
-    expect(api.getRampAttributes).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(api.getRampAttributes).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('region', { name: 'ADA requirements' })).not.toBeInTheDocument()
   })
 
@@ -255,6 +255,52 @@ describe('PedRampInspectionPage — the corner', () => {
     await userEvent.type(within(dialog()).getByLabelText(/Inspected by/), 'X')
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Save' }))
     expect(await within(dialog()).findByText(SUBMITTED_LOCK)).toBeInTheDocument()
+  })
+})
+
+describe('PedRampInspectionPage — admin unlock', () => {
+  const APPROVED = { ...DRAFT, status: 'approved', has_dot_pdf: true, re_name: 'Rita RE', re_signed_at: '2026-10-21T15:00:00Z',
+    submitted_at: '2026-10-21T13:00:00Z' }
+
+  it('lets an admin unlock an approved inspection, after saying what reopens and what stays', async () => {
+    inspection = { ...APPROVED }
+    api.unlockInspection.mockResolvedValue({ ...DRAFT, last_unlocked_at: '2026-10-22T10:00:00Z', last_unlocked_by_name: 'Ada Admin' })
+    renderPage()
+    await loaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Admin: Unlock inspection' }))
+    const ask = dialog()
+    expect(ask).toHaveAccessibleName('Unlock this approved inspection?')
+    expect(within(ask).getByText(/Every approved TIF of it: back to draft/)).toBeInTheDocument()
+    expect(within(ask).getByText(/DOT forms already filed stay in Storage/)).toBeInTheDocument()
+    await userEvent.click(within(ask).getByRole('button', { name: 'Unlock' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.unlockInspection).toHaveBeenCalledWith(DRAFT.id)
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText(/Last unlocked by Ada Admin on Oct 22, 2026/)).toBeInTheDocument()
+    expect(screen.queryByText(APPROVED_LOCK)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit corner' })).toBeInTheDocument()
+  })
+
+  it("offers it to admins only, and only on an approved inspection", async () => {
+    inspection = { ...APPROVED }
+    renderPage({ user: MEMBER, roles: ['re'] })
+    await loaded()
+    expect(screen.queryByRole('button', { name: 'Admin: Unlock inspection' })).not.toBeInTheDocument()
+    cleanup()
+    inspection = { ...DRAFT, status: 'submitted' }
+    renderPage()
+    await loaded()
+    expect(screen.queryByRole('button', { name: 'Admin: Unlock inspection' })).not.toBeInTheDocument()
+  })
+
+  it("shows a refused unlock in its dialog", async () => {
+    inspection = { ...APPROVED }
+    api.unlockInspection.mockRejectedValueOnce(Object.assign(new Error('Only an approved inspection can be unlocked'), { status: 409 }))
+    renderPage()
+    await loaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Admin: Unlock inspection' }))
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Unlock' }))
+    expect(await within(dialog()).findByText('Only an approved inspection can be unlocked')).toBeInTheDocument()
   })
 })
 

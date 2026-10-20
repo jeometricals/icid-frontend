@@ -17,6 +17,9 @@
  * allows), which drafts one and opens it. Approving waits for every TIF to be approved.
  * Photos (S4): each ramp card has its photos (PedRampPhotosSection: number, caption, upload, under the same lock);
  * submitting a form with none warns (NO_PHOTOS_WARNING) but doesn't stop it for the pilot.
+ * An admin can unlock an approved inspection ("Admin: Unlock inspection", confirmed with what reopens and what stays):
+ * it goes back to draft, its approved TIFs too, to be corrected and approved again; "Last unlocked by ... on ..." then
+ * reads in the status line.
  * Downloads: "Preview (ICID)" (the ICID inspection report, for everyone) and, once approved, "Download DOT form"
  * (DOT's fillable forms as filed at approval, a ZIP when there are several), with a note on why there can be several
  * and on the TIFs' signature images.
@@ -29,8 +32,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import {
   approveInspection, downloadInspectionDotForms, downloadInspectionReport, draftTif, getCorner, getCornerInspection,
-  getInspectionReport, listInspectionTifs, returnInspection, startInspection, submitInspection, updateCorner,
-  updateInspection,
+  getInspectionReport, listInspectionTifs, returnInspection, startInspection, submitInspection, unlockInspection,
+  updateCorner, updateInspection,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
 import { BOROUGHS, facingStreetName, rampTypeLabel } from '../data/propertyKinds'
@@ -78,6 +81,21 @@ const MOVES = {
     confirmLabel: 'Approve',
     run: inspection => approveInspection(inspection.id),
     done: 'Inspection approved.',
+  },
+  unlock: {
+    title: 'Unlock this approved inspection?',
+    message: 'It goes back to draft so it can be corrected and approved again (when DOT sends it back). This reopens:',
+    items: [
+      "The RE's approval and signature, and the submit: it must be submitted and approved again",
+      'The answer to "Are all ADA requirements met?"',
+      'Every approved TIF of it: back to draft, its signing cleared',
+      "The link to the DOT forms filed at approval",
+    ],
+    note: "What stays: the corner, the measurements, the photos and the inspector's signature. The DOT forms already filed stay in Storage for the record; the next approval files new ones.",
+    confirmLabel: 'Unlock',
+    className: 'btn-danger',
+    run: inspection => unlockInspection(inspection.id),
+    done: 'Inspection unlocked: back to draft.',
   },
 }
 
@@ -251,6 +269,9 @@ export default function PedRampInspectionPage() {
               {status === 'approved' && inspection.re_signed_at && (
                 <span>Approved by {inspection.re_name ?? 'the RE'} on {when(inspection.re_signed_at)}</span>
               )}
+              {inspection?.last_unlocked_at && (
+                <span>Last unlocked by {inspection.last_unlocked_by_name ?? 'an admin'} on {when(inspection.last_unlocked_at)}</span>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-start gap-3">
@@ -263,6 +284,11 @@ export default function PedRampInspectionPage() {
             )}
             {status === 'draft' && inspector && (
               <button type="button" onClick={() => open('submit')} className="btn-primary">Submit</button>
+            )}
+            {status === 'approved' && admin && writer && (
+              <button type="button" onClick={() => open('unlock')} className="btn-secondary text-red-600 hover:text-red-700">
+                Admin: Unlock inspection
+              </button>
             )}
             {status === 'submitted' && re && (
               <>
@@ -381,14 +407,15 @@ export default function PedRampInspectionPage() {
           </section>
         ))}
 
-        {(dialog === 'submit' || dialog === 'approve') && (
+        {MOVES[dialog] && (
           <ConfirmDialog
             title={MOVES[dialog].title}
             message={MOVES[dialog].message}
-            note={dialog === 'submit' && formPhotos?.length === 0 ? NO_PHOTOS_WARNING : null}
+            items={MOVES[dialog].items ?? null}
+            note={dialog === 'submit' && formPhotos?.length === 0 ? NO_PHOTOS_WARNING : MOVES[dialog].note ?? null}
             confirmLabel={MOVES[dialog].confirmLabel}
             cancelLabel="Cancel"
-            confirmClassName="btn-primary"
+            confirmClassName={MOVES[dialog].className ?? 'btn-primary'}
             onConfirm={move}
             onCancel={() => setDialog(null)}
             busy={busy}
