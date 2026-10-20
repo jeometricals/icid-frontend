@@ -390,8 +390,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Items added by description alone** have no ref or budget code, and the backend's roll-up groups those by
     unit only, so unrelated ones that share a unit arrive as one row. That is the backend's grouping.
   - No export and no breakdown by inspector or day yet.
-- **Daily Site Patrol (DSP).** `/project/:projectId/idr/:idrId/dsp/:reportId` (`DSPReportPage`), a main report added
-  from the IDR's Add report control. Its `report_data` is the one the backend checks (`DspReport`; 400 otherwise):
+- **Daily Site Patrol (DSP).** `/project/:projectId/idr/:idrId/dsp/:reportId` (`DSPReportPage`), the IDR's one DSP,
+  always an addendum (U1): not in the IDR's Add report control, but added with **Add DSP** (`AddDspButton`) in the
+  Addendums card of a main General, SWCB, AC, Conc Mix or Conc Cyl (`takesDsp`), which creates it as that report's
+  addendum and opens it. A Conc Mix or Conc Cyl filed as an addendum has no Addendums card; its page (`ReportPageShell`)
+  shows a "Daily Site Patrol" card whose Add DSP adds it to the main report the page belongs to, since the backend
+  takes only a main report as a parent. Once the IDR has a DSP every Add DSP is disabled, titled "DSP already added to
+  this IDR."; the backend's 400 (`A Daily Site Patrol is added to a General, SWCB, AC, Conc Mix or Conc Cyl report, as its
+  addendum`) and 409 (`This IDR already has a Daily Site Patrol`) show under the button as worded. A DSP made as a main
+  report before U1 still opens and lists as before. Its `report_data` is the one the backend checks (`DspReport`; 400 otherwise):
   `{timeOfPatrol, mosChecklist, mptChecklist, fieldOrderIssued, fieldOrderNumber}`, each checklist a row per item of
   `dspForm.js` in its order (`{item, answer: 'yes' | 'no' | 'na' | null, details}`); the page always saves the whole
   form. The date, day of week, I.R. No. and sheet show read-only (the export works them out). A field order issued

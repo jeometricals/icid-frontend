@@ -126,6 +126,52 @@ describe('AddendumsSection — add', () => {
   })
 })
 
+describe('AddendumsSection — Add DSP', () => {
+  const dsp = { report_id: 'rep-dsp', report_type: 'DSP', is_addendum: true, parent_report_id: 'rep-gen' }
+
+  it.each(['GEN', 'SWCB', 'AC', 'CONC_MIX', 'CONC_CYL'])('a main %s offers Add DSP', (type) => {
+    renderSection({ reports: [{ ...main, report_type: type }] })
+    expect(screen.getByRole('button', { name: 'Add DSP' })).toBeEnabled()
+  })
+
+  it('a report of another type offers none', () => {
+    renderSection({ reports: [{ ...main, report_type: 'SWR' }] })
+    expect(screen.queryByRole('button', { name: 'Add DSP' })).not.toBeInTheDocument()
+  })
+
+  it('adds the DSP as an addendum of this report and opens it', async () => {
+    api.addReport.mockResolvedValue({ report_id: 'rep-new-dsp', report_type: 'DSP', is_addendum: true, parent_report_id: REPORT_ID })
+    renderSection()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Add DSP' }))
+    expect(api.addReport).toHaveBeenCalledWith('idr-1', { reportType: 'DSP', isAddendum: true, parentReportId: REPORT_ID })
+    expect(await screen.findByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-1/dsp/rep-new-dsp')
+  })
+
+  it('is disabled with its tooltip once the IDR has a DSP, on another report or this one', () => {
+    renderSection({ reports: [main, mix, dsp] })
+    const button = screen.getByRole('button', { name: 'Add DSP' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'DSP already added to this IDR.')
+  })
+
+  it('lists a DSP added here among the addendums', () => {
+    renderSection({ reports: [main, { ...dsp, parent_report_id: REPORT_ID }] })
+    expect(rows().map(r => r.textContent)).toEqual([expect.stringContaining('Daily Site Patrol')])
+  })
+
+  it('is hidden when the section is disabled', () => {
+    renderSection({ disabled: true })
+    expect(screen.queryByRole('button', { name: 'Add DSP' })).not.toBeInTheDocument()
+  })
+
+  it('keeps DSP out of the addendum picker', async () => {
+    renderSection()
+    await userEvent.setup().click(screen.getByRole('button', { name: /add addendum/i }))
+    const picker = screen.getByRole('group', { name: 'Addendum types' })
+    expect(within(picker).queryByRole('button', { name: 'Daily Site Patrol' })).not.toBeInTheDocument()
+  })
+})
+
 describe('AddendumsSection — saving the parent before leaving', () => {
   // Stands in for useReportForm's navigateSafely: records the parent save, then runs the navigation (or not)
   const safeNav = (order, saveSucceeds = true) => vi.fn(async (action) => {

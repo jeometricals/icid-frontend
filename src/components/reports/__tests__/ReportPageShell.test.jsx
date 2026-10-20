@@ -23,6 +23,13 @@ vi.mock('../AddendumsSection', () => ({
   ),
 }))
 
+// AddDspButton navigates and calls the API itself; the shell only decides whether and for which parent it is mounted
+vi.mock('../AddDspButton', () => ({
+  default: (props) => (
+    <div data-testid="add-dsp" data-parent={props.parentReportId} data-count={props.reports.length} />
+  ),
+}))
+
 const SUBMITTED_AT = '2026-09-25T15:10:00Z'
 
 // A ready, editable form as useReportForm returns it; override per test
@@ -61,6 +68,15 @@ function formState(overrides = {}) {
     navigateSafely: vi.fn(),
     ...overrides,
   }
+}
+
+// Renders the shell and hands back render's result (for unmount)
+function renderShellRaw(overrides = {}) {
+  return render(
+    <ReportPageShell title="Test Inspector's Report" form={formState(overrides)}>
+      <input aria-label="Body field" />
+    </ReportPageShell>
+  )
 }
 
 function renderShell(overrides = {}, props = {}) {
@@ -150,6 +166,40 @@ describe('ReportPageShell', () => {
     expect(addendums).toHaveAttribute('data-disabled', 'false')
     await userEvent.setup().click(addendums)
     expect(form.refresh).toHaveBeenCalled() // onChanged refetches the IDR
+  })
+
+  it("gives a Conc Mix or Conc Cyl addendum Add DSP for its parent report", () => {
+    for (const type of ['CONC_MIX', 'CONC_CYL']) {
+      const addendum = { report_id: 'rep-2', report_type: type, is_addendum: true, parent_report_id: 'rep-1' }
+      const { unmount } = renderShellRaw({ report: addendum, reportId: 'rep-2' })
+      const dsp = screen.getByTestId('add-dsp')
+      expect(dsp).toHaveAttribute('data-parent', 'rep-1')
+      expect(dsp).toHaveAttribute('data-count', '2')
+      expect(screen.getByText('Added to the Sidewalk, Curb, Concrete Base this report belongs to.')).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('offers no Add DSP of its own on a main report (its addendums section has it)', () => {
+    renderShell()
+    expect(screen.queryByTestId('add-dsp')).not.toBeInTheDocument()
+  })
+
+  it('offers no Add DSP on a submitted addendum', () => {
+    renderShell({ isReadOnly: true, isLocked: true,
+      report: { report_id: 'rep-2', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: 'rep-1' } })
+    expect(screen.queryByTestId('add-dsp')).not.toBeInTheDocument()
+  })
+
+  it('offers no Add DSP under a parent that takes none', () => {
+    renderShell({
+      reports: [
+        { report_id: 'rep-1', report_type: 'SWR', is_addendum: false, parent_report_id: null },
+        { report_id: 'rep-2', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: 'rep-1' },
+      ],
+      report: { report_id: 'rep-2', report_type: 'CONC_MIX', is_addendum: true, parent_report_id: 'rep-1' },
+    })
+    expect(screen.queryByTestId('add-dsp')).not.toBeInTheDocument()
   })
 
   it('shows no addendums section on an addendum (an addendum cannot have addendums)', () => {
