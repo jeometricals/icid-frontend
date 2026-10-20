@@ -47,7 +47,9 @@ import Toast from '../components/Toast'
 export const APPROVED_LOCK = 'Inspection is approved — no further edits'
 export const SUBMITTED_LOCK = 'Inspection is submitted — only the RE can edit'
 export const NOT_STARTED = 'Not started'
-export const DOT_FORM_NOTE = "DOT's fillable form, with the approved TIFs. A corner with more ramps than one DOT form holds comes as several forms in a ZIP. TIF signatures are ICID signature images: re-sign in Acrobat if DOT requires a cryptographic signature."
+// Why Acrobat may ask to save a DOT form nobody edited: the forms are left fillable, so it redraws their fields
+export const ACROBAT_SAVE_NOTE = 'If Acrobat asks to save changes when you close the form, choose No: nothing was edited, it only redrew the fillable fields.'
+export const DOT_FORM_NOTE = `DOT's fillable form, with the approved TIFs. A corner with more ramps than one DOT form holds comes as several forms in a ZIP. TIF signatures are ICID signature images: re-sign in Acrobat if DOT requires a cryptographic signature. ${ACROBAT_SAVE_NOTE}`
 export const TIF_LIST_ERROR = "Couldn't load this inspection's TIFs"
 
 /** How a corner field reads on the form: a choice's words, Yes / No, the value, or a dash. */
