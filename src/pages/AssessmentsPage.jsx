@@ -2,26 +2,18 @@
  * As-Builts & Assessments (Slice C; route param :projectId), at /project/:projectId/assessments, reached from the
  * Progress and Assessments page. A tab bar of report types, the tab in the URL (?tab=, the first when there is none or
  * it is unknown) so a view can be linked: "Sidewalk Assessment Summary" (SidewalkAssessmentTab) and "Pedramp
- * Inspection Report" (a "Coming soon" placeholder). A new report type is one more entry in REPORT_TABS. Changing tab
+ * Inspection Reports" (PedrampInspectionReportsTab). A new report type is one more entry in REPORT_TABS. Changing tab
  * drops the other tab's parameters. Back returns to Progress and Assessments.
  */
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import SidewalkAssessmentTab from '../components/SidewalkAssessmentTab'
-
-function ComingSoon() {
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-10 text-center text-gray-600">
-      <p className="text-lg font-medium text-gray-900 mb-1">Coming soon</p>
-      <p className="text-sm">The pedestrian ramp inspection report isn't built yet.</p>
-    </div>
-  )
-}
+import PedrampInspectionReportsTab from '../components/PedrampInspectionReportsTab'
 
 // The report types, in tab order; each tab's Panel takes the project id
 export const REPORT_TABS = [
   { id: 'sidewalk', label: 'Sidewalk Assessment Summary', Panel: SidewalkAssessmentTab },
-  { id: 'ped-ramp', label: 'Pedramp Inspection Report', Panel: ComingSoon },
+  { id: 'ped-ramp', label: 'Pedramp Inspection Reports', Panel: PedrampInspectionReportsTab },
 ]
 
 export default function AssessmentsPage() {
