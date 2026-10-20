@@ -12,6 +12,12 @@ export const PED_RAMPS_TITLE = 'Pedestrian Ramps'
 export const NO_PED_RAMPS = 'No pedestrian ramps added yet.'
 export const PED_RAMP_HEADINGS = ['Intersection', 'Direction', 'Ramp type', 'Ramp label', 'Status', 'Actions']
 export const NO_CORNER = 'No corner'
+export const INSPECTION_FORM = 'As-Built Inspection Form'
+
+/** A corner's As-Built Inspection Form; with a ramp, scrolled to that ramp's card. */
+export const inspectionPath = (corner, propertyId) =>
+  `/project/${corner.project_id}/ped-ramp-corners/${corner.corner_id}/inspection${propertyId ? `#ramp-${propertyId}` : ''}`
+
 export const NEEDS_DIRECTION = "Set this corner's direction first (Edit one of its ramps)."
 
 /** A corner's name: its two streets. */
@@ -39,10 +45,12 @@ const headingCell = 'px-4 py-3 text-left text-xs font-medium text-gray-500 upper
 /**
  * The Site Info page's "Pedestrian Ramps" (Slice R): one section, folding as SiteSection does, where each row is a ped
  * ramp site and rows are stacked under their corner. A corner's heading row gives its streets, direction and borough,
- * how many live ramps it has, its Inspection Report (the PDF, for everyone) and, when onAddRamp is given and the corner
+ * how many live ramps it has, "As-Built Inspection Form" (the corner's inspection page, for everyone), its Inspection
+ * Report (the PDF, for everyone) and, when onAddRamp is given and the corner
  * is live, "Add another ramp" (off, with a tooltip, for a corner without a direction). Ramp rows: Intersection (a link
  * to the site's page), Direction (the ramp's quadrant), Ramp type, Ramp label (its Ramp ID, from the corner's ramps),
- * Status (SiteStatus; Deleted for a deleted ramp) and Actions (renderActions(row, corner)). Ramps whose corner isn't
+ * Status (SiteStatus; Deleted for a deleted ramp) and Actions ("As-Built Inspection Form", opening the corner's form at
+ * this ramp, on a live ramp at a corner; then renderActions(row, corner)). Ramps whose corner isn't
  * in the list come last, under "No corner". The header has the disabled Bulk Upload button and, when onAdd is given,
  * Add Pedramp; the empty state repeats it.
  * Props: rows (the project's ped ramp sites), corners, onAdd, addDisabled, onAddRamp(corner), renderActions(row, corner).
@@ -142,6 +150,7 @@ function CornerGroup({ corner, rows, onAddRamp, renderActions }) {
             </span>
             {corner && (
               <div className="flex flex-wrap items-start gap-2 font-normal">
+                <Link to={inspectionPath(corner)} className="btn-secondary">{INSPECTION_FORM}</Link>
                 <DownloadFileButton label="Inspection Report" download={() => downloadInspectionReport(corner.corner_id)} />
                 {canAdd && (
                   <span title={corner.corner_direction ? undefined : NEEDS_DIRECTION} className="inline-flex">
@@ -183,7 +192,14 @@ function CornerGroup({ corner, rows, onAddRamp, renderActions }) {
                 </span>
               ) : <SiteStatus status={row.status} />}
             </td>
-            <td className="px-4 py-3">{renderActions(row, corner)}</td>
+            <td className="px-4 py-3">
+              <div className="flex flex-wrap items-start gap-2">
+                {corner && !deleted && (
+                  <Link to={inspectionPath(corner, row.id)} className="btn-secondary">{INSPECTION_FORM}</Link>
+                )}
+                {renderActions(row, corner)}
+              </div>
+            </td>
           </tr>
         )
       })}

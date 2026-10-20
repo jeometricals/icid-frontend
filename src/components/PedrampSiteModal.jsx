@@ -40,7 +40,10 @@ const cleaned = (values) => Object.fromEntries(KEYS.map(key => [key, sent(key, v
 const pick = (values, keys) => Object.fromEntries(keys.map(key => [key, values[key]]))
 const changed = (now, before, keys) => Object.fromEntries(keys.filter(key => now[key] !== before[key]).map(key => [key, now[key]]))
 
-const TITLES = { add: 'Add Pedramp', 'add-ramp': 'Add another ramp at this corner', edit: 'Edit Pedramp', 'edit-ramp': 'Edit Pedramp' }
+const TITLES = {
+  add: 'Add Pedramp', 'add-ramp': 'Add another ramp at this corner', edit: 'Edit Pedramp', 'edit-ramp': 'Edit Pedramp',
+  'edit-corner': 'Edit corner',
+}
 export const CORNER_LOCKED_NOTE = "Sections A to C are this corner's: edit them from Site Info."
 
 /**
@@ -54,6 +57,8 @@ export const CORNER_LOCKED_NOTE = "Sections A to C are this corner's: edit them 
  * mode 'edit': the corner and the ramp given fill every section, all open, one scrolling page; A-C apply to the corner
  * and so to all its ramps (said above them when it has more than one); Save hands over {corner, ramp, label}, each the
  * changes to that part only (empty when none), label the new Ramp ID or undefined when it didn't change.
+ * mode 'edit-corner' (the inspection form's corner): only A-C, open, the corner given; Save hands over {corner, ramp:
+ * {}, label: undefined}; a note says the changes apply to every ramp at it.
  * mode 'edit-ramp' (the site page's Edit): as edit, but A-C are locked and folded, with a note to edit them from Site
  * Info; its corner changes are always empty.
  * Editing either way reads the ramp's saved attributes; switching its ramp type to one that doesn't take some of their
@@ -66,7 +71,9 @@ export const CORNER_LOCKED_NOTE = "Sections A to C are this corner's: edit them 
  */
 export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, onCancel, busy = false, error = null }) {
   const [values, setValues] = useState(() => startingValues(corner, ramp))
-  const editing = mode === 'edit' || mode === 'edit-ramp'
+  const editing = mode === 'edit' || mode === 'edit-ramp' || mode === 'edit-corner'
+  const cornerOnly = mode === 'edit-corner' // no section D
+  const required = cornerOnly ? SITE_CORNER_REQUIRED : REQUIRED
   const locked = mode === 'add-ramp' || mode === 'edit-ramp' // the corner's sections can't be changed
   const [attributes, setAttributes] = useState(null) // the ramp's saved attributes, when editing and they could be read
   const [typeSwitch, setTypeSwitch] = useState(null) // {to, dropped}: a ramp type change waiting to be confirmed
@@ -85,7 +92,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
   const rampChanges = changed(sending, before, PROPERTY_KEYS)
   const labelChanged = sending.ramp_id_label !== before.ramp_id_label
   const anyChange = Object.keys(cornerChanges).length > 0 || Object.keys(rampChanges).length > 0 || labelChanged
-  const complete = REQUIRED.every(key => sending[key] !== null)
+  const complete = required.every(key => sending[key] !== null)
   const ready = complete && (!editing || anyChange)
   const { fields, general } = formErrors(error, KEYS, {})
   const bothStreets = Boolean(sending.north_south_street && sending.east_west_street)
@@ -119,7 +126,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
   })
   const choice = (key, choices, { lockable = false, placeholder } = {}) => (
     <select {...control(key, { lockable })}>
-      <option value="" disabled={REQUIRED.includes(key)}>{placeholder ?? (REQUIRED.includes(key) ? 'Choose…' : '—')}</option>
+      <option value="" disabled={required.includes(key)}>{placeholder ?? (required.includes(key) ? 'Choose…' : '—')}</option>
       {choices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   )
@@ -136,7 +143,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
     <div key={key}>
       <label htmlFor={`site-${key}`} className="input-label">
         {label}
-        {!REQUIRED.includes(key) && <span className="text-gray-500 font-normal"> (optional)</span>}
+        {!required.includes(key) && <span className="text-gray-500 font-normal"> (optional)</span>}
       </label>
       {input}
       {fields[key] && <p id={`site-${key}-error`} role="alert" className="text-sm text-red-600 mt-1">{fields[key]}</p>}
@@ -166,6 +173,9 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
           </p>
         )}
         {mode === 'edit-ramp' && <p className="text-sm text-gray-600">{CORNER_LOCKED_NOTE}</p>}
+        {cornerOnly && (
+          <p className="text-sm text-gray-600">Changes apply to the corner and to all {rampCount} ramps at it.</p>
+        )}
         {mode === 'edit' && rampCount > 1 && (
           <p className="text-sm text-gray-600">
             Sections A to C are the corner's: changes there apply to all {rampCount} ramps at it. Section D is this ramp's alone.
@@ -187,7 +197,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
           </FoldingPanel>
         ))}
 
-        <FoldingPanel title={SITE_RAMP_TITLE} className={panel}>
+        {!cornerOnly && <FoldingPanel title={SITE_RAMP_TITLE} className={panel}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
             {field('quadrant', 'Quadrant', choice('quadrant', QUADRANTS.map(name => ({ value: name, label: name }))))}
             {field('facing_street', 'Facing street', (
@@ -218,7 +228,7 @@ export default function PedrampSiteModal({ mode = 'add', corner, ramp, onSave, o
               {field('notes', 'Notes', <textarea rows={3} maxLength={MAX_NOTES_LENGTH} {...control('notes')} />)}
             </div>
           </div>
-        </FoldingPanel>
+        </FoldingPanel>}
 
         {general && <p role="alert" className="text-sm text-red-600">{general}</p>}
       </form>

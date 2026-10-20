@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { RAMP_COMMENTS_MAX, RAMP_FIELDS, rampKeys } from '../data/pedRampForm'
 import { rampTypeLabel } from '../data/propertyKinds'
@@ -33,6 +33,7 @@ function sent(type, text) {
  * Props: property (a ped ramp), canEdit.
  */
 export default function RampAttributesSection({ property, canEdit }) {
+  const uid = useId() // one form per ramp: an inspection form shows several
   const fields = RAMP_FIELDS[property.ramp_type]
   const keys = rampKeys(property.ramp_type)
   const types = Object.fromEntries([...fields.answers, ...fields.measurements].map(([key, , type]) => [key, type]))
@@ -84,7 +85,7 @@ export default function RampAttributesSection({ property, canEdit }) {
   const set = (key, value) => setValues(current => ({ ...current, [key]: value }))
   const input = ([key, label, type, choices]) => {
     const common = {
-      id: `ramp-${key}`, value: values[key] ?? '', disabled: !canEdit || busy,
+      id: `${uid}-ramp-${key}`, value: values[key] ?? '', disabled: !canEdit || busy,
       'aria-invalid': warned.has(key) || undefined, onChange: (e) => set(key, e.target.value),
       className: `input-field ${warned.has(key) ? 'border-red-500 text-red-700' : ''}`,
     }
@@ -116,7 +117,7 @@ export default function RampAttributesSection({ property, canEdit }) {
     }
     return (
       <div key={key}>
-        <label htmlFor={`ramp-${key}`} className={`input-label ${warned.has(key) ? 'text-red-700' : ''}`}>
+        <label htmlFor={`${uid}-ramp-${key}`} className={`input-label ${warned.has(key) ? 'text-red-700' : ''}`}>
           {label}{warned.has(key) && <span className="ml-1 text-xs font-semibold">(ADA)</span>}
         </label>
         {control}
@@ -125,9 +126,9 @@ export default function RampAttributesSection({ property, canEdit }) {
   }
 
   return (
-    <section aria-labelledby="ramp-attributes-heading" className="bg-white rounded-lg shadow-sm p-6 mb-8">
+    <section aria-labelledby={`${uid}-ramp-attributes-heading`} className="bg-white rounded-lg shadow-sm p-6 mb-8">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h3 id="ramp-attributes-heading" className="text-lg font-semibold text-gray-900">
+        <h3 id={`${uid}-ramp-attributes-heading`} className="text-lg font-semibold text-gray-900">
           Ramp Attributes <span className="text-sm font-normal text-gray-500">— {rampTypeLabel(property.ramp_type)}</span>
         </h3>
         {canEdit && saved !== undefined && (
@@ -169,9 +170,9 @@ export default function RampAttributesSection({ property, canEdit }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">{fields.measurements.map(input)}</div>
           </div>
           <div className="mt-4">
-            <label htmlFor="ramp-comments" className="input-label">Comments</label>
+            <label htmlFor={`${uid}-ramp-comments`} className="input-label">Comments</label>
             <textarea
-              id="ramp-comments"
+              id={`${uid}-ramp-comments`}
               rows={3}
               maxLength={RAMP_COMMENTS_MAX}
               className="input-field"

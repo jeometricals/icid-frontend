@@ -3,7 +3,14 @@
 
 const options = (pairs) => pairs.map(([value, label]) => ({ value, label }))
 
-export const ENTITIES = options([['dob', 'DOB'], ['other', 'Other']])
+// DOT's lists (migration 048; one-way): the 13 entities, curb material without cobblestone, DWS colour without yellow,
+// DWS material with preformed plastic split, and no "other" material
+export const ENTITIES = options([
+  ['ddc_city_agency_capital', 'DDC City Agency Sponsored Capital Project'],
+  ['ddc_landmark_ped_ramp', 'DDC Landmark Ped Ramp Contract'], ['ddc_dot_ped_ramp', 'DDC Managed DOT Ped Ramp Contract'],
+  ['ddc_prior_notice', 'DDC Prior Notice Contract'], ['ddc_ta_ped_ramp', 'DDC TA Ped Ramp Contract'], ['dep', 'DEP'],
+  ['dob', 'DOB'], ['dpr', 'DPR'], ['edc', 'EDC'], ['mta', 'MTA'], ['nysdot', 'NYSDOT'], ['sca', 'SCA'], ['other', 'Other'],
+])
 export const TRAFFIC_CONTROLS = options([
   ['signal', 'Signal'], ['signal_aps', 'Signal with APS'], ['stop_yield', 'Stop / yield'], ['none', 'None'],
 ])
@@ -14,18 +21,22 @@ export const CORNER_TYPES = options([
 export const CORNER_DIRECTIONS = options(['SW', 'NW', 'NE', 'SE', 'N', 'S', 'E', 'W'].map(value => [value, value]))
 export const CONTRACT_TYPES = options([['simple', 'Simple'], ['complex', 'Complex']])
 export const CURB_MATERIALS = options([
-  ['steel_faced', 'Steel faced'], ['concrete', 'Concrete'], ['concrete_and_gutter', 'Concrete and gutter'],
-  ['granite', 'Granite'], ['bluestone', 'Bluestone'], ['cobblestone', 'Cobblestone'], ['other', 'Other'],
+  ['steel_faced', 'Steel faced concrete'], ['concrete', 'Concrete'], ['concrete_and_gutter', 'Concrete curb and gutter'],
+  ['granite', 'Granite'], ['bluestone', 'Bluestone'], ['other', 'Other'],
 ])
 export const SIDEWALK_MATERIALS = options([
   ['concrete', 'Concrete'], ['pigmented_concrete', 'Pigmented concrete'], ['bluestone', 'Bluestone'],
   ['cobblestone', 'Cobblestone'], ['other', 'Other'],
 ])
 export const YES_NO_NA = options([['yes', 'Yes'], ['no', 'No'], ['na', 'N/A']])
-export const DWS_COLORS = options([['red', 'Red'], ['white', 'White'], ['yellow', 'Yellow'], ['other', 'Other']])
+export const DWS_COLORS = options([
+  ['red', 'Red'], ['white', 'White'], ['dark_on_light', 'Dark on light'], ['light_on_dark', 'Light on dark'], ['other', 'Other'],
+])
 export const DWS_MATERIALS = options([
-  ['preformed_plastic', 'Preformed plastic'], ['cast_in_place_plastic', 'Cast-in-place plastic'],
-  ['cast_iron', 'Cast iron'], ['stone', 'Stone'], ['other', 'Other'],
+  ['preformed_plastic_embedded', 'Preformed plastic (embedded)'],
+  ['preformed_plastic_surface_applied', 'Preformed plastic (surface applied)'],
+  ['cast_in_place_surface_applied', 'Cast in place (surface applied)'], ['cast_iron', 'Cast iron'], ['stone', 'Stone'],
+  ['concrete_tile', 'Concrete tile'],
 ])
 export const CONSTRUCTIONS = options([
   ['existing_ramp', 'Existing ramp'], ['ramp_removed', 'Ramp removed'], ['new_install', 'New install'],

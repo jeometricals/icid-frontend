@@ -566,6 +566,22 @@ describe('PropertiesPage — deleting and un-deleting', () => {
   })
 })
 
+describe('PropertiesPage — the As-Built Inspection Form', () => {
+  it("opens the corner's form from its heading, and at a ramp's card from the ramp's row, for anyone", async () => {
+    await renderListed(DEMO_USER)
+    const path = `/project/HWS0023/ped-ramp-corners/${CORNER_ID}/inspection`
+    expect(within(cornerRow()).getByRole('link', { name: 'As-Built Inspection Form' })).toHaveAttribute('href', path)
+    expect(within(rowOf(RAMP)).getByRole('link', { name: 'As-Built Inspection Form' }))
+      .toHaveAttribute('href', `${path}#ramp-${LISTED[2].id}`)
+  })
+
+  it('offers none on a ramp without a corner', async () => {
+    server[2] = { ...server[2], corner_id: null }
+    await renderListed()
+    expect(within(rowOf(RAMP)).queryByRole('link', { name: 'As-Built Inspection Form' })).not.toBeInTheDocument()
+  })
+})
+
 describe('PropertiesPage — a corner heading', () => {
   it("downloads the corner's inspection report from its heading, for anyone", async () => {
     await renderListed(DEMO_USER)

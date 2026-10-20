@@ -17,6 +17,7 @@
  * off, titled "Not in a task order", when it is in none. The backend refuses anyone not on the
  * project (403), which shows as the load error.
  * A ped ramp (pedramp 2a) also shows its inspection corner in the Site card (its streets and direction, or a dash), and
+ * "As-Built Inspection Form" beside Edit (a ped ramp at a corner: its corner's inspection, at this ramp), and
  * under the Site card, its Ramp Attributes (RampAttributesSection), which whoever may change the site saves and
  * everyone else reads. A ped ramp at a corner is edited in the Pedramp dialog (PedrampSiteModal, mode 'edit-ramp'): its
  * own fields and Ramp ID, the corner's sections locked (they are edited from Site Info, so its streets never part from
@@ -24,7 +25,7 @@
  * corners.
  */
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -45,6 +46,7 @@ import PirFormModal from '../components/PirFormModal'
 import PirStatusBadge from '../components/PirStatusBadge'
 import PirWorkspaceLink from '../components/PirWorkspaceLink'
 import PedrampSiteModal from '../components/PedrampSiteModal'
+import { INSPECTION_FORM, inspectionPath } from '../components/PedRampsSection'
 import PropertyFormModal from '../components/PropertyFormModal'
 import RampAttributesSection from '../components/RampAttributesSection'
 import StatusBadge from '../components/StatusBadge'
@@ -307,6 +309,14 @@ export default function PropertyPage() {
               </button>
             )) : (
               <>
+                {property.kind === 'ped_ramp' && property.corner_id && (
+                  <Link
+                    to={inspectionPath({ project_id: property.project_id, corner_id: property.corner_id }, property.id)}
+                    className="btn-secondary"
+                  >
+                    {INSPECTION_FORM}
+                  </Link>
+                )}
                 {writer && (
                   <button
                     type="button"
