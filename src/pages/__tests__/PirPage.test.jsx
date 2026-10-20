@@ -34,6 +34,7 @@ vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
 
 const ADMIN = { ...TEST_USER, role: 'admin' }
 const PROPERTY_ID = 'c0000000-0000-4000-8000-000000000001'
+const REPORT_URL = '/project/HWS0023/idr/idr-1/swcb/rep-1'
 const PIR = { id: 'e0000000-0000-4000-8000-000000000001', property_id: PROPERTY_ID, project_id: 'HWS0023', as_built_signed_at: null }
 const page = (number, extra = {}) => ({
   pir_page_id: `page-${number}`, pir_id: PIR.id, page_number: number, image_url: `https://s/p${number}.png`,
@@ -116,6 +117,32 @@ describe('PirPage — loading', () => {
     await renderLoaded()
     await userEvent.click(screen.getByRole('button', { name: 'Back to Site Queens Block 123 Lot 45' }))
     expect(screen.getByTestId('url')).toHaveTextContent(`/project/HWS0023/properties/${PROPERTY_ID}`)
+  })
+
+  it('offers no Back to report without a returnTo', async () => {
+    await renderLoaded()
+    expect(screen.queryByRole('button', { name: 'Back to report' })).not.toBeInTheDocument()
+  })
+
+  it('goes back to the report it was opened from, keeping its own back buttons', async () => {
+    await renderLoaded({ search: `?page=2&returnTo=${encodeURIComponent(REPORT_URL)}` })
+    expect(screen.getByRole('button', { name: 'Back to Site Queens Block 123 Lot 45' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to report' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(REPORT_URL)
+  })
+
+  it('carries returnTo along on Back to Site', async () => {
+    await renderLoaded({ search: `?returnTo=${encodeURIComponent(REPORT_URL)}` })
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Queens Block 123 Lot 45' }))
+    expect(screen.getByTestId('url')).toHaveTextContent(
+      `/project/HWS0023/properties/${PROPERTY_ID}?returnTo=${encodeURIComponent(REPORT_URL)}`)
+  })
+
+  it('ignores a returnTo outside the app', async () => {
+    await renderLoaded({ search: `?returnTo=${encodeURIComponent('https://evil.example/project/x')}` })
+    expect(screen.queryByRole('button', { name: 'Back to report' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Back to Site Queens Block 123 Lot 45' }))
+    expect(screen.getByTestId('url').textContent).toBe(`/project/HWS0023/properties/${PROPERTY_ID}`)
   })
 
   it("heads a ped ramp's workspace with its intersection, and names it so on Back", async () => {
