@@ -65,6 +65,8 @@ function idrAt(status, overrides = {}) {
 vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(),
+  listReportSites: vi.fn(async () => []), getPayItemSources: vi.fn(async () => ({ pay_items: [] })),
+  getIdrFlags: vi.fn(async () => ({ flags: [] })), getIdrSegments: vi.fn(async () => ({ segments: [] })),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
 

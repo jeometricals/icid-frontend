@@ -7,7 +7,8 @@
  * stays editable after a pick. A row the inspector chose "+ Add manually" for no longer opens the picker on click. While the catalog loads Add Item is disabled; if it failed to load, rows are typed by hand.
  * Props: payItems (array of { itemNo, budgetCode, payQuantity, unit, description }), onAddItem(),
  * onItemChange(index, field, value), onRemoveItem(index), contractItems, contractItemsLoading, contractItemsError,
- * disabled (makes the buttons and inputs natively disabled).
+ * disabled (makes the buttons and inputs natively disabled), siteRows (optional: the report's imported sites' pay items,
+ * read-only (SitePayItemRows, Slice X), shown first; the editable rows are then its cross-site extras).
  * Once the IDR is past draft the table is drawn by PayItemsReview instead: read-only rows with the reviewers'
  * revisions and additions, and their Revise / Add Pay Item buttons.
  */
@@ -30,6 +31,7 @@ export default function PayItemsSection({
   contractItemsLoading = false,
   contractItemsError = null,
   disabled = false,
+  siteRows = null,
 }) {
   const redline = useRedline()
   // The open picker: which row and cell it hangs off, and whether it takes focus (nonce remounts it to refocus)
@@ -156,7 +158,19 @@ export default function PayItemsSection({
   const addLabel = contractItemsLoading ? 'Add Item (loading catalog…)' : 'Add Item'
 
   // Past draft there is nothing to type here: the review table shows the items with their revisions
-  if (redline && !redline.isDraft) return <PayItemsReview payItems={payItems} contractItems={contractItems} />
+  if (redline && !redline.isDraft) {
+    const review = <PayItemsReview payItems={payItems} contractItems={contractItems} />
+    if (!siteRows) return review
+    return (
+      <>
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h3 className="form-section-title">Pay Items</h3>
+          {siteRows}
+        </div>
+        {review}
+      </>
+    )
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -176,6 +190,8 @@ export default function PayItemsSection({
           </button>
         </div>
       </div>
+      {siteRows}
+      {siteRows && <h4 className="text-sm font-semibold text-gray-800 mb-1">Cross-site extras</h4>}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">

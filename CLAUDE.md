@@ -1093,7 +1093,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `other` (with its text, at most 200). A site is in one report of an IDR at most (409 with `existing_report_id`);
     an import is also 409 when a report holds by hand a pay item the site's flags or segments fill. Who changes them:
     as for an IDR's flags (the backend's `attribution_editor`); the UI offers them on a draft only.
-  - **Where:** SWCB only for the pilot (the backend also takes General, AC, Conc Mix and Conc Cyl, not DSP).
+  - **Where:** imported on the SWCB only for the pilot (the backend also takes General, AC, Conc Mix and Conc Cyl, not
+    DSP). A General that has sites (migration 053's backfill put an approved IDR's there) shows the same card read-only
+    (Slice X: no Import, work select or Remove; links and the Pay items column as on the SWCB), only when it has some.
     `ImportedSitesSection` (in `components/reports/`), above Pay Items, loaded by `lib/useReportSites.js`: a row per
     site with an SW / PR badge, its `display_address` linking to where its pay items are entered (see Site pay items),
     with `?returnTo=` the report, the work
@@ -1114,7 +1116,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `ImportedSitesSection`.
   - **Site pay items (Slice V1; moved by W3 and W4):** the row's Pay items column is a summary, read-only (W4,
     `payItemSummary`): the site's rows as its own page's table has them (Slice X), what its flags, then its curb
-    segments, come to for this IDR (`siteGeometryRows` over `lib/useIdrGeometry.js`, the IDR's attributed flags and segments,
+    segments, come to for this IDR (`siteGeometryRows` over `lib/useIdrGeometry.js` through `lib/useReportSitePayItems.js`, the IDR's attributed flags and segments,
     read once and again after a site is imported or removed), then the pay items entered on it (the totals'
     `site_lines`). "3 items · 180 SF · 20 LF · 1 EA": the row count, then the total per unit in the order the units first
     appear; "1 item · 40 SF"; "—" for none. They are entered on the site's own page, which the site's link opens with the IDR's context
@@ -1140,6 +1142,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site changes and
     after a save), a row per pay item with its total over the IDR's flags, curb segments, site pay items and this
     report's own (as saved), each expanding ("Source breakdown") to its sources, the sites named.
+  - **Pay Items card on the SWCB (Slice X):** `PayItemsSection`'s `siteRows` opens it with "From imported sites"
+    (`SitePayItemRows`), read-only: each pay item summed over the report's sites' flags, curb segments and entered pay
+    items (`useReportSitePayItems`' `siteRows`), its sites named (with each one's part when several), each linking to its
+    page in this IDR's context; then "Cross-site extras", the report's own items, editable with Add Item as before (and
+    past draft the review table, under the site rows' own card). A sum is changed on its sites' pages, never here.
   - **Toggles on a read-only report:** "Source breakdown" is a `DisclosureToggle` (a span with the
     button role), which the read-only page's disabled fieldset doesn't disable. user-event refuses to click inside a
     disabled fieldset, so tests of them on a read-only report use `fireEvent.click`.
