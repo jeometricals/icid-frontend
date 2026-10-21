@@ -149,11 +149,17 @@ describe('uploadAttachment', () => {
       .rejects.toBeInstanceOf(UnsupportedFileTypeError)
     await expect(uploadAttachment(IDR_ID, REPORT_ID, uploadArgs({ name: '   ' })))
       .rejects.toThrow(AttachmentValidationError)
-    await expect(uploadAttachment(IDR_ID, REPORT_ID, uploadArgs({ description: '' })))
-      .rejects.toThrow('Description is required.')
+    await expect(uploadAttachment(IDR_ID, REPORT_ID, uploadArgs({ description: 'x'.repeat(2001) })))
+      .rejects.toThrow(AttachmentValidationError)
     await expect(uploadAttachment(IDR_ID, REPORT_ID, uploadArgs({ name: 'x'.repeat(201) })))
       .rejects.toThrow(AttachmentValidationError)
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([[''], ['   '], [undefined], [null]])('sends a blank or missing description (%j) as null', async (description) => {
+    mockFetchSequence([[201, ok(UPLOAD_REQUEST_DATA)], [200, undefined], [200, ok(MOCK_ATTACHMENT)]])
+    await uploadAttachment(IDR_ID, REPORT_ID, uploadArgs({ description }))
+    expect(JSON.parse(fetchCall(0).init.body).attachment_description).toBeNull()
   })
 
   it('surfaces a 409 from upload-request (IDR submitted) with its message, and cleans nothing up', async () => {
@@ -265,6 +271,12 @@ describe('updateAttachmentMetadata', () => {
       attachment_name: 'Renamed',
       attachment_description: 'North side, station 12+50',
     })
+  })
+
+  it('sends a cleared description as null', async () => {
+    mockFetch(200, ok({ ...MOCK_ATTACHMENT, attachment_description: null }))
+    await updateAttachmentMetadata(IDR_ID, REPORT_ID, ATTACHMENT_ID, { name: 'Renamed', description: '  ' })
+    expect(JSON.parse(fetchInit().body)).toEqual({ attachment_name: 'Renamed', attachment_description: null })
   })
 
   it('throws AttachmentValidationError without calling the API for blank or too-long fields', async () => {

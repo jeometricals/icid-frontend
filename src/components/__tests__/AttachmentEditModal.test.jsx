@@ -42,7 +42,7 @@ describe('AttachmentEditModal', () => {
     expect(screen.getByText('File: crack.jpg')).toBeInTheDocument()
   })
 
-  it('disables Save when the name or the description is blank', async () => {
+  it('disables Save when the name is blank, not when the description is', async () => {
     const user = userEvent.setup()
     renderModal()
     const save = screen.getByRole('button', { name: 'Save' })
@@ -52,7 +52,27 @@ describe('AttachmentEditModal', () => {
     await user.type(screen.getByLabelText('Name'), 'Renamed')
     await user.clear(screen.getByLabelText('Description'))
     await user.type(screen.getByLabelText('Description'), '   ')
-    expect(save).toBeDisabled()
+    expect(save).toBeEnabled()
+  })
+
+  it('saves with the description cleared', async () => {
+    const user = userEvent.setup()
+    attachments.updateAttachmentMetadata.mockResolvedValue({ ...ATTACHMENT, attachment_description: null })
+    const { onSaved } = renderModal()
+    await user.clear(screen.getByLabelText('Description'))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(attachments.updateAttachmentMetadata).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 'att-1', {
+      name: 'Crack at curb',
+      description: '',
+    })
+  })
+
+  it('opens an attachment without a description with the field empty', () => {
+    render(<AttachmentEditModal idrId={IDR_ID} reportId={REPORT_ID} attachment={{ ...ATTACHMENT, attachment_description: null }}
+      onSaved={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByLabelText('Description')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
   it('saves the edited fields and reports the updated attachment', async () => {

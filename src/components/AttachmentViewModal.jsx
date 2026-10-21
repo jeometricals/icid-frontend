@@ -69,7 +69,9 @@ export default function AttachmentViewModal({ idrId, reportId, attachment, onClo
           className="max-h-[65vh] w-auto mx-auto rounded"
         />
       )}
-      <p className="text-gray-700 mt-4 whitespace-pre-wrap">{attachment.attachment_description}</p>
+      {attachment.attachment_description && (
+        <p className="text-gray-700 mt-4 whitespace-pre-wrap">{attachment.attachment_description}</p>
+      )}
     </Modal>
   )
 }

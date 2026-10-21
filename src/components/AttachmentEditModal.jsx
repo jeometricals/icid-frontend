@@ -10,11 +10,11 @@ import { updateAttachmentMetadata } from '../services/attachments'
  */
 export default function AttachmentEditModal({ idrId, reportId, attachment, onSaved, onClose }) {
   const [name, setName] = useState(attachment.attachment_name)
-  const [description, setDescription] = useState(attachment.attachment_description)
+  const [description, setDescription] = useState(attachment.attachment_description ?? '')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
-  const canSave = !saving && name.trim() && description.trim()
+  const canSave = !saving && name.trim()
 
   const handleSave = async () => {
     setSaveError(null)

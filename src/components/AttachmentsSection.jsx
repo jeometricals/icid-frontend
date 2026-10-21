@@ -48,7 +48,9 @@ function AttachmentCard({ attachment, thumbnailUrl, readOnly, onThumbnailError, 
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-gray-900 truncate">{attachment.attachment_name}</p>
-        <p className="text-sm text-gray-600 line-clamp-2">{attachment.attachment_description}</p>
+        {attachment.attachment_description && (
+          <p className="text-sm text-gray-600 line-clamp-2">{attachment.attachment_description}</p>
+        )}
         <p className="text-xs text-gray-500 mt-1">
           {attachment.file_name} · {formatFileSize(attachment.file_size_bytes)} ·{' '}
           {format(new Date(attachment.uploaded_at), 'MMM d, yyyy HH:mm')}

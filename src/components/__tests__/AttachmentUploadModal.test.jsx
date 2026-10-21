@@ -55,16 +55,27 @@ describe('AttachmentUploadModal', () => {
     expect(screen.getByLabelText('Description')).toBeInTheDocument()
   })
 
-  it('keeps Save disabled until a file, a name and a description are all given', async () => {
+  it('keeps Save disabled until a file and a name are given; the description is optional', async () => {
     const user = userEvent.setup()
     renderModal()
     expect(saveButton()).toBeDisabled()
     await user.upload(screen.getByLabelText('File'), jpeg())
     expect(saveButton()).toBeDisabled()
     await user.type(screen.getByLabelText('Name'), 'Crack at curb')
-    expect(saveButton()).toBeDisabled()
-    await user.type(screen.getByLabelText('Description'), 'North side')
     expect(saveButton()).toBeEnabled()
+  })
+
+  it('uploads with no description', async () => {
+    const user = userEvent.setup()
+    attachments.uploadAttachment.mockResolvedValue({ ...UPLOADED, attachment_description: null })
+    const { onUploaded } = renderModal()
+    await fillForm(user, { description: '' })
+    await user.click(saveButton())
+    await waitFor(() => expect(onUploaded).toHaveBeenCalled())
+    expect(attachments.uploadAttachment).toHaveBeenCalledWith(IDR_ID, REPORT_ID, expect.objectContaining({
+      name: 'Crack at curb',
+      description: '',
+    }))
   })
 
   it('treats a whitespace-only name as missing', async () => {

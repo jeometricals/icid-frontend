@@ -27,9 +27,9 @@ const IMAGE = {
 
 const signed = url => ({ download_url: url, expires_at: '2026-09-28T13:05:00Z' })
 
-function renderModal() {
+function renderModal(attachment = IMAGE) {
   const onClose = vi.fn()
-  render(<AttachmentViewModal idrId={IDR_ID} reportId={REPORT_ID} attachment={IMAGE} onClose={onClose} />)
+  render(<AttachmentViewModal idrId={IDR_ID} reportId={REPORT_ID} attachment={attachment} onClose={onClose} />)
   return { onClose }
 }
 
@@ -54,6 +54,15 @@ describe('AttachmentViewModal', () => {
     expect(screen.getByRole('dialog', { name: 'Crack at curb' })).toBeInTheDocument()
     expect(screen.getByText('North side, station 12+50')).toBeInTheDocument()
     await screen.findByRole('img')
+  })
+
+  it('shows no description line for an attachment without one', async () => {
+    attachments.getDownloadUrl.mockResolvedValue(signed(URL_1))
+    renderModal({ ...IMAGE, attachment_description: null })
+    const dialog = screen.getByRole('dialog', { name: 'Crack at curb' })
+    await screen.findByRole('img')
+    expect(dialog).not.toHaveTextContent('null')
+    expect(dialog.querySelector('p.whitespace-pre-wrap')).toBeNull()
   })
 
   it('fetches a new URL once when the image fails to load (expired link)', async () => {

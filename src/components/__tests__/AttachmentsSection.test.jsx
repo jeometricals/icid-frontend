@@ -114,6 +114,14 @@ describe('attachment cards', () => {
     expect(within(card('Site plan')).getByText(/plan\.pdf · 20 KB/)).toBeInTheDocument()
   })
 
+  it('shows a card without a description cleanly', async () => {
+    attachments.listAttachments.mockResolvedValue([{ ...PDF, attachment_description: null }])
+    renderSection()
+    const pdf = await screen.findByText('Site plan').then(el => el.closest('li'))
+    expect(pdf).not.toHaveTextContent('null')
+    expect(pdf.querySelector('p.line-clamp-2')).toBeNull()
+  })
+
   it('shows a real thumbnail for an image and an icon for a PDF (no URL fetched for it)', async () => {
     attachments.listAttachments.mockResolvedValue([IMAGE, PDF])
     renderSection()

@@ -17,7 +17,7 @@ const STEP_LABELS = {
 }
 
 /**
- * Modal for attaching a file to a report: file chooser plus the required name and description.
+ * Modal for attaching a file to a report: file chooser plus the required name and an optional description.
  * Checks the file as soon as it is picked; stays open with a spinner while uploading and with the error if it fails.
  * Props: idrId, reportId, onUploaded(attachment), onClose.
  */
@@ -31,7 +31,7 @@ export default function AttachmentUploadModal({ idrId, reportId, onUploaded, onC
   const [uploadError, setUploadError] = useState(null) // { message, canRetry }
 
   const busy = step !== null
-  const canSave = !busy && file && !fileError && name.trim() && description.trim()
+  const canSave = !busy && file && !fileError && name.trim()
 
   const handleFileChange = (e) => {
     const chosen = e.target.files[0] ?? null
