@@ -186,6 +186,17 @@ describe('Imported sites', () => {
     expect(api.removeReportSite).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1')
   })
 
+  it('shows who last changed each site and when, else who added it', async () => {
+    api.listReportSites.mockResolvedValue([
+      site(SIDEWALK, { added_at: '2026-10-19T14:05:00', added_by_name: 'Genghis Khan', updated_at: '2026-10-20T09:30:00',
+        updated_by_name: 'Jane Doe' }),
+      site(RAMP, { added_at: '2026-10-19T14:05:00', added_by_name: 'Genghis Khan', updated_at: null, updated_by_name: null }),
+    ])
+    renderPage()
+    expect(await screen.findByText('Jane Doe · 10/20/26 9:30 AM')).toBeInTheDocument()
+    expect(screen.getByText('Genghis Khan · 10/19/26 2:05 PM')).toBeInTheDocument()
+  })
+
   it('a submitted IDR shows the sites read-only', async () => {
     api.getIdr.mockResolvedValue(parentIdr({ status: 'submitted' }))
     api.listReportSites.mockResolvedValue([site(SIDEWALK)])

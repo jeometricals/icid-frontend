@@ -26,6 +26,7 @@ vi.mock('../../services/api', () => ({
   listPirPages: vi.fn(),
   listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
   listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), saveRampLabel: vi.fn(),
+  getPropertyWorkHistory: vi.fn(),
 }))
 
 const pir = (number, extra = {}) => ({
@@ -45,6 +46,7 @@ const live = () => pirs.find(row => !row.deleted_at)
 beforeEach(() => {
   vi.clearAllMocks()
   created = 0
+  api.getPropertyWorkHistory.mockResolvedValue([])
   property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45',
     address: '12 Main St', display_address: '12 Main St', property_type: '4_plus_family', violation_no: 'V-77',
     notes: 'Corner lot', created_at: `${YEAR}-09-01T12:00:00`, deleted_at: null }
@@ -618,5 +620,40 @@ describe('PropertyPage — Construction Report', () => {
     api.listFlags.mockResolvedValue([{ id: 'f1', claimed_by_idr_id: 'idr-1' }])
     await renderLoaded(DEMO_USER)
     await waitFor(() => expect(reportButton()).toBeEnabled())
+  })
+})
+
+describe('PropertyPage — Work history', () => {
+  const entry = (extra) => ({
+    id: `s-${extra.idr_number ?? 'x'}`, idr_id: 'idr-1', report_id: 'r-1', report_type: 'SWCB', work_type: 'excavation',
+    work_type_other: null, added_at: '2026-10-19T13:00:00Z', idr_number: '123AB', report_date: '2026-10-19',
+    status: 'approved', deleted_at: null, return_reason: null, reporter_uuid: 'u-1', reporter_name: 'Genghis Khan', ...extra,
+  })
+
+  it('lists every import, newest first, deleted ones struck and returned ones marked', async () => {
+    api.getPropertyWorkHistory.mockResolvedValue([
+      entry({ id: 'a', work_type: 'other', work_type_other: 'Custom work spec', idr_number: 'IDR-013', report_date: '2026-10-27',
+        reporter_name: 'Alice Admin', status: 'deleted', deleted_at: '2026-10-28T13:00:00Z' }),
+      entry({ id: 'b', work_type: 'pavement_restoration', idr_number: null, report_date: '2026-10-26', reporter_name: 'John Smith',
+        status: 'draft', return_reason: 'Fix it' }),
+      entry({ id: 'c', work_type: 'concrete', idr_number: 'IDR-005', report_date: '2026-10-20', reporter_name: 'Jane Doe' }),
+      entry({ id: 'd' }),
+    ])
+    renderPage()
+    const section = await screen.findByRole('region', { name: 'Work history' })
+    const items = await within(section).findAllByRole('listitem')
+    expect(items.map(item => item.textContent)).toEqual([
+      '"Custom work spec" on 10/27/26 reported by Alice Admin, IDR# IDR-013(deleted)',
+      'Pavement Restoration on 10/26/26 reported by John Smith, IDR# Draft(returned)',
+      'Concrete on 10/20/26 reported by Jane Doe, IDR# IDR-005',
+      'Excavation on 10/19/26 reported by Genghis Khan, IDR# 123AB',
+    ])
+    expect(within(items[0]).getByText(/Custom work spec/)).toHaveClass('line-through')
+    expect(api.getPropertyWorkHistory).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it('says when no IDR has reported work here', async () => {
+    renderPage()
+    expect(await screen.findByText('No IDR has reported work here yet.')).toBeInTheDocument()
   })
 })
