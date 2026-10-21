@@ -48,6 +48,8 @@ vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   addReport: vi.fn(), deleteReport: vi.fn(),
   listReportSites: vi.fn(), importReportSite: vi.fn(), updateReportSite: vi.fn(), removeReportSite: vi.fn(),
+  getPayItemSources: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
+  removeSitePayItem: vi.fn(),
   listProperties: vi.fn(), listTaskOrders: vi.fn(), getTaskOrder: vi.fn(),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
@@ -76,6 +78,8 @@ beforeEach(() => {
   api.getProjectById.mockResolvedValue({ project_id: 'HWS0023', project_name: 'S/W Queens' })
   api.getContractItems.mockResolvedValue([])
   api.listReportSites.mockResolvedValue([])
+  api.getPayItemSources.mockResolvedValue({ pay_items: [] })
+  api.listSitePayItems.mockResolvedValue([])
   api.listProperties.mockResolvedValue([SIDEWALK, RAMP, ELSEWHERE])
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-001' }])
   api.getTaskOrder.mockResolvedValue({ id: 'to-1', properties: [SIDEWALK] })

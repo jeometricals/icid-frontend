@@ -10,6 +10,7 @@ import { TEST_USER, sessionFor } from '../test/users'
 vi.mock('../services/api', () => ({
   getContractItems: vi.fn(),
   listReportSites: vi.fn(() => Promise.resolve([])),
+  getPayItemSources: vi.fn(() => Promise.resolve({ pay_items: [] })),
   getProjectsForUser: vi.fn(),
   getProjectById: vi.fn(),
   getIdr: vi.fn(),
