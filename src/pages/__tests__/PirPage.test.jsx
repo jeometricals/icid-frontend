@@ -535,30 +535,61 @@ describe("PirPage — the site's pay items for an IDR (W3)", () => {
       budget_code: 'HW-200(S)', description: '4in sidewalk', unit: 'SF' })
   })
 
-  it('shows them above Pay Items Reported, and reads that again after an add', async () => {
+  const OTHERS = [
+    { contract_item_id: 'ci-1', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)', description: '4in sidewalk', unit: 'SF',
+      total: 140, idrs: [
+        { idr_id: 'idr-1', idr_number: 'IDR-005', report_date: '2026-10-21', status: 'draft', inspector: 'Jane Doe', quantity: 40 },
+        { idr_id: 'idr-0', idr_number: 'IDR-001', report_date: '2026-10-16', status: 'approved', inspector: 'Genghis Khan', quantity: 100 },
+      ] },
+    { contract_item_id: 'ci-2', pay_item_ref: '6.70 AB', budget_code: 'HW-200(S)', description: 'MTP', unit: 'EA',
+      total: 1, idrs: [
+        { idr_id: 'idr-1', idr_number: 'IDR-005', report_date: '2026-10-21', status: 'draft', inspector: 'Jane Doe', quantity: 1 },
+      ] },
+  ]
+
+  it('shows them, then the other IDRs folded as a footer, read again after an add', async () => {
+    api.getPropertyPayItemSummary.mockResolvedValue(OTHERS)
     const user = userEvent.setup()
     renderPage({ search: CONTEXT })
-    const section = await screen.findByRole('region', { name: 'Pay items (this IDR: IDR-005)' })
-    const reported = await screen.findByRole('region', { name: 'Pay Items Reported' })
-    expect(section.compareDocumentPosition(reported) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const section = await screen.findByRole('region', { name: 'Pay items for this site' })
+    const footer = await screen.findByRole('region', { name: 'Previously reported in other IDRs' })
+    expect(section.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Pay Items Reported' })).not.toBeInTheDocument()
+    const toggle = within(footer).getByRole('button', { name: 'Previously reported in other IDRs' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(within(footer).queryByRole('table')).not.toBeInTheDocument()
+    await user.click(toggle)
+    // Only IDR-001's entry: the item this IDR alone reports is gone, the other's total is IDR-001's
+    const rows = within(within(footer).getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows.map(row => row.textContent)).toEqual(['4.13 AAS (HW-200(S))4in sidewalk100 SF1 IDR'])
     expect(api.getPropertyPayItemSummary).toHaveBeenCalledTimes(1)
     await user.selectOptions(await within(section).findByLabelText('Pay item'), 'ci-1')
     await user.type(within(section).getByLabelText('Quantity'), '12')
-    await user.click(within(section).getByRole('button', { name: 'Add pay item' }))
+    await user.click(within(section).getByRole('button', { name: '+ Add pay item' }))
     await waitFor(() => expect(api.getPropertyPayItemSummary).toHaveBeenCalledTimes(2))
+  })
+
+  it('leaves the footer out when no other IDR reports here', async () => {
+    api.getPropertyPayItemSummary.mockResolvedValue([OTHERS[1]])
+    renderPage({ search: CONTEXT })
+    await screen.findByRole('region', { name: 'Pay items for this site' })
+    await waitFor(() => expect(api.getPropertyPayItemSummary).toHaveBeenCalled())
+    expect(screen.queryByRole('region', { name: 'Previously reported in other IDRs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Pay Items Reported' })).not.toBeInTheDocument()
   })
 
   it('shows them on a site with no PIR yet', async () => {
     api.getPirByProperty.mockResolvedValue(null)
     renderPage({ search: CONTEXT })
     expect(await screen.findByText(NO_PIR_TEXT)).toBeInTheDocument()
-    const section = await screen.findByRole('region', { name: 'Pay items (this IDR: IDR-005)' })
-    expect(await within(section).findByRole('button', { name: 'Add pay item' })).toBeInTheDocument()
+    const section = await screen.findByRole('region', { name: 'Pay items for this site' })
+    expect(await within(section).findByRole('button', { name: '+ Add pay item' })).toBeInTheDocument()
   })
 
   it('stays hidden without the IDR context', async () => {
     await renderLoaded()
-    expect(screen.queryByRole('region', { name: /Pay items \(this IDR/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Pay items for this site' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Previously reported in other IDRs' })).not.toBeInTheDocument()
     expect(api.getIdr).not.toHaveBeenCalled()
   })
 })

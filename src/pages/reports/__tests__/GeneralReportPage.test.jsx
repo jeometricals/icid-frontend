@@ -91,6 +91,8 @@ vi.mock('../../../services/api', () => ({
   getIdr: vi.fn(),
   getProjectById: vi.fn(),
   saveReport: vi.fn(),
+  listReportSites: vi.fn(async () => []), getPayItemSources: vi.fn(async () => ({ pay_items: [] })),
+  getIdrFlags: vi.fn(async () => ({ flags: [] })), getIdrSegments: vi.fn(async () => ({ segments: [] })),
 }))
 
 // AttachmentsSection fetches its own data and needs AuthProvider; this page's tests only check where it is placed
@@ -851,5 +853,39 @@ describe('attachments', () => {
     renderPage()
     await loaded()
     expect(section()).not.toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Imported sites on a General (Slice X): read-only, shown once it has some
+// ---------------------------------------------------------------------------
+
+describe('Imported sites', () => {
+  const SITE = {
+    id: 's-1', report_id: REPORT_ID, idr_id: IDR_ID, property_id: 'p-1', kind: 'sidewalk', display_address: '152 23 ST',
+    work_type: 'concrete', work_type_other: null, added_at: '2026-10-20T19:00:54Z', added_by_name: 'Reza',
+  }
+
+  it('lists them read-only, each counting its pay items and linking to its PIR in this IDR', async () => {
+    api.listReportSites.mockResolvedValueOnce([SITE])
+    api.getIdrFlags.mockResolvedValueOnce({ flags: [{ property_id: 'p-1', state: 'attributed', pay_item_ref: '4.13 AAS',
+      budget_code: 'HW-200(S)', pay_item_description: '4in sidewalk', unit: 'SF', amount: 180 }] })
+    renderPage()
+    await loaded()
+    expect(await screen.findByRole('heading', { name: 'Imported sites' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '152 23 ST' })).toHaveAttribute('href',
+      `/project/HWS0023/properties/p-1/pir?returnTo=${encodeURIComponent(REPORT_URL)}&idrId=${IDR_ID}&reportId=${REPORT_ID}`)
+    expect(await screen.findByTestId('site-pay-items-s-1')).toHaveTextContent('1 item · 180 SF')
+    expect(screen.queryByRole('button', { name: 'Import sites' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Work at 152 23 ST')).not.toBeInTheDocument()
+    expect(api.listReportSites).toHaveBeenCalledWith(IDR_ID, REPORT_ID)
+  })
+
+  it('has no card without sites', async () => {
+    renderPage()
+    await loaded()
+    await waitFor(() => expect(api.listReportSites).toHaveBeenCalled())
+    expect(screen.queryByRole('heading', { name: 'Imported sites' })).not.toBeInTheDocument()
   })
 })

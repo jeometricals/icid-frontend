@@ -14,23 +14,24 @@ import { formatPayItemQuantity } from '../../lib/payItemFormat'
  * with the work done there. On a draft, Import sites opens the picker, the work can be changed (Other asks to specify)
  * and a site removed; otherwise the table is read-only. Each site links, with ?returnTo= this report and this IDR's
  * context (?idrId=&reportId=), to where its pay items for this IDR are entered (Slice W3): a sidewalk's PIR workspace, a
- * ped ramp's site page. Its Pay items column (W4) sums up the pay items entered on it (payItemSummary). Last updated
+ * ped ramp's site page. Its Pay items column (W4) sums up its pay items for the IDR (payItemSummary): what its flags and
+ * curb segments come to (Slice X) and the pay items entered on it. Last updated
  * (V2) is who last changed its work and when, or who added it and when if nobody has.
  * Props: form (useReportForm's: idr, reports, report, idrId, projectId, reportId, isReadOnly), sites (from
  * useReportSites), onImported(added) after the picker imported some, onChanged(site) after a change,
- * onRemoved(siteId) and sitePayItems (site id → its pay items entered on it, [{amount, unit}]).
+ * onRemoved(siteId) and sitePayItems (site id → its pay-item rows, auto and entered, [{amount, unit}]).
  */
 /**
- * A site's pay items entered on it in a few words (W4): "3 items · 120 SF" when they share a unit, "3 items" when not,
- * "1 item · 40 SF", or "—" for none. Takes [{amount, unit}].
+ * A site's pay items for the IDR in a few words (W4; Slice X lists every unit): "3 items · 180 SF · 20 LF · 1 EA", the
+ * row count then the total per unit in the order the units first appear, "1 item · 40 SF", or "—" for none. Takes
+ * [{amount, unit}].
  */
 export function payItemSummary(lines = []) {
   if (lines.length === 0) return '—'
-  const count = `${lines.length} ${lines.length === 1 ? 'item' : 'items'}`
-  const units = new Set(lines.map(line => line.unit))
-  if (units.size !== 1) return count
-  const total = lines.reduce((sum, line) => sum + Number(line.amount), 0)
-  return `${count} · ${formatPayItemQuantity(Math.round(total * 100) / 100)} ${lines[0].unit}`
+  const totals = new Map()
+  for (const line of lines) totals.set(line.unit ?? '', (totals.get(line.unit ?? '') ?? 0) + Number(line.amount))
+  const units = [...totals].map(([unit, total]) => `${formatPayItemQuantity(Math.round(total * 100) / 100)}${unit ? ` ${unit}` : ''}`)
+  return [`${lines.length} ${lines.length === 1 ? 'item' : 'items'}`, ...units].join(' · ')
 }
 
 /** Where a site's link goes (W3): a sidewalk's PIR workspace, a ped ramp's site page, with the report and IDR along. */

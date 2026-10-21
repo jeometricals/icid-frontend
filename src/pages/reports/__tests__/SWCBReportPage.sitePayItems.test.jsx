@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import SWCBReportPage from '../SWCBReportPage'
@@ -47,7 +47,7 @@ vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   addReport: vi.fn(), deleteReport: vi.fn(),
   listReportSites: vi.fn(), importReportSite: vi.fn(), updateReportSite: vi.fn(), removeReportSite: vi.fn(),
-  getPayItemSources: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
+  getPayItemSources: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
   removeSitePayItem: vi.fn(),
   listProperties: vi.fn(), listTaskOrders: vi.fn(), getTaskOrder: vi.fn(),
 }))
@@ -78,6 +78,8 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue([])
   api.listReportSites.mockResolvedValue([])
   api.getPayItemSources.mockResolvedValue({ pay_items: [] })
+  api.getIdrFlags.mockResolvedValue({ flags: [] })
+  api.getIdrSegments.mockResolvedValue({ segments: [] })
   api.listSitePayItems.mockResolvedValue([])
   api.listProperties.mockResolvedValue([SIDEWALK, RAMP, ELSEWHERE])
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-001' }])
@@ -98,7 +100,7 @@ const SOURCES = {
 }
 
 describe("Imported sites' Pay items column (W4)", () => {
-  it("sums each site's pay items from the totals' site lines, one unit or not", async () => {
+  it("sums each site's pay items from the totals' site lines, per unit", async () => {
     api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP), site(ELSEWHERE)])
     api.getPayItemSources.mockResolvedValue({ pay_items: [
       ...SOURCES.pay_items,
@@ -107,10 +109,28 @@ describe("Imported sites' Pay items column (W4)", () => {
         site_lines: [{ amount: 10, site_id: 's-p-2', property_id: 'p-2' }, { amount: 20, site_id: 's-p-2', property_id: 'p-2' }] },
     ] })
     renderPage()
-    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items$/)
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items · 5 SF · 12\.5 LS$/)
     expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('2 items · 30 LF')
     expect(screen.getByTestId('site-pay-items-s-p-3')).toHaveTextContent('—')
     expect(api.getPayItemSources).toHaveBeenCalledWith(IDR_ID, REPORT_ID)
+  })
+
+  it("counts what each site's attributed flags and curb segments come to, flags first", async () => {
+    const drawing = { property_id: 'p-1', state: 'attributed', budget_code: 'HW-200(S)' }
+    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP)])
+    api.getIdrFlags.mockResolvedValue({ flags: [
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 100 },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 80 },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 50, state: 'excluded' },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: null },
+    ] })
+    api.getIdrSegments.mockResolvedValue({ segments: [{ ...drawing, pay_item_ref: '4.08 AA', unit: 'LF', amount: 20 }] })
+    api.getPayItemSources.mockResolvedValue({ pay_items: [SOURCES.pay_items[1]] })
+    renderPage()
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^3 items · 180 SF · 20 LF · 12\.5 LS$/)
+    expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('—')
+    expect(api.getIdrFlags).toHaveBeenCalledWith(IDR_ID)
+    expect(api.getIdrSegments).toHaveBeenCalledWith(IDR_ID)
   })
 
   it('has no editor on the row: no toggle and nothing read per site', async () => {
@@ -129,6 +149,58 @@ describe("Imported sites' Pay items column (W4)", () => {
     api.getPayItemSources.mockResolvedValue({ pay_items: [SOURCES.pay_items[1]] })
     renderPage()
     expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent('1 item · 12.5 LS')
+  })
+})
+
+describe("Pay Items card: the sites' pay items, read-only, above the extras (Slice X)", () => {
+  const drawing = (property, extra) => ({ property_id: property, state: 'attributed', budget_code: 'HW-200(S)',
+    pay_item_description: '4in sidewalk', ...extra })
+
+  beforeEach(() => {
+    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP)])
+    api.getIdrFlags.mockResolvedValue({ flags: [
+      drawing('p-1', { pay_item_ref: '4.01 AAS', unit: 'SF', amount: 100 }),
+      drawing('p-2', { pay_item_ref: '4.01 AAS', unit: 'SF', amount: 40 }),
+    ] })
+    api.getPayItemSources.mockResolvedValue({ pay_items: [SOURCES.pay_items[1]] })
+  })
+
+  const siteTable = () => screen.findByRole('table', { name: 'Pay items from imported sites' })
+
+  it('sums each pay item over the sites, linking each site to its page in this IDR', async () => {
+    renderPage()
+    const table = await siteTable()
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(3))
+    const [sidewalk, mtp] = within(table).getAllByRole('row').slice(1)
+    expect(sidewalk).toHaveTextContent(/^4\.01 AASHW-200\(S\)140SF4in sidewalk138-22 227 Street \(100\), 38 St & 31 Ave/)
+    expect(mtp).toHaveTextContent(/^6\.70 ABHW-200\(S\)12\.5LSMaintenance and protection of traffic138-22 227 Street$/)
+    const context = `returnTo=${encodeURIComponent(REPORT_URL)}&idrId=${IDR_ID}&reportId=${REPORT_ID}`
+    expect(within(sidewalk).getByRole('link', { name: '138-22 227 Street' }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/p-1/pir?${context}`)
+    expect(within(sidewalk).getByRole('link', { name: RAMP.display_address }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/p-2?${context}`)
+    expect(within(table).queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it("keeps the report's own items editable below, as cross-site extras, with Add Item", async () => {
+    renderPage()
+    await siteTable()
+    expect(screen.getByRole('heading', { name: 'Cross-site extras' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Item' })).toBeEnabled()
+  })
+
+  it('still shows them once the IDR is submitted', async () => {
+    api.getIdr.mockResolvedValue(parentIdr({ status: 'submitted' }))
+    renderPage()
+    const table = await siteTable()
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(3))
+  })
+
+  it('says when the sites bring no pay items', async () => {
+    api.getIdrFlags.mockResolvedValue({ flags: [] })
+    api.getPayItemSources.mockResolvedValue({ pay_items: [] })
+    renderPage()
+    expect(await screen.findByText('No pay items from imported sites.')).toBeInTheDocument()
   })
 })
 

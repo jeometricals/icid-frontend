@@ -50,7 +50,7 @@ function renderPanel(search = CONTEXT, props = {}) {
   )
 }
 
-const panel = () => screen.findByRole('region', { name: 'Pay items (this IDR: IDR-005)' })
+const panel = () => screen.findByRole('region', { name: 'Pay items for this site' })
 
 describe('SitePayItemsPanel', () => {
   it('renders nothing and reads nothing without an IDR context', () => {
@@ -59,14 +59,18 @@ describe('SitePayItemsPanel', () => {
     expect(api.getIdr).not.toHaveBeenCalled()
   })
 
-  it("names the IDR and lists this site's flag quantities read-only, then its own pay items", async () => {
+  it("names the IDR and lists this site's flag quantities read-only, then its own pay items, in one table", async () => {
+    api.listSitePayItems.mockResolvedValue([{ id: 'spi-1', quantity: 1, note: null, pay_item_ref: '6.70 AB',
+      budget_code: 'HW-200(S)', description: 'MTP', unit: 'EA' }])
     renderPanel()
     const section = await panel()
-    const geometry = await within(section).findByRole('table', { name: 'From its flags and curb segments' })
-    expect(within(geometry).getAllByRole('row').slice(1).map(row => row.textContent))
-      .toEqual(['4.13 AAS (HW-200(S))4in sidewalk40 SF1 flag'])
-    expect(within(geometry).queryByRole('textbox')).not.toBeInTheDocument()
-    expect(await within(section).findByText('No pay items entered on this site.')).toBeInTheDocument()
+    expect(within(section).getByText('This IDR: IDR-005')).toBeInTheDocument()
+    const table = await within(section).findByRole('table', { name: 'Pay items for this site' })
+    await within(table).findByLabelText('Quantity of 6.70 AB')
+    const rows = within(table).getAllByRole('row').slice(1, 3)
+    expect(rows[0].textContent).toBe('4.13 AAS (HW-200(S))4in sidewalk40SFauto (1 flag)from the sketch')
+    expect(within(rows[0]).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(rows[1]).getByText('entered')).toBeInTheDocument()
     expect(api.listSitePayItems).toHaveBeenCalledWith('idr-1', 'rep-1', 'site-1')
     expect(api.listReportSites).toHaveBeenCalledWith('idr-1', 'rep-1')
     expect(api.getContractItems).toHaveBeenCalledWith('HWS0023')
@@ -75,7 +79,19 @@ describe('SitePayItemsPanel', () => {
   it('calls an IDR without a number a Draft', async () => {
     api.getIdr.mockResolvedValue(idr({ idr_number: null }))
     renderPanel()
-    expect(await screen.findByRole('region', { name: 'Pay items (this IDR: Draft)' })).toBeInTheDocument()
+    expect(await within(await panel()).findByText('This IDR: Draft')).toBeInTheDocument()
+  })
+
+  it('says, above the table, what another IDR already billed here', async () => {
+    const billed = { property_id: PROPERTY_ID, state: 'claimed_elsewhere', claimed_by_idr_id: 'idr-0',
+      claimed_by_idr_number: 'IDR-001', constructed_on: '2026-10-16', amount: 10, unit: 'SF' }
+    api.getIdrFlags.mockResolvedValue({ flags: [...Array(8)].map(() => billed) })
+    api.getIdrSegments.mockResolvedValue({ segments: [billed, { ...billed, property_id: 'prop-0' }] })
+    renderPanel()
+    const section = await panel()
+    expect(await within(section).findByText('8 flags and 1 curb segment here were billed by IDR-001 (10/16/26).'))
+      .toBeInTheDocument()
+    expect(await within(section).findByText('No pay items for this site yet.')).toBeInTheDocument()
   })
 
   it("lets the draft's inspector add a pay item, and says so to the page", async () => {
@@ -85,7 +101,7 @@ describe('SitePayItemsPanel', () => {
     const section = await panel()
     await user.selectOptions(await within(section).findByLabelText('Pay item'), 'ci-1')
     await user.type(within(section).getByLabelText('Quantity'), '12')
-    await user.click(within(section).getByRole('button', { name: 'Add pay item' }))
+    await user.click(within(section).getByRole('button', { name: '+ Add pay item' }))
     await waitFor(() => expect(api.addSitePayItem).toHaveBeenCalledWith('idr-1', 'rep-1', 'site-1',
       { contract_item_id: 'ci-1', quantity: '12', note: null }))
     expect(onChanged).toHaveBeenCalled()
@@ -101,8 +117,9 @@ describe('SitePayItemsPanel', () => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: theUser })
     renderPanel()
     const section = await panel()
-    expect(await within(section).findByText('No pay items entered on this site.')).toBeInTheDocument()
-    expect(within(section).queryByRole('button', { name: 'Add pay item' })).not.toBeInTheDocument()
+    expect(await within(section).findByText('4.13 AAS')).toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: '+ Add pay item' })).not.toBeInTheDocument()
+    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
   it('lets an admin edit an IDR in review', async () => {
@@ -110,7 +127,7 @@ describe('SitePayItemsPanel', () => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: { ...TEST_USER, role: 'admin' } })
     renderPanel()
     const section = await panel()
-    expect(await within(section).findByRole('button', { name: 'Add pay item' })).toBeInTheDocument()
+    expect(await within(section).findByRole('button', { name: '+ Add pay item' })).toBeInTheDocument()
   })
 
   it("says so when the site isn't in that report", async () => {
@@ -126,7 +143,7 @@ describe('SitePayItemsPanel', () => {
     renderPanel()
     const section = await panel()
     expect(await within(section).findByText("Couldn't load its flags and curb segments: Network down")).toBeInTheDocument()
-    expect(await within(section).findByRole('button', { name: 'Add pay item' })).toBeInTheDocument()
+    expect(await within(section).findByRole('button', { name: '+ Add pay item' })).toBeInTheDocument()
   })
 
   it("shows the load error when the IDR can't be read", async () => {
