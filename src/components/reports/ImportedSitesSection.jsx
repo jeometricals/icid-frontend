@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import ConfirmDialog from '../ConfirmDialog'
 import ReportSitePickerModal from './ReportSitePickerModal'
+import SitePayItemsEditor from './SitePayItemsEditor'
+import DisclosureToggle from './DisclosureToggle'
 import { removeReportSite, updateReportSite } from '../../services/api'
 import { WORK_TYPES } from '../../lib/reportSites'
 
@@ -9,10 +11,12 @@ import { WORK_TYPES } from '../../lib/reportSites'
  * The "Imported sites" card of a report (Slice U2): the sites whose PIR flags and curb segments this IDR covers, each
  * with the work done there. On a draft, Import sites opens the picker, the work can be changed (Other asks to specify)
  * and a site removed; otherwise the table is read-only. Each site links to its page, with ?returnTo= this report.
- * Props: form (useReportForm's: idr, reports, report, idrId, projectId, reportId, isReadOnly), sites (from
- * useReportSites), onImported(added) after the picker imported some, onChanged(site) after a change, onRemoved(siteId).
+ * Each site's "Pay items (N)" opens its pay items entered by hand (Slice V1) beneath it.
+ * Props: form (useReportForm's: idr, reports, report, idrId, projectId, reportId, isReadOnly, contractItems), sites
+ * (from useReportSites), onImported(added) after the picker imported some, onChanged(site) after a change,
+ * onRemoved(siteId), payItemCounts (site id → how many pay items it has) and onPayItemsChanged() after one changes.
  */
-export default function ImportedSitesSection({ form, sites, onImported, onChanged, onRemoved }) {
+export default function ImportedSitesSection({ form, sites, onImported, onChanged, onRemoved, payItemCounts = {}, onPayItemsChanged }) {
   const location = useLocation()
   const { idrId, projectId, reportId, isReadOnly } = form
   const [picking, setPicking] = useState(false)
@@ -21,6 +25,7 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
   const [removing, setRemoving] = useState(null) // the site whose removal is being confirmed
   const [busy, setBusy] = useState(false)
   const [removeError, setRemoveError] = useState(null)
+  const [openSite, setOpenSite] = useState(null) // the site whose pay items are open
   const returnTo = encodeURIComponent(`${location.pathname}${location.search}`)
 
   const change = async (site, workType, workTypeOther) => {
@@ -91,6 +96,7 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                 <th className="py-1 pr-3">Kind</th>
                 <th className="py-1 pr-3">Site</th>
                 <th className="py-1 pr-3">Work</th>
+                <th className="py-1 pr-3">Pay items</th>
                 {!isReadOnly && <th className="py-1"><span className="sr-only">Remove</span></th>}
               </tr>
             </thead>
@@ -99,8 +105,10 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                 const typing = otherDraft[site.id]
                 const workType = typing !== undefined ? 'other' : site.work_type
                 const label = WORK_TYPES.find(type => type.value === site.work_type)?.label
+                const count = payItemCounts[site.id] ?? 0
                 return (
-                  <tr key={site.id}>
+                  <Fragment key={site.id}>
+                  <tr>
                     <td className="py-2 pr-3">
                       <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${site.kind === 'ped_ramp' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
                         {site.kind === 'ped_ramp' ? 'PR' : 'SW'}
@@ -137,12 +145,27 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                         </div>
                       )}
                     </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      <DisclosureToggle expanded={openSite === site.id}
+                        onToggle={() => setOpenSite(id => (id === site.id ? null : site.id))}>
+                        Pay items ({count})
+                      </DisclosureToggle>
+                    </td>
                     {!isReadOnly && (
                       <td className="py-2 text-right">
                         <button type="button" className="text-red-600 underline" onClick={() => setRemoving(site)}>Remove</button>
                       </td>
                     )}
                   </tr>
+                  {openSite === site.id && (
+                    <tr>
+                      <td colSpan={isReadOnly ? 4 : 5} className="pb-3">
+                        <SitePayItemsEditor idrId={idrId} reportId={reportId} site={site} contractItems={form.contractItems}
+                          isReadOnly={isReadOnly} onChanged={onPayItemsChanged} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 )
               })}
             </tbody>

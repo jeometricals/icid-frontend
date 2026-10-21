@@ -77,6 +77,7 @@ vi.mock('../../../services/api', () => ({
   addReport: vi.fn(),
   deleteReport: vi.fn(),
   listReportSites: vi.fn(),
+  getPayItemSources: vi.fn(),
 }))
 
 // AttachmentsSection fetches its own data and needs AuthProvider; these tests only check it is mounted
@@ -90,6 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.getIdr.mockResolvedValue(parentIdr())
   api.listReportSites.mockResolvedValue([])
+  api.getPayItemSources.mockResolvedValue({ pay_items: [] })
   api.getProjectById.mockResolvedValue(PROJECT)
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.saveReport.mockImplementation(async (_, reportId, reportData) => ({

@@ -5,9 +5,11 @@
  * On top of the shared sections it has the Operation line (Structural, Subcontractor), the SWCB Detailed Activity table
  * and the Inspection Matrix. Its equipment rows follow the DDC form, which has no Excavator or Pavement Cutter row.
  * Its Imported sites (Slice U2) are the sites whose PIR flags and curb segments the IDR covers; the description can be
- * written from them ("Regenerate from sites", and on the first import into an empty description).
+ * written from them ("Regenerate from sites", and on the first import into an empty description). Each site takes pay
+ * items entered by hand, and Pay item totals sums every source per pay item (Slice V1).
  * Load / save / layout: useReportForm + ReportPageShell.
  */
+import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import useReportForm from '../../lib/useReportForm'
 import { formDataFromReportData, isObject, sharedSectionDefaults } from '../../lib/reportData'
@@ -23,6 +25,8 @@ import SafetyChecklistSection from '../../components/reports/SafetyChecklistSect
 import CommentsSection from '../../components/reports/CommentsSection'
 import ImportedSitesSection from '../../components/reports/ImportedSitesSection'
 import useReportSites from '../../lib/useReportSites'
+import usePayItemSources from '../../lib/usePayItemSources'
+import PayItemTotalsSection from '../../components/reports/PayItemTotalsSection'
 import { descriptionFromSites } from '../../lib/reportSites'
 
 const DESCRIPTION_SUBHEADING =
@@ -112,6 +116,15 @@ export default function SWCBReportPage() {
   })
   const { formData, isReadOnly, updateForm } = form
   const sites = useReportSites(idrId, reportId)
+  const sources = usePayItemSources(idrId, reportId)
+  const { reload: reloadSources } = sources
+  // The report's own pay items count in the totals as saved, so a save reloads them
+  useEffect(() => { if (form.savedAt) reloadSources() }, [form.savedAt, reloadSources])
+  // How many pay items each site has, from the totals' site lines
+  const payItemCounts = {}
+  for (const item of sources.data?.pay_items ?? []) {
+    for (const line of item.site_lines) payItemCounts[line.site_id] = (payItemCounts[line.site_id] ?? 0) + 1
+  }
 
   const writeDescription = (rows) => form.handleInputChange('description', descriptionFromSites(rows))
 
@@ -120,6 +133,12 @@ export default function SWCBReportPage() {
     const empty = !formData.description.trim()
     sites.added(added)
     if (empty) writeDescription([...sites.rows, ...added])
+    sources.reload()
+  }
+
+  const handleSiteRemoved = (siteId) => {
+    sites.removed(siteId)
+    sources.reload()
   }
 
   const handleActivityChange = (row, field, value) => {
@@ -168,7 +187,11 @@ export default function SWCBReportPage() {
       <SWCBInspectionMatrix matrix={formData.inspectionMatrix} onChange={handleMatrixChange} disabled={isReadOnly} />
 
       {/* Imported sites: their PIR flags and curb segments are the IDR's */}
-      <ImportedSitesSection form={form} sites={sites} onImported={handleImported} onChanged={sites.changed} onRemoved={sites.removed} />
+      <ImportedSitesSection form={form} sites={sites} onImported={handleImported} onChanged={sites.changed}
+        onRemoved={handleSiteRemoved} payItemCounts={payItemCounts} onPayItemsChanged={sources.reload} />
+
+      {/* Pay item totals: every source, per pay item */}
+      <PayItemTotalsSection sources={sources} />
 
       {/* Pay Items */}
       <PayItemsSection
