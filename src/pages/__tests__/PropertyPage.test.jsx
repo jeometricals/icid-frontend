@@ -28,6 +28,9 @@ vi.mock('../../services/api', () => ({
   listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), saveRampLabel: vi.fn(),
   getPropertyWorkHistory: vi.fn(),
 }))
+vi.mock('../../components/SitePayItemsPanel', () => ({
+  default: (props) => <div data-testid="site-pay-items" data-property={props.propertyId} />,
+}))
 
 const pir = (number, extra = {}) => ({
   id: `e0000000-0000-4000-8000-00000000000${number}`, property_id: PROPERTY_ID, project_id: 'HWS0023',
@@ -655,5 +658,23 @@ describe('PropertyPage — Work history', () => {
   it('says when no IDR has reported work here', async () => {
     renderPage()
     expect(await screen.findByText('No IDR has reported work here yet.')).toBeInTheDocument()
+  })
+})
+
+describe("PropertyPage — a site's pay items for an IDR (W3)", () => {
+  it('shows them on a ped ramp, under its attributes', async () => {
+    api.getRampAttributes.mockResolvedValue({ property_id: PROPERTY_ID, ramp_type: 'PERPENDICULAR', warnings: [] })
+    property = {
+      ...property, kind: 'ped_ramp', boro: 'Brooklyn', block: null, lot: null, address: null, property_type: null, violation_no: null,
+      intersection_street_1: 'Atlantic Ave', intersection_street_2: 'Court St', quadrant: 'NE', facing_street: 'street_2',
+      ramp_type: 'PERPENDICULAR', corner_id: null, display_address: 'Atlantic Ave & Court St — NE Quadrant (Facing Court St)',
+    }
+    renderPage(ADMIN, '?idrId=idr-1&reportId=rep-1')
+    expect(await screen.findByTestId('site-pay-items')).toHaveAttribute('data-property', PROPERTY_ID)
+  })
+
+  it("leaves them to a sidewalk's PIR workspace", async () => {
+    await renderLoaded(ADMIN, '?idrId=idr-1&reportId=rep-1')
+    expect(screen.queryByTestId('site-pay-items')).not.toBeInTheDocument()
   })
 })

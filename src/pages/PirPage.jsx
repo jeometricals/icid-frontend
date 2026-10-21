@@ -14,7 +14,9 @@
  * HWS0023 · Constructed: 2026-10-05 · ↑ NE", from page 1's title block and the PIR), with "Edit title block"
  * (TitleBlockEditor; read-only for anyone who can't write here). Opened with `?returnTo=` (an IDR report page;
  * lib/returnTo.js), it also offers Back to report (BackToReportButton), and Back to Site carries it along.
- * Under the sketch area, the site's Pay Items Reported (PayItemsReportedSection, Slice V5): what IDRs report here.
+ * Under the sketch area, opened with `?idrId=&reportId=` (an imported site's link, lib/idrSiteContext.js), the site's pay
+ * items for that IDR (SitePayItemsPanel, Slice W3), shown with or without a PIR; then its Pay Items Reported
+ * (PayItemsReportedSection, Slice V5): what IDRs report here, read again after a change above.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -36,6 +38,7 @@ import PirUploadModal, { UPLOAD_PROMPT } from '../components/PirUploadModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 import PayItemsReportedSection from '../components/PayItemsReportedSection'
+import SitePayItemsPanel from '../components/SitePayItemsPanel'
 import TitleBlockEditor from '../components/TitleBlockEditor'
 import SketchWorkspace from '../components/sketch/SketchWorkspace'
 
@@ -90,6 +93,7 @@ export default function PirPage() {
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [payItemsChanged, setPayItemsChanged] = useState(0) // bumped when the site's pay items for an IDR change
   const [attempt, setAttempt] = useState(0) // bump to retry
 
   const [titleBlock, setTitleBlock] = useState(null) // what the Construction Report prints; null until read
@@ -363,7 +367,10 @@ export default function PirPage() {
         </section>
       )}
 
-      {pir && <PayItemsReportedSection projectId={projectId} propertyId={propertyId} />}
+      {/* Opened from an IDR report (?idrId=&reportId=): the site's pay items for it, a PIR or not */}
+      <SitePayItemsPanel projectId={projectId} propertyId={propertyId} onChanged={() => setPayItemsChanged(n => n + 1)} />
+
+      {pir && <PayItemsReportedSection projectId={projectId} propertyId={propertyId} refreshKey={payItemsChanged} />}
 
       {dialog === 'upload' && (
         <PirUploadModal pirId={pir.id} replacing={count > 0} onUploaded={uploaded} onClose={() => setDialog(null)} />
