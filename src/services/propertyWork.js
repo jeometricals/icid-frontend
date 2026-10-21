@@ -12,3 +12,13 @@ export async function getPropertyWorkHistory(propertyId) {
   const json = await apiFetch(`/v1/properties/${propertyId}/work-history`)
   return json.data
 }
+
+/**
+ * Lists the pay items IDRs report on a property (V5), read-only: [{contract_item_id, pay_item_ref, budget_code,
+ * description, unit, total, idrs: [{idr_id, idr_number, report_date, status, inspector, quantity}]}], each IDR newest
+ * first; from approved and open IDRs' flags and curb segments and the pay items entered on the site.
+ */
+export async function getPropertyPayItemSummary(propertyId) {
+  const json = await apiFetch(`/v1/properties/${propertyId}/pay-item-summary`)
+  return json.data
+}

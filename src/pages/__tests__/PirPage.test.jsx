@@ -18,6 +18,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
     listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
     getPageTitleBlock: vi.fn(), updatePirTitleBlock: vi.fn(),
+    getPropertyPayItemSummary: vi.fn(),
   }
 })
 vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
@@ -46,6 +47,7 @@ let pages
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.getPropertyPayItemSummary.mockResolvedValue([])
   property = { id: PROPERTY_ID, project_id: 'HWS0023', kind: 'sidewalk', boro: 'Queens', block: '123', lot: '45', address: '12 Main St',
     display_address: '12 Main St', deleted_at: null }
   pages = [page(1), page(2, { scale_px_per_ft: null }), page(3)]
@@ -465,5 +467,36 @@ describe('PirPage — title block', () => {
     await renderLoaded()
     expect(banner()).toHaveTextContent('Title block not loaded: Network down')
     expect(editButton()).toBeDisabled()
+  })
+})
+
+describe('PirPage — Pay Items Reported', () => {
+  const SUMMARY = [{
+    contract_item_id: 'ci-1', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)', description: '4in sidewalk', unit: 'SF',
+    total: 140, idrs: [
+      { idr_id: 'idr-2', idr_number: null, report_date: '2026-10-21', status: 'draft', inspector: 'Jane Doe', quantity: 40 },
+      { idr_id: 'idr-1', idr_number: 'IDR-001', report_date: '2026-10-19', status: 'approved', inspector: 'Genghis Khan', quantity: 100 },
+    ],
+  }]
+
+  it('lists each pay item with its total and expands to each IDR, newest first', async () => {
+    api.getPropertyPayItemSummary.mockResolvedValue(SUMMARY)
+    const user = userEvent.setup()
+    renderPage()
+    const section = await screen.findByRole('region', { name: 'Pay Items Reported' })
+    expect(await within(section).findByText('140 SF')).toBeInTheDocument()
+    await user.click(within(section).getByRole('button', { name: 'By IDR (2)' }))
+    const items = within(screen.getByRole('list', { name: 'IDRs reporting 4.13 AAS' })).getAllByRole('listitem')
+    expect(items.map(item => item.textContent)).toEqual([
+      'Draft · 10/21/26 · 40 SF · Jane Doe(in progress)',
+      'IDR-001 · 10/19/26 · 100 SF · Genghis Khan',
+    ])
+    expect(within(items[1]).getByRole('link', { name: 'IDR-001' })).toHaveAttribute('href', '/project/HWS0023/idr/idr-1')
+    expect(api.getPropertyPayItemSummary).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it('says when no IDR has reported pay items here', async () => {
+    renderPage()
+    expect(await screen.findByText('No IDR has reported pay items here yet.')).toBeInTheDocument()
   })
 })
