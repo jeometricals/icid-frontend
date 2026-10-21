@@ -3,10 +3,11 @@ import { addSitePayItem, listSitePayItems, removeSitePayItem, updateSitePayItem 
 import { formatPayItemQuantity } from '../../lib/payItemFormat'
 
 /**
- * The pay items entered by hand on one imported site (Slice V1), opened from its row's "Pay items (N)": a list with
+ * The pay items entered by hand on one imported site (Slice V1), on the site's own page in the IDR's context
+ * (SitePayItemsPanel, Slice W3): a list with
  * each item's quantity and note, and, unless read-only, a contract-item picker, quantity and note to add one, the
  * quantity and note editable in place and a Remove button. They add to what the site's flags and curb segments fill.
- * Props: idrId, reportId, site (its row), contractItems (the project's, from useReportForm), isReadOnly,
+ * Props: idrId, reportId, site (its row), contractItems (the project's), isReadOnly,
  * onChanged() after any change (the page reloads its pay-item totals).
  */
 export default function SitePayItemsEditor({ idrId, reportId, site, contractItems = [], isReadOnly, onChanged }) {

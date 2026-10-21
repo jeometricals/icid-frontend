@@ -19,6 +19,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
     getPageTitleBlock: vi.fn(), updatePirTitleBlock: vi.fn(),
     getPropertyPayItemSummary: vi.fn(),
+    getIdr: vi.fn(), listReportSites: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(),
+    listSitePayItems: vi.fn(), addSitePayItem: vi.fn(),
   }
 })
 vi.mock('../../components/PirUploadModal', async (importOriginal) => ({
@@ -514,5 +516,49 @@ describe('PirPage — Pay Items Reported', () => {
   it('says when no IDR has reported pay items here', async () => {
     renderPage()
     expect(await screen.findByText('No IDR has reported pay items here yet.')).toBeInTheDocument()
+  })
+})
+
+describe("PirPage — the site's pay items for an IDR (W3)", () => {
+  const CONTEXT = '?returnTo=%2Fproject%2FHWS0023%2Fidr%2Fidr-1%2Fswcb%2Frep-1&idrId=idr-1&reportId=rep-1'
+
+  beforeEach(() => {
+    api.getIdr.mockResolvedValue({ idr_id: 'idr-1', status: 'draft', idr_number: 'IDR-005', reporter_uuid: TEST_USER.uuid,
+      deleted_at: null })
+    api.listReportSites.mockResolvedValue([{ id: 'site-1', property_id: PROPERTY_ID, display_address: '12 Main St' }])
+    api.getIdrFlags.mockResolvedValue({ flags: [] })
+    api.getIdrSegments.mockResolvedValue({ segments: [] })
+    api.listSitePayItems.mockResolvedValue([])
+    api.getContractItems.mockResolvedValue([{ contract_item_id: 'ci-1', item_no: '4.13 AAS', budget_code: 'HW-200(S)',
+      description: '4in sidewalk' }])
+    api.addSitePayItem.mockResolvedValue({ id: 'spi-1', quantity: 12, note: null, pay_item_ref: '4.13 AAS',
+      budget_code: 'HW-200(S)', description: '4in sidewalk', unit: 'SF' })
+  })
+
+  it('shows them above Pay Items Reported, and reads that again after an add', async () => {
+    const user = userEvent.setup()
+    renderPage({ search: CONTEXT })
+    const section = await screen.findByRole('region', { name: 'Pay items (this IDR: IDR-005)' })
+    const reported = await screen.findByRole('region', { name: 'Pay Items Reported' })
+    expect(section.compareDocumentPosition(reported) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(api.getPropertyPayItemSummary).toHaveBeenCalledTimes(1)
+    await user.selectOptions(await within(section).findByLabelText('Pay item'), 'ci-1')
+    await user.type(within(section).getByLabelText('Quantity'), '12')
+    await user.click(within(section).getByRole('button', { name: 'Add pay item' }))
+    await waitFor(() => expect(api.getPropertyPayItemSummary).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows them on a site with no PIR yet', async () => {
+    api.getPirByProperty.mockResolvedValue(null)
+    renderPage({ search: CONTEXT })
+    expect(await screen.findByText(NO_PIR_TEXT)).toBeInTheDocument()
+    const section = await screen.findByRole('region', { name: 'Pay items (this IDR: IDR-005)' })
+    expect(await within(section).findByRole('button', { name: 'Add pay item' })).toBeInTheDocument()
+  })
+
+  it('stays hidden without the IDR context', async () => {
+    await renderLoaded()
+    expect(screen.queryByRole('region', { name: /Pay items \(this IDR/ })).not.toBeInTheDocument()
+    expect(api.getIdr).not.toHaveBeenCalled()
   })
 })
