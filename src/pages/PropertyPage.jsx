@@ -16,7 +16,8 @@
  * properties; Back to task order to the latest live task order the site is in (the property's task_order_id), and is
  * off, titled "Not in a task order", when it is in none. Opened from an IDR report with `?returnTo=` (lib/returnTo.js),
  * it also offers Back to report (BackToReportButton), and the way into the sketch workspace carries it along. The backend refuses anyone not on the
- * project (403), which shows as the load error.
+ * project (403), which shows as the load error. Under the PIR card, its Work history (WorkHistorySection, Slice V2):
+ * every IDR that imported it, deleted ones struck through.
  * A ped ramp (pedramp 2a) also shows its inspection corner in the Site card (its streets and direction, or a dash), and
  * "As-Built Inspection Form" beside Edit (a ped ramp at a corner: its corner's inspection, at this ramp), and
  * under the Site card, its Ramp Attributes (RampAttributesSection), which whoever may change the site saves and
@@ -54,6 +55,7 @@ import PropertyFormModal from '../components/PropertyFormModal'
 import RampAttributesSection from '../components/RampAttributesSection'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
+import WorkHistorySection from '../components/WorkHistorySection'
 
 const NOT_IN_A_TASK_ORDER = 'Not in a task order'
 
@@ -467,6 +469,8 @@ export default function PropertyPage() {
           </div>
         )}
       </section>
+
+      <WorkHistorySection propertyId={property.id} />
 
       {form?.kind === 'property' && corner && (
         <PedrampSiteModal
