@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { REPORT_TYPES, isAddendumType, isReportTypeAvailable } from '../data/reportTypes'
+import { DSP_TAKEN_TOOLTIP, REPORT_TYPES, isAddendumType, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
  * Report-type dropdown (every main report type; ones without a form page yet are "coming soon") plus Add button.
  * Addendum types are left out: they're added from their parent report's page.
  * Props: onAdd(reportType), adding (an add is running), disabled (another action is running),
- * generalExists (the IDR already has its one main General, so that option is unavailable).
+ * generalExists (the IDR already has its one main General, so that option is unavailable),
+ * dspExists (the IDR already has its one Daily Site Patrol, addendum or not, so that option is unavailable).
  */
-export default function AddReportControl({ onAdd, adding, disabled, generalExists }) {
+export default function AddReportControl({ onAdd, adding, disabled, generalExists, dspExists = false }) {
   const [reportType, setReportType] = useState('GEN')
   const optionSuffix = code => {
     if (!isReportTypeAvailable(code)) return ' (coming soon)'
     if (code === 'GEN' && generalExists) return ' (already added)'
+    if (code === 'DSP' && dspExists) return ' (already added)'
     return ''
   }
+  const optionTitle = code => (code === 'DSP' && dspExists ? DSP_TAKEN_TOOLTIP : undefined)
   const canAdd = optionSuffix(reportType) === '' && !adding && !disabled
   const mainReportTypes = REPORT_TYPES.filter(({ code }) => !isAddendumType(code))
 
@@ -28,7 +31,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
         onChange={e => setReportType(e.target.value)}
       >
         {mainReportTypes.map(({ code, label }) => (
-          <option key={code} value={code} disabled={optionSuffix(code) !== ''}>
+          <option key={code} value={code} disabled={optionSuffix(code) !== ''} title={optionTitle(code)}>
             {label}{optionSuffix(code)}
           </option>
         ))}
@@ -36,6 +39,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
       <button
         onClick={() => onAdd(reportType)}
         disabled={!canAdd}
+        title={optionTitle(reportType)}
         className="btn-primary flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Plus className="h-4 w-4" />

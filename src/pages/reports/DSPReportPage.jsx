@@ -1,6 +1,6 @@
 /**
- * Daily Site Patrol (DSP) report, at /project/:projectId/idr/:idrId/dsp/:reportId. The IDR's one DSP, an addendum
- * added with Add DSP from a General, SWCB, AC, Conc Mix or Conc Cyl (AddDspButton). Same load / Save Draft / read-only flow as the other report pages (useReportForm +
+ * Daily Site Patrol (DSP) report, at /project/:projectId/idr/:idrId/dsp/:reportId. The IDR's one DSP, a top-level
+ * report added from the IDR page's Add report (one filed as an addendum before V4 opens here too). Same load / Save Draft / read-only flow as the other report pages (useReportForm +
  * ReportPageShell). Its body follows DDC's Daily Site Patrol sheet: the patrol details (the date, day, I.R. No. and
  * sheet read-only, the time of patrol entered), the Maintenance of Site and Maintenance and Protection of Traffic
  * checklists and Field Order Issued?. A save with a field order issued but no number is blocked here, as the backend
