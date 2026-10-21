@@ -120,10 +120,12 @@ export default function SWCBReportPage() {
   const { reload: reloadSources } = sources
   // The report's own pay items count in the totals as saved, so a save reloads them
   useEffect(() => { if (form.savedAt) reloadSources() }, [form.savedAt, reloadSources])
-  // How many pay items each site has, from the totals' site lines
-  const payItemCounts = {}
+  // Each site's pay items entered on it ({amount, unit}), from the totals' site lines
+  const sitePayItems = {}
   for (const item of sources.data?.pay_items ?? []) {
-    for (const line of item.site_lines) payItemCounts[line.site_id] = (payItemCounts[line.site_id] ?? 0) + 1
+    for (const line of item.site_lines) {
+      (sitePayItems[line.site_id] ??= []).push({ amount: line.amount, unit: item.unit })
+    }
   }
 
   const writeDescription = (rows) => form.handleInputChange('description', descriptionFromSites(rows))
@@ -188,7 +190,7 @@ export default function SWCBReportPage() {
 
       {/* Imported sites: their PIR flags and curb segments are the IDR's */}
       <ImportedSitesSection form={form} sites={sites} onImported={handleImported} onChanged={sites.changed}
-        onRemoved={handleSiteRemoved} payItemCounts={payItemCounts} onPayItemsChanged={sources.reload} />
+        onRemoved={handleSiteRemoved} sitePayItems={sitePayItems} />
 
       {/* Pay item totals: every source, per pay item */}
       <PayItemTotalsSection sources={sources} />
