@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import SWCBReportPage from '../SWCBReportPage'
 import * as api from '../../../services/api'
 
 // ---------------------------------------------------------------------------
-// The SWCB report's site pay items and pay-item totals (Slice V1)
+// The SWCB report's imported sites' pay-item summaries (W4) and pay-item totals (Slice V1)
 // ---------------------------------------------------------------------------
 
 const IDR_ID = 'idr-1'
@@ -84,10 +84,6 @@ beforeEach(() => {
   api.getTaskOrder.mockResolvedValue({ id: 'to-1', properties: [SIDEWALK] })
 })
 
-const CONTRACT_ITEM = { contract_item_id: 'ci-1', item_no: '6.70 AB', budget_code: 'HW-200(S)',
-  description: 'Maintenance and protection of traffic', pay_unit: 'LS' }
-const PAY_ITEM = { id: 'sp-1', report_site_id: 's-p-1', contract_item_id: 'ci-1', quantity: 12.5, note: 'MTP',
-  pay_item_ref: '6.70 AB', budget_code: 'HW-200(S)', description: 'Maintenance and protection of traffic', unit: 'LS' }
 const SOURCES = {
   pay_items: [
     { pay_item_ref: '4.01 AAS', budget_code: 'HW-200(S)', description: '4in sidewalk', unit: 'SF', total: 125,
@@ -101,86 +97,38 @@ const SOURCES = {
   ],
 }
 
-describe('Site pay items', () => {
-  it("shows each site's pay-item count from the totals and opens its editor", async () => {
-    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP)])
-    api.getPayItemSources.mockResolvedValue(SOURCES)
-    api.listSitePayItems.mockResolvedValue([PAY_ITEM])
-    const user = userEvent.setup()
+describe("Imported sites' Pay items column (W4)", () => {
+  it("sums each site's pay items from the totals' site lines, one unit or not", async () => {
+    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP), site(ELSEWHERE)])
+    api.getPayItemSources.mockResolvedValue({ pay_items: [
+      ...SOURCES.pay_items,
+      { pay_item_ref: '4.08 AA', budget_code: 'HW-200(S)', description: 'Curb', unit: 'LF', total: 30, flags: 0,
+        segments: 0, sites: 30, manual: 0, manual_lines: [],
+        site_lines: [{ amount: 10, site_id: 's-p-2', property_id: 'p-2' }, { amount: 20, site_id: 's-p-2', property_id: 'p-2' }] },
+    ] })
     renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Pay items (2)' }))
-    expect(screen.getByRole('button', { name: 'Pay items (0)' })).toBeInTheDocument()
-    expect(await screen.findByLabelText('Quantity of 6.70 AB')).toHaveValue(12.5)
-    expect(screen.getByLabelText('Note on 6.70 AB')).toHaveValue('MTP')
-    expect(api.listSitePayItems).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1')
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items$/)
+    expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('2 items · 30 LF')
+    expect(screen.getByTestId('site-pay-items-s-p-3')).toHaveTextContent('—')
     expect(api.getPayItemSources).toHaveBeenCalledWith(IDR_ID, REPORT_ID)
   })
 
-  it('adds a pay item with the picker, quantity and note, then reloads the totals', async () => {
-    api.listReportSites.mockResolvedValue([site(SIDEWALK)])
-    api.getContractItems.mockResolvedValue([CONTRACT_ITEM])
-    api.addSitePayItem.mockResolvedValue(PAY_ITEM)
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Pay items (0)' }))
-    await screen.findByText('No pay items entered on this site.')
-    await user.selectOptions(screen.getByLabelText('Pay item'), 'ci-1')
-    await user.type(screen.getByLabelText('Quantity'), '12.5')
-    await user.type(screen.getByLabelText('Note'), ' MTP ')
-    await user.click(screen.getByRole('button', { name: 'Add pay item' }))
-    await waitFor(() => expect(api.addSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1',
-      { contract_item_id: 'ci-1', quantity: '12.5', note: 'MTP' }))
-    expect(await screen.findByLabelText('Quantity of 6.70 AB')).toBeInTheDocument()
-    await waitFor(() => expect(api.getPayItemSources).toHaveBeenCalledTimes(2))
-  })
-
-  it('refuses a quantity not above 0 without calling the backend', async () => {
-    api.listReportSites.mockResolvedValue([site(SIDEWALK)])
-    api.getContractItems.mockResolvedValue([CONTRACT_ITEM])
-    const user = userEvent.setup()
-    renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Pay items (0)' }))
-    await screen.findByText('No pay items entered on this site.')
-    await user.selectOptions(screen.getByLabelText('Pay item'), 'ci-1')
-    await user.type(screen.getByLabelText('Quantity'), '0')
-    await user.click(screen.getByRole('button', { name: 'Add pay item' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a quantity above 0')
-    expect(api.addSitePayItem).not.toHaveBeenCalled()
-  })
-
-  it('changes a quantity on blur and removes a pay item', async () => {
+  it('has no editor on the row: no toggle and nothing read per site', async () => {
     api.listReportSites.mockResolvedValue([site(SIDEWALK)])
     api.getPayItemSources.mockResolvedValue(SOURCES)
-    api.listSitePayItems.mockResolvedValue([PAY_ITEM])
-    api.updateSitePayItem.mockResolvedValue({ ...PAY_ITEM, quantity: 4 })
-    api.removeSitePayItem.mockResolvedValue()
-    const user = userEvent.setup()
     renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Pay items (2)' }))
-    const quantity = await screen.findByLabelText('Quantity of 6.70 AB')
-    await user.clear(quantity)
-    await user.type(quantity, '4')
-    await user.tab()
-    await waitFor(() => expect(api.updateSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1', 'sp-1', { quantity: '4' }))
-    const editor = screen.getByLabelText('Pay items at 138-22 227 Street')
-    await user.click(within(editor).getByRole('button', { name: 'Remove' }))
-    await waitFor(() => expect(api.removeSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1', 'sp-1'))
-    expect(await screen.findByText('No pay items entered on this site.')).toBeInTheDocument()
+    await screen.findByTestId('site-pay-items-s-p-1')
+    expect(screen.queryByRole('button', { name: /^Pay items/ })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Pay items at 138-22 227 Street')).not.toBeInTheDocument()
+    expect(api.listSitePayItems).not.toHaveBeenCalled()
   })
 
-  it('a submitted IDR shows the pay items read-only', async () => {
+  it('reads the same on a submitted IDR', async () => {
     api.getIdr.mockResolvedValue(parentIdr({ status: 'submitted' }))
     api.listReportSites.mockResolvedValue([site(SIDEWALK)])
-    api.getPayItemSources.mockResolvedValue(SOURCES)
-    api.listSitePayItems.mockResolvedValue([PAY_ITEM])
+    api.getPayItemSources.mockResolvedValue({ pay_items: [SOURCES.pay_items[1]] })
     renderPage()
-    expect(await screen.findByText('Concrete')).toBeInTheDocument()
-    // user-event won't click anything inside the read-only page's disabled fieldset; a browser only disables its controls
-    fireEvent.click(await screen.findByRole('button', { name: 'Pay items (2)' }))
-    const editor = await screen.findByLabelText('Pay items at 138-22 227 Street')
-    expect(await within(editor).findByText('12.5 LS')).toBeInTheDocument()
-    expect(within(editor).queryByRole('button', { name: 'Add pay item' })).not.toBeInTheDocument()
-    expect(within(editor).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent('1 item · 12.5 LS')
   })
 })
 

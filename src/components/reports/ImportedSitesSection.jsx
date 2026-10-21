@@ -1,23 +1,44 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import ConfirmDialog from '../ConfirmDialog'
 import ReportSitePickerModal from './ReportSitePickerModal'
-import SitePayItemsEditor from './SitePayItemsEditor'
-import DisclosureToggle from './DisclosureToggle'
 import { removeReportSite, updateReportSite } from '../../services/api'
 import { WORK_TYPES } from '../../lib/reportSites'
+import { withIdrContext } from '../../lib/idrSiteContext'
+import { withReturnTo } from '../../lib/returnTo'
+import { formatPayItemQuantity } from '../../lib/payItemFormat'
 
 /**
  * The "Imported sites" card of a report (Slice U2): the sites whose PIR flags and curb segments this IDR covers, each
  * with the work done there. On a draft, Import sites opens the picker, the work can be changed (Other asks to specify)
- * and a site removed; otherwise the table is read-only. Each site links to its page, with ?returnTo= this report.
- * Each site's "Pay items (N)" opens its pay items entered by hand (Slice V1) beneath it. Last updated (V2) is who last
- * changed its work and when, or who added it and when if nobody has.
- * Props: form (useReportForm's: idr, reports, report, idrId, projectId, reportId, isReadOnly, contractItems), sites
- * (from useReportSites), onImported(added) after the picker imported some, onChanged(site) after a change,
- * onRemoved(siteId), payItemCounts (site id → how many pay items it has) and onPayItemsChanged() after one changes.
+ * and a site removed; otherwise the table is read-only. Each site links, with ?returnTo= this report and this IDR's
+ * context (?idrId=&reportId=), to where its pay items for this IDR are entered (Slice W3): a sidewalk's PIR workspace, a
+ * ped ramp's site page. Its Pay items column (W4) sums up the pay items entered on it (payItemSummary). Last updated
+ * (V2) is who last changed its work and when, or who added it and when if nobody has.
+ * Props: form (useReportForm's: idr, reports, report, idrId, projectId, reportId, isReadOnly), sites (from
+ * useReportSites), onImported(added) after the picker imported some, onChanged(site) after a change,
+ * onRemoved(siteId) and sitePayItems (site id → its pay items entered on it, [{amount, unit}]).
  */
+/**
+ * A site's pay items entered on it in a few words (W4): "3 items · 120 SF" when they share a unit, "3 items" when not,
+ * "1 item · 40 SF", or "—" for none. Takes [{amount, unit}].
+ */
+export function payItemSummary(lines = []) {
+  if (lines.length === 0) return '—'
+  const count = `${lines.length} ${lines.length === 1 ? 'item' : 'items'}`
+  const units = new Set(lines.map(line => line.unit))
+  if (units.size !== 1) return count
+  const total = lines.reduce((sum, line) => sum + Number(line.amount), 0)
+  return `${count} · ${formatPayItemQuantity(Math.round(total * 100) / 100)} ${lines[0].unit}`
+}
+
+/** Where a site's link goes (W3): a sidewalk's PIR workspace, a ped ramp's site page, with the report and IDR along. */
+export function sitePagePath(projectId, site, { returnTo, idrId, reportId }) {
+  const page = `/project/${projectId}/properties/${site.property_id}${site.kind === 'ped_ramp' ? '' : '/pir'}`
+  return withIdrContext(withReturnTo(page, returnTo), { idrId, reportId })
+}
+
 /** Who last changed a site's work and when, as "Jane Doe · 10/20/26 2:05 PM"; who added it when nobody has (V2). */
 export function lastUpdated(site) {
   const at = site.updated_at ?? site.added_at
@@ -25,7 +46,7 @@ export function lastUpdated(site) {
   return at ? `${name} · ${format(parseISO(at), 'M/d/yy h:mm a')}` : name
 }
 
-export default function ImportedSitesSection({ form, sites, onImported, onChanged, onRemoved, payItemCounts = {}, onPayItemsChanged }) {
+export default function ImportedSitesSection({ form, sites, onImported, onChanged, onRemoved, sitePayItems = {} }) {
   const location = useLocation()
   const { idrId, projectId, reportId, isReadOnly } = form
   const [picking, setPicking] = useState(false)
@@ -34,8 +55,7 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
   const [removing, setRemoving] = useState(null) // the site whose removal is being confirmed
   const [busy, setBusy] = useState(false)
   const [removeError, setRemoveError] = useState(null)
-  const [openSite, setOpenSite] = useState(null) // the site whose pay items are open
-  const returnTo = encodeURIComponent(`${location.pathname}${location.search}`)
+  const returnTo = `${location.pathname}${location.search}`
 
   const change = async (site, workType, workTypeOther) => {
     if (workType === 'other' && !workTypeOther?.trim()) {
@@ -115,17 +135,15 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                 const typing = otherDraft[site.id]
                 const workType = typing !== undefined ? 'other' : site.work_type
                 const label = WORK_TYPES.find(type => type.value === site.work_type)?.label
-                const count = payItemCounts[site.id] ?? 0
                 return (
-                  <Fragment key={site.id}>
-                  <tr>
+                  <tr key={site.id}>
                     <td className="py-2 pr-3">
                       <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${site.kind === 'ped_ramp' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
                         {site.kind === 'ped_ramp' ? 'PR' : 'SW'}
                       </span>
                     </td>
                     <td className="py-2 pr-3">
-                      <Link className="text-construction-700 underline" to={`/project/${projectId}/properties/${site.property_id}?returnTo=${returnTo}`}>
+                      <Link className="text-construction-700 underline" to={sitePagePath(projectId, site, { returnTo, idrId, reportId })}>
                         {site.display_address}
                       </Link>
                     </td>
@@ -155,11 +173,8 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                         </div>
                       )}
                     </td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
-                      <DisclosureToggle expanded={openSite === site.id}
-                        onToggle={() => setOpenSite(id => (id === site.id ? null : site.id))}>
-                        Pay items ({count})
-                      </DisclosureToggle>
+                    <td className="py-2 pr-3 whitespace-nowrap" data-testid={`site-pay-items-${site.id}`}>
+                      {payItemSummary(sitePayItems[site.id])}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap text-gray-600">{lastUpdated(site)}</td>
                     {!isReadOnly && (
@@ -168,15 +183,6 @@ export default function ImportedSitesSection({ form, sites, onImported, onChange
                       </td>
                     )}
                   </tr>
-                  {openSite === site.id && (
-                    <tr>
-                      <td colSpan={isReadOnly ? 5 : 6} className="pb-3">
-                        <SitePayItemsEditor idrId={idrId} reportId={reportId} site={site} contractItems={form.contractItems}
-                          isReadOnly={isReadOnly} onChanged={onPayItemsChanged} />
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
                 )
               })}
             </tbody>

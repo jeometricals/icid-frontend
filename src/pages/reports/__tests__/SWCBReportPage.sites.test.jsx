@@ -103,11 +103,14 @@ describe('descriptionFromSites', () => {
 })
 
 describe('Imported sites', () => {
-  it('lists the sites with their kind, work and a link back to this report', async () => {
+  it("lists the sites with their kind and work, each linking to its pay items for this IDR: a sidewalk's PIR, a ramp's page", async () => {
     api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP, { work_type: 'excavation' })])
     renderPage()
     const link = await screen.findByRole('link', { name: '138-22 227 Street' })
-    expect(link).toHaveAttribute('href', `/project/HWS0023/properties/p-1?returnTo=${encodeURIComponent(REPORT_URL)}`)
+    const context = `returnTo=${encodeURIComponent(REPORT_URL)}&idrId=${IDR_ID}&reportId=${REPORT_ID}`
+    expect(link).toHaveAttribute('href', `/project/HWS0023/properties/p-1/pir?${context}`)
+    expect(screen.getByRole('link', { name: RAMP.display_address }))
+      .toHaveAttribute('href', `/project/HWS0023/properties/p-2?${context}`)
     expect(screen.getByText('SW')).toBeInTheDocument()
     expect(screen.getByText('PR')).toBeInTheDocument()
     expect(screen.getByLabelText(`Work at ${RAMP.display_address}`)).toHaveValue('excavation')

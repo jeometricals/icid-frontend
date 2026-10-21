@@ -1092,7 +1092,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     as for an IDR's flags (the backend's `attribution_editor`); the UI offers them on a draft only.
   - **Where:** SWCB only for the pilot (the backend also takes General, AC, Conc Mix and Conc Cyl, not DSP).
     `ImportedSitesSection` (in `components/reports/`), above Pay Items, loaded by `lib/useReportSites.js`: a row per
-    site with an SW / PR badge, its `display_address` linking to the site page with `?returnTo=` the report, the work
+    site with an SW / PR badge, its `display_address` linking to where its pay items are entered (see Site pay items),
+    with `?returnTo=` the report, the work
     (a select; Other shows a Specify box, saved when it loses focus with text in it) and Remove (confirmed: "Its PIR
     flags and curb segments leave this IDR."). Read-only past draft.
   - **Picker:** `ReportSitePickerModal`: the project's sites, a search (address, intersection, block, lot, CB), kind
@@ -1108,8 +1109,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Last updated (Slice V2):** a column, "Jane Doe · 10/20/26 2:05 PM": who last changed the site's work and when
     (`updated_by_name`, `updated_at`), else who added it (`added_by_name`, `added_at`); `lastUpdated` in
     `ImportedSitesSection`.
-  - **Site pay items (Slice V1):** each row's "Pay items (N)" (N counted from the totals' `site_lines`) opens
-    `SitePayItemsEditor` beneath it: the site's pay items (`listSitePayItems`), and on a draft a contract-item picker,
+  - **Site pay items (Slice V1; moved by W3 and W4):** the row's Pay items column is a summary, read-only (W4,
+    `payItemSummary` from the totals' `site_lines`): "3 items · 120 SF" when they share a unit, "3 items" when not, "—"
+    for none. They are entered on the site's own page, which the site's link opens with the IDR's context
+    (`sitePagePath`: a sidewalk's PIR workspace, a ped ramp's site page, `?returnTo=&idrId=&reportId=`), in
+    `SitePayItemsEditor`: the site's pay items (`listSitePayItems`), and where editable a contract-item picker,
     quantity (above 0) and note to add one (`addSitePayItem`), the quantity and note saved on blur
     (`updateSitePayItem`) and Remove (`removeSitePayItem`); `services/reportSitePayItems.js`. Not checked against the
     site's flags; the backend refuses a report save holding by hand a pay item a site holds (400 naming the sites).
@@ -1122,10 +1126,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Editable for whom the backend allows (`canChangeIdrFlags`: the inspector on a draft, the stage's reviewer in review,
     an admin; never a demo user or once approved); the backend's 403 stands behind it.
   - **Pay item totals (V1):** `PayItemTotalsSection`, under Imported sites on the SWCB, display only:
-    `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site or its pay items change and
+    `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site changes and
     after a save), a row per pay item with its total over the IDR's flags, curb segments, site pay items and this
     report's own (as saved), each expanding ("Source breakdown") to its sources, the sites named.
-  - **Toggles on a read-only report:** "Pay items (N)" and "Source breakdown" are `DisclosureToggle`s (a span with the
+  - **Toggles on a read-only report:** "Source breakdown" is a `DisclosureToggle` (a span with the
     button role), which the read-only page's disabled fieldset doesn't disable. user-event refuses to click inside a
     disabled fieldset, so tests of them on a read-only report use `fireEvent.click`.
 - **IDR flags (R1f).** An IDR's sidewalk quantities come from the PIR flags it covers, as a live rollup, beside its
