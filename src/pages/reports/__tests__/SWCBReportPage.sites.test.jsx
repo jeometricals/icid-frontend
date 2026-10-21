@@ -79,7 +79,7 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue([])
   api.listReportSites.mockResolvedValue([])
   api.getPayItemSources.mockResolvedValue({ pay_items: [] })
-  api.listSitePayItems.mockResolvedValue([])
+  api.listSitePayItems.mockResolvedValue({ rows: [], audit: [] })
   api.listProperties.mockResolvedValue([SIDEWALK, RAMP, ELSEWHERE])
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-001' }])
   api.getTaskOrder.mockResolvedValue({ id: 'to-1', properties: [SIDEWALK] })

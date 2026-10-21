@@ -387,6 +387,19 @@ describe('SketchWorkspace — features, segments and non-assessable areas', () =
     expect(screen.getByTestId('non-assessable-areas').querySelectorAll('[data-area-label]')).toHaveLength(2)
   })
 
+  it("lists the PIR's curb segments under the flags, every page's (Slice X.1)", async () => {
+    await renderLoaded()
+    const table = screen.getByRole('table', { name: 'Curb segments' })
+    expect(within(table).getAllByRole('row')).toHaveLength(3)
+    expect(within(table).getAllByRole('row')[2]).toHaveTextContent(/^22Concrete curb/)
+  })
+
+  it('has no Curb segments table without segments', async () => {
+    api.listPirSegments.mockResolvedValue([])
+    await renderLoaded()
+    expect(screen.queryByRole('heading', { name: 'Curb segments' })).not.toBeInTheDocument()
+  })
+
   it("drops a deleted flag's areas from the page", async () => {
     await renderLoaded()
     await userEvent.click(flagShape(1))

@@ -8,6 +8,7 @@ import { newFlagValues } from '../../lib/flags'
 import CalibrateControl from './CalibrateControl'
 import FlagPanel from './FlagPanel'
 import FlagsFallbackList from './FlagsFallbackList'
+import SegmentsTable from './SegmentsTable'
 import ShapeToolbar from './ShapeToolbar'
 import SketchCanvas from './SketchCanvas'
 import Toast from '../Toast'
@@ -40,7 +41,7 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
 /**
  * The sketch workspace of one PIR page: the shape toolbar and Calibrate above, the page with its sketch
  * (SketchCanvas) beside the selected flag's panel (FlagPanel), and every flag of the PIR in a read-only list below
- * (FlagsFallbackList). Reads the PIR's flags and the project's contract items when it mounts (render it with a key
+ * (FlagsFallbackList), then its curb segments in another (SegmentsTable, when it has some). Reads the PIR's flags and the project's contract items when it mounts (render it with a key
  * that changes when the pages are replaced). A writer places a flag by arming a shape and clicking the page (the
  * defaults of lib/flags.js `newFlagValues`, then it is selected; the shape stays armed until Esc or its button),
  * drags a selected flag to move it (saved on release; a refusal puts it back), deletes the selected flag with the
@@ -246,7 +247,10 @@ export default function SketchWorkspace({
       </div>
 
       {!loading && !loadError && (
-        <FlagsFallbackList flags={flags} pages={pages} contractItems={contractItems} selectedId={selected?.id ?? null} onPick={pick} />
+        <>
+          <FlagsFallbackList flags={flags} pages={pages} contractItems={contractItems} selectedId={selected?.id ?? null} onPick={pick} />
+          <SegmentsTable segments={segments} pages={pages} contractItems={contractItems} />
+        </>
       )}
 
       <Toast message={toast} onDone={() => setToast(null)} />

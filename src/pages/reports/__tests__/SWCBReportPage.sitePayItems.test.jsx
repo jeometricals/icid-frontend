@@ -80,7 +80,7 @@ beforeEach(() => {
   api.getPayItemSources.mockResolvedValue({ pay_items: [] })
   api.getIdrFlags.mockResolvedValue({ flags: [] })
   api.getIdrSegments.mockResolvedValue({ segments: [] })
-  api.listSitePayItems.mockResolvedValue([])
+  api.listSitePayItems.mockResolvedValue({ rows: [], audit: [] })
   api.listProperties.mockResolvedValue([SIDEWALK, RAMP, ELSEWHERE])
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-001' }])
   api.getTaskOrder.mockResolvedValue({ id: 'to-1', properties: [SIDEWALK] })
@@ -233,5 +233,46 @@ describe('Pay item totals', () => {
   it('says when there are none', async () => {
     renderPage()
     expect(await screen.findByText('No pay items yet.')).toBeInTheDocument()
+  })
+})
+
+describe("A site's override replaces its auto amount on the SWCB (Slice X.1)", () => {
+  const drawing = (property, amount) => ({ property_id: property, state: 'attributed', budget_code: 'HW-200(S)',
+    pay_item_id: 'ci-sw', pay_item_ref: '4.13 AAS', pay_item_description: '4in sidewalk', unit: 'SF', amount })
+  const line = (siteId, propertyId, amount, overridesAuto) => ({ amount, report_id: REPORT_ID, site_id: siteId,
+    property_id: propertyId, label: '', overrides_auto: overridesAuto })
+  const sources = (siteLines) => ({ pay_items: [{ pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)',
+    description: '4in sidewalk', unit: 'SF', total: 0, flags: 0, segments: 0, sites: 0, manual: 0, manual_lines: [],
+    site_lines: siteLines }] })
+
+  beforeEach(() => {
+    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP)])
+    // 152: 180 SF from its flags; the ramp: 40 SF
+    api.getIdrFlags.mockResolvedValue({ flags: [drawing('p-1', 100), drawing('p-1', 80), drawing('p-2', 40)] })
+  })
+
+  it('185 replaces 180 in the site summary and the From imported sites row, not 365', async () => {
+    api.getPayItemSources.mockResolvedValue(sources([line('s-p-1', 'p-1', 185, true)]))
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^1 item · 185 SF$/))
+    expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent(/^1 item · 40 SF$/)
+    const table = await screen.findByRole('table', { name: 'Pay items from imported sites' })
+    const [row] = within(table).getAllByRole('row').slice(1)
+    expect(row).toHaveTextContent(/^4\.13 AASHW-200\(S\)225SF4in sidewalk138-22 227 Street \(185\), 38 St & 31 Ave.* \(40\)$/)
+  })
+
+  it('takes a lower override too, and an ordinary line still adds', async () => {
+    api.getPayItemSources.mockResolvedValue(sources([line('s-p-1', 'p-1', 160, true), line('s-p-1', 'p-1', 5, false)]))
+    renderPage()
+    await waitFor(() => expect(screen.getByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items · 165 SF$/))
+    const table = await screen.findByRole('table', { name: 'Pay items from imported sites' })
+    await waitFor(() => expect(within(table).getAllByRole('row')[1]).toHaveTextContent(/^4\.13 AASHW-200\(S\)205SF/))
+  })
+
+  it('an override with no auto row left is counted as it stands', async () => {
+    api.getIdrFlags.mockResolvedValue({ flags: [] })
+    api.getPayItemSources.mockResolvedValue(sources([line('s-p-1', 'p-1', 185, true)]))
+    renderPage()
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^1 item · 185 SF$/)
   })
 })

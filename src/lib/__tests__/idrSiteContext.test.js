@@ -4,11 +4,11 @@ import { autoSourceText, claimedElsewhereNote, readIdrContext, siteGeometryRows,
 const SITE = 'prop-1'
 
 const flag = (extra = {}) => ({
-  property_id: SITE, state: 'attributed', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)',
+  property_id: SITE, state: 'attributed', pay_item_id: 'ci-sw', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)',
   pay_item_description: '4in sidewalk', unit: 'SF', amount: 40, ...extra,
 })
 const segment = (extra = {}) => ({
-  property_id: SITE, state: 'attributed', pay_item_ref: '4.08 AA', budget_code: 'HW-200(S)',
+  property_id: SITE, state: 'attributed', pay_item_id: 'ci-curb', pay_item_ref: '4.08 AA', budget_code: 'HW-200(S)',
   pay_item_description: 'Concrete curb', unit: 'LF', amount: 12.5, ...extra,
 })
 
@@ -41,9 +41,9 @@ describe('siteGeometryRows', () => {
   it("sums the site's counting flags and segments per pay item, by item number", () => {
     const flags = [flag(), flag({ amount: 2.255 }), flag({ state: 'claimed', amount: 10 })]
     expect(siteGeometryRows(flags, [segment()], SITE)).toEqual([
-      { key: '4.08 AA|HW-200(S)', pay_item_ref: '4.08 AA', budget_code: 'HW-200(S)', description: 'Concrete curb',
+      { key: '4.08 AA|HW-200(S)', pay_item_id: 'ci-curb', pay_item_ref: '4.08 AA', budget_code: 'HW-200(S)', description: 'Concrete curb',
         unit: 'LF', amount: 12.5, flags: 0, segments: 1 },
-      { key: '4.13 AAS|HW-200(S)', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)', description: '4in sidewalk',
+      { key: '4.13 AAS|HW-200(S)', pay_item_id: 'ci-sw', pay_item_ref: '4.13 AAS', budget_code: 'HW-200(S)', description: '4in sidewalk',
         unit: 'SF', amount: 52.26, flags: 3, segments: 0 },
     ])
   })

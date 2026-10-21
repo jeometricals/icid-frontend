@@ -528,7 +528,7 @@ describe("PirPage — the site's pay items for an IDR (W3)", () => {
     api.listReportSites.mockResolvedValue([{ id: 'site-1', property_id: PROPERTY_ID, display_address: '12 Main St' }])
     api.getIdrFlags.mockResolvedValue({ flags: [] })
     api.getIdrSegments.mockResolvedValue({ segments: [] })
-    api.listSitePayItems.mockResolvedValue([])
+    api.listSitePayItems.mockResolvedValue({ rows: [], audit: [] })
     api.getContractItems.mockResolvedValue([{ contract_item_id: 'ci-1', item_no: '4.13 AAS', budget_code: 'HW-200(S)',
       description: '4in sidewalk' }])
     api.addSitePayItem.mockResolvedValue({ id: 'spi-1', quantity: 12, note: null, pay_item_ref: '4.13 AAS',

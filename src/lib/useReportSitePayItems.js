@@ -9,7 +9,8 @@ import { siteGeometryRows } from './idrSiteContext'
  * Takes the IDR's and the report's ids and the report's sites (useReportSites' rows).
  * Returns {sources, geometry, sitePayItems, siteRows, reload()}:
  * - sitePayItems: site id → its rows, [{amount, unit}]: what its flags, then its curb segments, come to for this IDR (as
- *   its own page's table counts them), then the pay items entered on it;
+ *   its own page's table counts them), then the pay items entered on it; an override entered on it (overrides_auto,
+ *   Slice X.1) replaces the auto row of the same item number and budget code instead of adding to it;
  * - siteRows: the same summed per pay item over the report's sites, [{key, pay_item_ref, budget_code, description,
  *   unit, amount, sites: [{site, amount}]}], by item number then budget code;
  * - reload(): reads both again (after a site is imported or removed).
@@ -36,18 +37,30 @@ export default function useReportSitePayItems(idrId, reportId, sites) {
     byKey.set(key, entry)
   }
 
-  for (const site of sites) {
+  // Each site's rows: its auto rows, then the lines entered on it; an override line replaces its auto row's amount
+  const bySite = new Map(sites.map(site => {
     const auto = siteGeometryRows(geometry.flags, geometry.segments, site.property_id)
-    sitePayItems[site.id] = [...auto.filter(row => row.flags), ...auto.filter(row => !row.flags)]
-      .map(row => ({ amount: row.amount, unit: row.unit }))
-    for (const row of auto) add(site, row)
-  }
+    const rows = [...auto.filter(row => row.flags), ...auto.filter(row => !row.flags)].map(row => ({ ...row, auto: true }))
+    return [site.id, rows]
+  }))
   for (const item of sources.data?.pay_items ?? []) {
     for (const line of item.site_lines) {
-      (sitePayItems[line.site_id] ??= []).push({ amount: line.amount, unit: item.unit })
-      const site = sites.find(s => s.id === line.site_id)
-      if (site) add(site, { ...item, amount: line.amount })
+      const rows = bySite.get(line.site_id) ?? []
+      const replaced = line.overrides_auto && rows.find(row =>
+        row.auto && !row.overridden && row.pay_item_ref === item.pay_item_ref && row.budget_code === item.budget_code)
+      if (replaced) {
+        replaced.amount = Number(line.amount)
+        replaced.overridden = true
+      } else {
+        rows.push({ ...item, amount: Number(line.amount) })
+      }
+      bySite.set(line.site_id, rows)
     }
+  }
+  for (const [siteId, rows] of bySite) {
+    sitePayItems[siteId] = rows.map(row => ({ amount: row.amount, unit: row.unit }))
+    const site = sites.find(s => s.id === siteId)
+    if (site) for (const row of rows) add(site, row)
   }
 
   const siteRows = [...byKey.values()]
