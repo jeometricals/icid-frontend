@@ -95,7 +95,8 @@ export function validateFileForUpload(file) {
   return null
 }
 
-// Same rules as the backend: both fields required, checked after trimming. Returns null or an AttachmentValidationError.
+// Same rules as the backend: the name required, the description optional; both checked after trimming.
+// Returns null or an AttachmentValidationError.
 function validateMetadata(name, description) {
   const trimmedName = (name ?? '').trim()
   const trimmedDescription = (description ?? '').trim()
@@ -103,13 +104,17 @@ function validateMetadata(name, description) {
   if (trimmedName.length > MAX_ATTACHMENT_NAME_LENGTH) {
     return new AttachmentValidationError(`Name must be at most ${MAX_ATTACHMENT_NAME_LENGTH} characters.`)
   }
-  if (!trimmedDescription) return new AttachmentValidationError('Description is required.')
   if (trimmedDescription.length > MAX_ATTACHMENT_DESCRIPTION_LENGTH) {
     return new AttachmentValidationError(
       `Description must be at most ${MAX_ATTACHMENT_DESCRIPTION_LENGTH} characters.`
     )
   }
   return null
+}
+
+// The description as sent: null when blank or missing (the backend stores a blank one as null too)
+function descriptionOrNull(description) {
+  return (description ?? '').trim() ? description : null
 }
 
 /**
@@ -154,7 +159,7 @@ export async function uploadAttachment(idrId, reportId, { file, name, descriptio
       file_type: file.type.toLowerCase(),
       file_size_bytes: file.size,
       attachment_name: name,
-      attachment_description: description,
+      attachment_description: descriptionOrNull(description),
     },
   })
   const { attachment_id: attachmentId, upload_url: uploadUrl, upload_headers: uploadHeaders } = request.data
@@ -204,7 +209,7 @@ export async function getDownloadUrl(idrId, reportId, attachmentId) {
 }
 
 /**
- * Replaces an attachment's name and description on a draft IDR (both required). The file itself is unchanged.
+ * Replaces an attachment's name and description on a draft IDR (the name required; a blank description clears it). The file itself is unchanged.
  * Returns the updated attachment. Throws AttachmentValidationError before sending if either field is invalid;
  * a 409 means the IDR was submitted.
  */
@@ -214,7 +219,7 @@ export async function updateAttachmentMetadata(idrId, reportId, attachmentId, { 
 
   const json = await attachmentFetch(`${attachmentsPath(idrId, reportId)}/${attachmentId}`, {
     method: 'PUT',
-    body: { attachment_name: name, attachment_description: description },
+    body: { attachment_name: name, attachment_description: descriptionOrNull(description) },
   })
   return json.data
 }

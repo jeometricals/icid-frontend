@@ -2,7 +2,8 @@ import { useId } from 'react'
 import { MAX_ATTACHMENT_NAME_LENGTH, MAX_ATTACHMENT_DESCRIPTION_LENGTH } from '../services/attachments'
 
 /**
- * The Name and Description inputs shared by the attachment upload and edit modals; both are required.
+ * The Name and Description inputs shared by the attachment upload and edit modals; the name is required, the
+ * description optional.
  * Props: name, description, onNameChange(value), onDescriptionChange(value), disabled.
  */
 export default function AttachmentDetailsFields({ name, description, onNameChange, onDescriptionChange, disabled }) {
@@ -33,7 +34,7 @@ export default function AttachmentDetailsFields({ name, description, onNameChang
           onChange={(e) => onDescriptionChange(e.target.value)}
           maxLength={MAX_ATTACHMENT_DESCRIPTION_LENGTH}
           disabled={disabled}
-          placeholder="What does this show, and where?"
+          placeholder="Optional: what does this show, and where?"
         />
       </div>
     </>
