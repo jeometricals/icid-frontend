@@ -14,6 +14,7 @@
  * HWS0023 · Constructed: 2026-10-05 · ↑ NE", from page 1's title block and the PIR), with "Edit title block"
  * (TitleBlockEditor; read-only for anyone who can't write here). Opened with `?returnTo=` (an IDR report page;
  * lib/returnTo.js), it also offers Back to report (BackToReportButton), and Back to Site carries it along.
+ * Under the sketch area, the site's Pay Items Reported (PayItemsReportedSection, Slice V5): what IDRs report here.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -34,6 +35,7 @@ import PirStatusBadge from '../components/PirStatusBadge'
 import PirUploadModal, { UPLOAD_PROMPT } from '../components/PirUploadModal'
 import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
+import PayItemsReportedSection from '../components/PayItemsReportedSection'
 import TitleBlockEditor from '../components/TitleBlockEditor'
 import SketchWorkspace from '../components/sketch/SketchWorkspace'
 
@@ -360,6 +362,8 @@ export default function PirPage() {
           )}
         </section>
       )}
+
+      {pir && <PayItemsReportedSection projectId={projectId} propertyId={propertyId} />}
 
       {dialog === 'upload' && (
         <PirUploadModal pirId={pir.id} replacing={count > 0} onUploaded={uploaded} onClose={() => setDialog(null)} />

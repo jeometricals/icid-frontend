@@ -785,7 +785,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     (U3):** opened with `?returnTo=<an IDR report page>` (`withReturnTo` builds the link; `readReturnTo` follows only a
     relative path starting with `/project/`, no `//`, no backslash), it also shows "Back to report"
     (`BackToReportButton`), which goes there; the other back buttons stay, and "Open sketch workspace" carries
-    `returnTo` along. One `getProperty` and one
+    `returnTo` along. Under the PIR card, **Work history** (`WorkHistorySection`, Slice V2): every IDR that imported
+    the site, newest work date first, "Excavation on 10/19/26 reported by Genghis Khan, IDR# 123AB" (Other's text in
+    quotes, "Draft" without a number), a deleted IDR's line struck and marked (deleted), a returned one marked
+    (returned). One `getProperty` and one
     `listPirs(…, { includeDeleted: true })` (the backend gives a non-admin only the live one). The heading is
     "<project_id> · <display_address>". The Site card (the property's) lists the borough, then a sidewalk's block, lot,
     CB, address, violation no. and type or a ped ramp's CB, intersection, quadrant, facing street and ramp type, then notes
@@ -839,6 +842,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `getPirByProperty`, then `listPirPages`; a failure (a non-member's 403 included) is the load error with Retry.
     The heading is "PIR · <display_address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
     one on the site page first." `?flag=<id>` (`sketchLink` in `lib/idrFlags.js`) selects that flag to start.
+    Under the sketch area, **Pay Items Reported** (`PayItemsReportedSection`, Slice V5), read-only: each pay item IDRs
+    report on the site (`getPropertyPayItemSummary`), its total and unit, "By IDR (n)" expanding to "IDR-005 ·
+    10/20/26 · 40 SF · Jane Doe" lines, newest first, each number linking to its IDR ("Draft" without one, "(in
+    progress)" before approval).
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
       the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
       Each page shows at its rotation in the sketch workspace (`SketchWorkspace`; see Flags) with "Scale: 15 px/ft"
@@ -1095,6 +1102,21 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     into an empty description writes it; otherwise the description is left alone. "Regenerate from sites", above the
     textarea (`DescriptionSection`'s `onRegenerate`), replaces it on click. Removing a site or changing its work
     doesn't touch the description. The text is saved with the report as any edit is.
+  - **Last updated (Slice V2):** a column, "Jane Doe · 10/20/26 2:05 PM": who last changed the site's work and when
+    (`updated_by_name`, `updated_at`), else who added it (`added_by_name`, `added_at`); `lastUpdated` in
+    `ImportedSitesSection`.
+  - **Site pay items (Slice V1):** each row's "Pay items (N)" (N counted from the totals' `site_lines`) opens
+    `SitePayItemsEditor` beneath it: the site's pay items (`listSitePayItems`), and on a draft a contract-item picker,
+    quantity (above 0) and note to add one (`addSitePayItem`), the quantity and note saved on blur
+    (`updateSitePayItem`) and Remove (`removeSitePayItem`); `services/reportSitePayItems.js`. Not checked against the
+    site's flags; the backend refuses a report save holding by hand a pay item a site holds (400 naming the sites).
+  - **Pay item totals (V1):** `PayItemTotalsSection`, under Imported sites on the SWCB, display only:
+    `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site or its pay items change and
+    after a save), a row per pay item with its total over the IDR's flags, curb segments, site pay items and this
+    report's own (as saved), each expanding ("Source breakdown") to its sources, the sites named.
+  - **Toggles on a read-only report:** "Pay items (N)" and "Source breakdown" are `DisclosureToggle`s (a span with the
+    button role), which the read-only page's disabled fieldset doesn't disable. user-event refuses to click inside a
+    disabled fieldset, so tests of them on a read-only report use `fireEvent.click`.
 - **IDR flags (R1f).** An IDR's sidewalk quantities come from the PIR flags it covers, as a live rollup, beside its
   reports' hand-entered pay items.
   - **Scope (Slice U).** An IDR covers the live flags on the sites its reports imported (see Imported sites), without
@@ -1239,7 +1261,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     same for curb segments (`segments_claimed` / `segments_dropped` / `segments_released`), which the approval toast
     and the admin IDR list's toasts add ("18 flags and 3 curb segments released.").
   - Report sites: `GET` / `POST /v1/idrs/{id}/reports/{report_id}/sites` · `PATCH` / `DELETE .../sites/{site_id}`
-    (see Imported sites).
+    (see Imported sites); a site's pay items `GET` / `POST .../sites/{site_id}/pay-items` · `PATCH` / `DELETE
+    .../pay-items/{item_id}`; `GET /v1/idrs/{id}/pay-item-sources?report_id=` (Slice V1).
+  - A property's work: `GET /v1/properties/{id}/work-history` (V2) · `GET /v1/properties/{id}/pay-item-summary` (V5);
+    `services/propertyWork.js`.
   - IDR curb segments: `GET /v1/idrs/{id}/attributed-segments` · `POST .../attributed-segments/{segment_id}/exclude`
     · `POST .../attributed-segments/{segment_id}/include` (who: as for flags).
   - Review: `GET /v1/idrs/queue?status=` · `POST /v1/idrs/{id}/accept-stage1` · `POST /v1/idrs/{id}/approve-stage1` ·
