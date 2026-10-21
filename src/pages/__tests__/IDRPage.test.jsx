@@ -297,6 +297,44 @@ describe('IDRPage — reports', () => {
     expect(await screen.findByText("Couldn't add report: Only draft IDRs can be edited")).toBeInTheDocument()
   })
 
+  it('adds a Daily Site Patrol as a top-level report', async () => {
+    server = draftIdr({ reports: [] })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.selectOptions(screen.getByLabelText('Add report'), 'DSP')
+    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    expect(api.addReport).toHaveBeenCalledWith(IDR_ID, { reportType: 'DSP' })
+    expect(await screen.findByRole('option', { name: 'Daily Site Patrol (already added)' })).toBeDisabled()
+  })
+
+  it('marks Daily Site Patrol already added when the IDR has one filed as an addendum', async () => {
+    server = draftIdr({ reports: [
+      report({ report_id: 'rep-1', report_type: 'SWCB' }),
+      report({ report_id: 'rep-2', report_type: 'DSP', is_addendum: true, parent_report_id: 'rep-1' }),
+    ] })
+    renderPage()
+    await ready()
+    const option = screen.getByRole('option', { name: 'Daily Site Patrol (already added)' })
+    expect(option).toBeDisabled()
+    expect(option).toHaveAttribute('title', 'DSP already added to this IDR.')
+  })
+
+  it("shows the backend's 409 for a second DSP and refetches", async () => {
+    server = draftIdr({ reports: [] })
+    api.addReport.mockImplementationOnce(async () => {
+      server = { ...server, reports: [report({ report_id: 'rep-9', report_type: 'DSP' })] }
+      throw Object.assign(new Error('This IDR already has a Daily Site Patrol'), { status: 409 })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+    await user.selectOptions(screen.getByLabelText('Add report'), 'DSP')
+    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    expect(await screen.findByText("Couldn't add report: This IDR already has a Daily Site Patrol")).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Daily Site Patrol (already added)' })).toBeDisabled()
+  })
+
   it('asks before deleting and does nothing on Cancel', async () => {
     window.confirm.mockReturnValue(false)
     const user = userEvent.setup()

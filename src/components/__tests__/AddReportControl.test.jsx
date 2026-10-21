@@ -10,11 +10,11 @@ function renderControl(props = {}) {
 }
 
 describe('AddReportControl', () => {
-  it('lists the 15 main report types, with only General, SWCB and AC enabled and the rest "coming soon"', () => {
+  it('lists the 16 main report types, with only General, SWCB, AC and Daily Site Patrol enabled and the rest "coming soon"', () => {
     renderControl()
     const options = screen.getAllByRole('option')
-    expect(options).toHaveLength(15)
-    const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete']
+    expect(options).toHaveLength(16)
+    const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete', 'Daily Site Patrol']
     for (const option of options) {
       if (available.includes(option.textContent)) {
         expect(option).toBeEnabled()
@@ -38,8 +38,6 @@ describe('AddReportControl', () => {
       expect(labels.some(l => l.startsWith(addendum))).toBe(false)
     }
     expect(screen.getByRole('option', { name: 'Water Main (Sheet 1) (coming soon)' })).toBeInTheDocument()
-    // A DSP is only ever an addendum: Add DSP on its parent report
-    expect(labels.some(l => l.startsWith('Daily Site Patrol'))).toBe(false)
   })
 
   it('starts on General', () => {
@@ -65,6 +63,28 @@ describe('AddReportControl', () => {
     renderControl({ generalExists: true })
     expect(screen.getByRole('option', { name: 'General (already added)' })).toBeDisabled()
     expect(screen.getByRole('button', { name: /add/i })).toBeDisabled()
+  })
+
+  it('offers a Daily Site Patrol as a top-level report', async () => {
+    const onAdd = renderControl()
+    const user = userEvent.setup()
+    const option = screen.getByRole('option', { name: 'Daily Site Patrol' })
+    expect(option).toBeEnabled()
+    expect(option).toHaveValue('DSP')
+    expect(option).not.toHaveAttribute('title')
+    await user.selectOptions(screen.getByLabelText('Add report'), 'DSP')
+    await user.click(screen.getByRole('button', { name: /add/i }))
+    expect(onAdd).toHaveBeenCalledWith('DSP')
+  })
+
+  it('marks Daily Site Patrol unavailable, with its tooltip, once the IDR has a DSP', async () => {
+    renderControl({ dspExists: true })
+    const option = screen.getByRole('option', { name: 'Daily Site Patrol (already added)' })
+    expect(option).toBeDisabled()
+    expect(option).toHaveAttribute('title', 'DSP already added to this IDR.')
+    // General stays available
+    expect(screen.getByRole('option', { name: 'General' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /add/i })).toBeEnabled()
   })
 
   it('shows "Adding..." and disables Add while adding', () => {

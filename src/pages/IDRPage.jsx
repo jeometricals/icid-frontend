@@ -21,7 +21,7 @@ import {
 } from '../services/api'
 import { headerFormValues, changedHeaderFields } from '../lib/idrHeader'
 import { personName } from '../lib/personName'
-import { reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
+import { findDsp, reportTypeLabel, reportTypeRoute } from '../data/reportTypes'
 import { listOrigin } from '../lib/listOrigin'
 import IdrHeaderForm from '../components/IdrHeaderForm'
 import IdrReportRow from '../components/IdrReportRow'
@@ -247,6 +247,7 @@ export default function IDRPage() {
   const headerChanges = changedHeaderFields(headerForm, savedHeader)
   const headerDirty = Object.keys(headerChanges).length > 0
   const generalExists = reports.some(r => r.report_type === 'GEN' && !r.is_addendum)
+  const dspExists = Boolean(findDsp(reports))
 
   const handleHeaderChange = (field, value) => {
     setHeaderForm(prev => ({ ...prev, [field]: value }))
@@ -488,6 +489,7 @@ export default function IDRPage() {
                 adding={busyAction === 'add'}
                 disabled={busy}
                 generalExists={generalExists}
+                dspExists={dspExists}
               />
             </div>
           )}

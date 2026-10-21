@@ -29,15 +29,11 @@ export const REPORT_TYPES = [
 // Types whose form page exists: they can be added to an IDR and opened. Add a code here once its page is built.
 const AVAILABLE_REPORT_TYPES = new Set(['GEN', 'SWCB', 'AC', 'DSP', 'CONC_MIX', 'CONC_CYL'])
 
-// Types that are addendums by nature: the backend's ADDENDUM_TYPES, and DSP, which the backend takes only as an
-// addendum (through its own Add DSP button, not the addendum picker). They're added from their parent report's page,
-// not from the IDR's top-level Add report control.
-const ADDENDUM_TYPES = new Set(['SKETCH', 'CONT', 'CONC_MIX', 'WM_2', 'WM_3', 'CONC_CYL', 'DSP'])
+// Types that are addendums by nature (the backend's ADDENDUM_TYPES). They're added from their parent report's page,
+// not from the IDR's top-level Add report control. DSP is not one: it is a top-level report, one per IDR.
+const ADDENDUM_TYPES = new Set(['SKETCH', 'CONT', 'CONC_MIX', 'WM_2', 'WM_3', 'CONC_CYL'])
 
-// The main reports a Daily Site Patrol is added to, as its addendum (the backend's DSP_PARENT_TYPES); one per IDR
-const DSP_PARENT_TYPES = new Set(['GEN', 'SWCB', 'AC', 'CONC_MIX', 'CONC_CYL'])
-
-/** Tooltip of every Add DSP button once the IDR has its one Daily Site Patrol. */
+/** Tooltip of the Add report control's Daily Site Patrol once the IDR has its one DSP. */
 export const DSP_TAKEN_TOOLTIP = 'DSP already added to this IDR.'
 
 const LABELS = Object.fromEntries(REPORT_TYPES.map(({ code, label }) => [code, label]))
@@ -55,11 +51,6 @@ export function reportTypeRoute(code) {
 /** Whether a report type is an addendum by nature, added from its parent report rather than at the IDR level. */
 export function isAddendumType(code) {
   return ADDENDUM_TYPES.has(code)
-}
-
-/** Whether a report can take the IDR's Daily Site Patrol as its addendum: a main report of a DSP_PARENT_TYPES type. */
-export function takesDsp(report) {
-  return Boolean(report) && !report.is_addendum && DSP_PARENT_TYPES.has(report.report_type)
 }
 
 /** The IDR's Daily Site Patrol among its reports (an IDR holds at most one), or undefined. */

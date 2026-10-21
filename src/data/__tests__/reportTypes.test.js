@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  REPORT_TYPES, reportTypeLabel, reportTypeRoute, isAddendumType, isReportTypeAvailable, takesDsp, findDsp, reportPagePath,
+  REPORT_TYPES, reportTypeLabel, reportTypeRoute, isAddendumType, isReportTypeAvailable, findDsp, reportPagePath,
 } from '../reportTypes'
 
 // The backend's ReportType enum, in order
@@ -46,16 +46,10 @@ describe('reportTypes', () => {
     expect(BACKEND_ENUM.filter(isReportTypeAvailable)).toEqual(['GEN', 'SWCB', 'AC', 'DSP', 'CONC_MIX', 'CONC_CYL'])
   })
 
-  it("marks the backend's addendum types, and DSP, which is only ever an addendum", () => {
-    expect(BACKEND_ENUM.filter(isAddendumType)).toEqual(['WM_2', 'WM_3', 'DSP', 'SKETCH', 'CONT', 'CONC_MIX', 'CONC_CYL'])
+  it("marks the backend's addendum types; DSP is a top-level report", () => {
+    expect(BACKEND_ENUM.filter(isAddendumType)).toEqual(['WM_2', 'WM_3', 'SKETCH', 'CONT', 'CONC_MIX', 'CONC_CYL'])
     expect(isAddendumType('GEN')).toBe(false)
-  })
-
-  it('lets a main General, SWCB, AC, Conc Mix or Conc Cyl take the DSP, and nothing else', () => {
-    const main = (report_type) => ({ report_type, is_addendum: false })
-    expect(BACKEND_ENUM.filter(code => takesDsp(main(code)))).toEqual(['GEN', 'SWCB', 'AC', 'CONC_MIX', 'CONC_CYL'])
-    expect(takesDsp({ report_type: 'CONC_MIX', is_addendum: true })).toBe(false)
-    expect(takesDsp(undefined)).toBe(false)
+    expect(isAddendumType('DSP')).toBe(false)
   })
 
   it("finds the IDR's DSP", () => {
