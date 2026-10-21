@@ -841,7 +841,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     The heading is "PIR · <display_address>" with the PIR's status badge. Without a live PIR: "This site has no PIR yet. Add
     one on the site page first." `?flag=<id>` (`sketchLink` in `lib/idrFlags.js`) selects that flag to start.
     Under the sketch area, **Pay Items Reported** (`PayItemsReportedSection`, Slice V5), read-only: each pay item IDRs
-    report on the site (`getPropertyPayItemSummary`), its total and unit, "By IDR (n)" expanding to "IDR-005 ·
+    report on the site (`getPropertyPayItemSummary`), its total and unit, its IDR count ("1 IDR", "3 IDRs"; W2) expanding to "IDR-005 ·
     10/20/26 · 40 SF · Jane Doe" lines, newest first, each number linking to its IDR ("Draft" without one, "(in
     progress)" before approval).
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has

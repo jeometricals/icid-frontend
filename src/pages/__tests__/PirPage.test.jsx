@@ -485,7 +485,7 @@ describe('PirPage — Pay Items Reported', () => {
     renderPage()
     const section = await screen.findByRole('region', { name: 'Pay Items Reported' })
     expect(await within(section).findByText('140 SF')).toBeInTheDocument()
-    await user.click(within(section).getByRole('button', { name: 'By IDR (2)' }))
+    await user.click(within(section).getByRole('button', { name: '2 IDRs' }))
     const items = within(screen.getByRole('list', { name: 'IDRs reporting 4.13 AAS' })).getAllByRole('listitem')
     expect(items.map(item => item.textContent)).toEqual([
       'Draft · 10/21/26 · 40 SF · Jane Doe(in progress)',
@@ -493,6 +493,22 @@ describe('PirPage — Pay Items Reported', () => {
     ])
     expect(within(items[1]).getByRole('link', { name: 'IDR-001' })).toHaveAttribute('href', '/project/HWS0023/idr/idr-1')
     expect(api.getPropertyPayItemSummary).toHaveBeenCalledWith(PROPERTY_ID)
+  })
+
+  it('counts the IDRs behind each pay item, one IDR in the singular, and folds them away again', async () => {
+    const one = { ...SUMMARY[0], contract_item_id: 'ci-2', pay_item_ref: '4.08 AA', total: 40, idrs: [SUMMARY[0].idrs[0]] }
+    const three = { ...SUMMARY[0], idrs: [...SUMMARY[0].idrs, { ...SUMMARY[0].idrs[1], idr_id: 'idr-0' }] }
+    api.getPropertyPayItemSummary.mockResolvedValue([three, one])
+    const user = userEvent.setup()
+    renderPage()
+    const section = await screen.findByRole('region', { name: 'Pay Items Reported' })
+    const button = await within(section).findByRole('button', { name: '3 IDRs' })
+    expect(within(section).getByRole('button', { name: '1 IDR' })).toHaveAttribute('aria-expanded', 'false')
+    await user.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(within(screen.getByRole('list', { name: 'IDRs reporting 4.13 AAS' })).getAllByRole('listitem')).toHaveLength(3)
+    await user.click(within(section).getByRole('button', { name: 'Hide IDRs' }))
+    expect(screen.queryByRole('list', { name: 'IDRs reporting 4.13 AAS' })).not.toBeInTheDocument()
   })
 
   it('says when no IDR has reported pay items here', async () => {

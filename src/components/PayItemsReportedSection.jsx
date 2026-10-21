@@ -4,10 +4,15 @@ import { format, parseISO } from 'date-fns'
 import { getPropertyPayItemSummary } from '../services/api'
 import { formatPayItemQuantity } from '../lib/payItemFormat'
 
+/** How many IDRs report a pay item, as its expand button reads: "1 IDR", "3 IDRs" (Slice W2). */
+export function idrCountLabel(count) {
+  return `${count} IDR${count === 1 ? '' : 's'}`
+}
+
 /**
  * A site's "Pay Items Reported" (Slice V5), read-only, under its PIR workspace: each pay item IDRs report here (from
  * the PIR's flags and curb segments, approved and in flight, and the pay items entered on the site), with its total
- * and unit, expanding to each IDR's part ("IDR-005 · 10/20/26 · 40 SF · Jane Doe", newest first, each opening its
+ * and unit, expanding from its IDR count ("3 IDRs") to each IDR's part ("IDR-005 · 10/20/26 · 40 SF · Jane Doe", newest first, each opening its
  * IDR). The data flows from the IDRs; nothing is entered here. Props: projectId, propertyId.
  */
 export default function PayItemsReportedSection({ projectId, propertyId }) {
@@ -43,7 +48,7 @@ export default function PayItemsReportedSection({ projectId, propertyId }) {
               <th className="py-1 pr-3">Item</th>
               <th className="py-1 pr-3">Description</th>
               <th className="py-1 pr-3 text-right">Total</th>
-              <th className="py-1"><span className="sr-only">By IDR</span></th>
+              <th className="py-1"><span className="sr-only">IDRs</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -61,7 +66,7 @@ export default function PayItemsReportedSection({ projectId, propertyId }) {
                     <button type="button" className="text-construction-700 underline whitespace-nowrap"
                       aria-expanded={!!open[item.contract_item_id]}
                       onClick={() => setOpen(o => ({ ...o, [item.contract_item_id]: !o[item.contract_item_id] }))}>
-                      {open[item.contract_item_id] ? 'Hide IDRs' : `By IDR (${item.idrs.length})`}
+                      {open[item.contract_item_id] ? 'Hide IDRs' : idrCountLabel(item.idrs.length)}
                     </button>
                   </td>
                 </tr>
