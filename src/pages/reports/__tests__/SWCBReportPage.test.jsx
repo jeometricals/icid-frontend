@@ -77,7 +77,7 @@ vi.mock('../../../services/api', () => ({
   addReport: vi.fn(),
   deleteReport: vi.fn(),
   listReportSites: vi.fn(),
-  getPayItemSources: vi.fn(),
+  getPayItemSources: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(),
 }))
 
 // AttachmentsSection fetches its own data and needs AuthProvider; these tests only check it is mounted

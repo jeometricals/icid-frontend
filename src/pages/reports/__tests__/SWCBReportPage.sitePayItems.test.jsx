@@ -47,7 +47,7 @@ vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   addReport: vi.fn(), deleteReport: vi.fn(),
   listReportSites: vi.fn(), importReportSite: vi.fn(), updateReportSite: vi.fn(), removeReportSite: vi.fn(),
-  getPayItemSources: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
+  getPayItemSources: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
   removeSitePayItem: vi.fn(),
   listProperties: vi.fn(), listTaskOrders: vi.fn(), getTaskOrder: vi.fn(),
 }))
@@ -78,6 +78,8 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue([])
   api.listReportSites.mockResolvedValue([])
   api.getPayItemSources.mockResolvedValue({ pay_items: [] })
+  api.getIdrFlags.mockResolvedValue({ flags: [] })
+  api.getIdrSegments.mockResolvedValue({ segments: [] })
   api.listSitePayItems.mockResolvedValue([])
   api.listProperties.mockResolvedValue([SIDEWALK, RAMP, ELSEWHERE])
   api.listTaskOrders.mockResolvedValue([{ id: 'to-1', task_order_number: 'TO-001' }])
@@ -98,7 +100,7 @@ const SOURCES = {
 }
 
 describe("Imported sites' Pay items column (W4)", () => {
-  it("sums each site's pay items from the totals' site lines, one unit or not", async () => {
+  it("sums each site's pay items from the totals' site lines, per unit", async () => {
     api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP), site(ELSEWHERE)])
     api.getPayItemSources.mockResolvedValue({ pay_items: [
       ...SOURCES.pay_items,
@@ -107,10 +109,28 @@ describe("Imported sites' Pay items column (W4)", () => {
         site_lines: [{ amount: 10, site_id: 's-p-2', property_id: 'p-2' }, { amount: 20, site_id: 's-p-2', property_id: 'p-2' }] },
     ] })
     renderPage()
-    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items$/)
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^2 items · 5 SF · 12\.5 LS$/)
     expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('2 items · 30 LF')
     expect(screen.getByTestId('site-pay-items-s-p-3')).toHaveTextContent('—')
     expect(api.getPayItemSources).toHaveBeenCalledWith(IDR_ID, REPORT_ID)
+  })
+
+  it("counts what each site's attributed flags and curb segments come to, flags first", async () => {
+    const drawing = { property_id: 'p-1', state: 'attributed', budget_code: 'HW-200(S)' }
+    api.listReportSites.mockResolvedValue([site(SIDEWALK), site(RAMP)])
+    api.getIdrFlags.mockResolvedValue({ flags: [
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 100 },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 80 },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: 50, state: 'excluded' },
+      { ...drawing, pay_item_ref: '4.13 AAS', unit: 'SF', amount: null },
+    ] })
+    api.getIdrSegments.mockResolvedValue({ segments: [{ ...drawing, pay_item_ref: '4.08 AA', unit: 'LF', amount: 20 }] })
+    api.getPayItemSources.mockResolvedValue({ pay_items: [SOURCES.pay_items[1]] })
+    renderPage()
+    expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent(/^3 items · 180 SF · 20 LF · 12\.5 LS$/)
+    expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('—')
+    expect(api.getIdrFlags).toHaveBeenCalledWith(IDR_ID)
+    expect(api.getIdrSegments).toHaveBeenCalledWith(IDR_ID)
   })
 
   it('has no editor on the row: no toggle and nothing read per site', async () => {

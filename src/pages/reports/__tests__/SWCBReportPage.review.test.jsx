@@ -60,7 +60,7 @@ vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   editIdrField: vi.fn(), revisePayItem: vi.fn(), addPayItem: vi.fn(), approvePayItem: vi.fn(), addTruck: vi.fn(),
   listReportSites: vi.fn(),
-  getPayItemSources: vi.fn(),
+  getPayItemSources: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(),
 }))
 vi.mock('../../../components/AttachmentsSection', () => ({ default: () => <div data-testid="attachments-section" /> }))
 

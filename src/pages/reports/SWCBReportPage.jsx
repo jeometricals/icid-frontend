@@ -6,7 +6,8 @@
  * and the Inspection Matrix. Its equipment rows follow the DDC form, which has no Excavator or Pavement Cutter row.
  * Its Imported sites (Slice U2) are the sites whose PIR flags and curb segments the IDR covers; the description can be
  * written from them ("Regenerate from sites", and on the first import into an empty description). Each site takes pay
- * items entered by hand, and Pay item totals sums every source per pay item (Slice V1).
+ * items entered by hand, and Pay item totals sums every source per pay item (Slice V1). Each site's Pay items summary
+ * counts its flags' and curb segments' pay items too (Slice X, useIdrGeometry).
  * Load / save / layout: useReportForm + ReportPageShell.
  */
 import { useEffect } from 'react'
@@ -26,6 +27,8 @@ import CommentsSection from '../../components/reports/CommentsSection'
 import ImportedSitesSection from '../../components/reports/ImportedSitesSection'
 import useReportSites from '../../lib/useReportSites'
 import usePayItemSources from '../../lib/usePayItemSources'
+import useIdrGeometry from '../../lib/useIdrGeometry'
+import { siteGeometryRows } from '../../lib/idrSiteContext'
 import PayItemTotalsSection from '../../components/reports/PayItemTotalsSection'
 import { descriptionFromSites } from '../../lib/reportSites'
 
@@ -120,8 +123,15 @@ export default function SWCBReportPage() {
   const { reload: reloadSources } = sources
   // The report's own pay items count in the totals as saved, so a save reloads them
   useEffect(() => { if (form.savedAt) reloadSources() }, [form.savedAt, reloadSources])
-  // Each site's pay items entered on it ({amount, unit}), from the totals' site lines
+  const geometry = useIdrGeometry(idrId)
+  // Each site's pay-item rows ({amount, unit}): what its flags, then its curb segments, come to for this IDR (as its own
+  // page's table counts them), then the pay items entered on it, from the totals' site lines
   const sitePayItems = {}
+  for (const site of sites.rows) {
+    const auto = siteGeometryRows(geometry.flags, geometry.segments, site.property_id)
+    sitePayItems[site.id] = [...auto.filter(row => row.flags), ...auto.filter(row => !row.flags)]
+      .map(row => ({ amount: row.amount, unit: row.unit }))
+  }
   for (const item of sources.data?.pay_items ?? []) {
     for (const line of item.site_lines) {
       (sitePayItems[line.site_id] ??= []).push({ amount: line.amount, unit: item.unit })
@@ -136,11 +146,13 @@ export default function SWCBReportPage() {
     sites.added(added)
     if (empty) writeDescription([...sites.rows, ...added])
     sources.reload()
+    geometry.reload()
   }
 
   const handleSiteRemoved = (siteId) => {
     sites.removed(siteId)
     sources.reload()
+    geometry.reload()
   }
 
   const handleActivityChange = (row, field, value) => {

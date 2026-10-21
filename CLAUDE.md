@@ -846,9 +846,12 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     Under the sketch area, **Pay Items Reported** (`PayItemsReportedSection`, Slice V5), read-only: each pay item IDRs
     report on the site (`getPropertyPayItemSummary`), its total and unit, its IDR count ("1 IDR", "3 IDRs"; W2) expanding to "IDR-005 ·
     10/20/26 · 40 SF · Jane Doe" lines, newest first, each number linking to its IDR ("Draft" without one, "(in
-    progress)" before approval). Above it, opened with `?idrId=&reportId=`, the site's pay items for that IDR
-    (`SitePayItemsPanel`, W3; with or without a PIR; see Imported sites); a change there reads Pay Items Reported again
-    (its `refreshKey`).
+    progress)" before approval). Opened with `?idrId=&reportId=` instead, the site's pay items for that IDR
+    (`SitePayItemsPanel`, W3; with or without a PIR; see Imported sites), and under it, in place of Pay Items Reported, a
+    footer "Previously reported in other IDRs" (Slice X; the same component with `otherThanIdrId`, with or without a
+    PIR): folded to start (`FoldingPanel`), only the other IDRs' entries (`otherIdrsItems`: an item's total summed again
+    from them, an item left with none dropped), and nothing at all unless another IDR has one. A change in the table
+    above reads either again (its `refreshKey`).
     - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
       the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
       Each page shows at its rotation in the sketch workspace (`SketchWorkspace`; see Flags) with "Scale: 15 px/ft"
@@ -1110,19 +1113,27 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     (`updated_by_name`, `updated_at`), else who added it (`added_by_name`, `added_at`); `lastUpdated` in
     `ImportedSitesSection`.
   - **Site pay items (Slice V1; moved by W3 and W4):** the row's Pay items column is a summary, read-only (W4,
-    `payItemSummary` from the totals' `site_lines`): "3 items · 120 SF" when they share a unit, "3 items" when not, "—"
-    for none. They are entered on the site's own page, which the site's link opens with the IDR's context
+    `payItemSummary`): the site's rows as its own page's table has them (Slice X), what its flags, then its curb
+    segments, come to for this IDR (`siteGeometryRows` over `lib/useIdrGeometry.js`, the IDR's attributed flags and segments,
+    read once and again after a site is imported or removed), then the pay items entered on it (the totals'
+    `site_lines`). "3 items · 180 SF · 20 LF · 1 EA": the row count, then the total per unit in the order the units first
+    appear; "1 item · 40 SF"; "—" for none. They are entered on the site's own page, which the site's link opens with the IDR's context
     (`sitePagePath`: a sidewalk's PIR workspace, a ped ramp's site page, `?returnTo=&idrId=&reportId=`), in
-    `SitePayItemsEditor`: the site's pay items (`listSitePayItems`), and where editable a contract-item picker,
-    quantity (above 0) and note to add one (`addSitePayItem`), the quantity and note saved on blur
-    (`updateSitePayItem`) and Remove (`removeSitePayItem`); `services/reportSitePayItems.js`. Not checked against the
+    `SitePayItemsEditor`: the site's pay items (`listSitePayItems`), and where editable a "+ Add pay item" row
+    (contract-item picker, quantity above 0, note; `addSitePayItem`), the quantity and note saved on blur
+    (`updateSitePayItem`) and Delete (`removeSitePayItem`); `services/reportSitePayItems.js`. Not checked against the
     site's flags; the backend refuses a report save holding by hand a pay item a site holds (400 naming the sites).
-  - **On the site's own page (Slice W3):** `SitePayItemsPanel`, "Pay items (this IDR: IDR-005)" ("Draft" without a
-    number), on the PIR workspace of a sidewalk (a PIR or not) and the site page of a ped ramp, only when opened with
+  - **On the site's own page (Slice W3; one table since Slice X):** `SitePayItemsPanel`, "Pay items for this site" under
+    "This IDR: IDR-005" ("Draft" without a number), on the PIR workspace of a sidewalk (a PIR or not) and the site page of a ped ramp, only when opened with
     `?idrId=&reportId=` (`readIdrContext`). It reads the IDR, the report's sites (the one on this property; "This site
     isn't imported into that report." otherwise), the project's contract items and the IDR's attributed flags and
-    segments; first, read-only, what the site's flags and segments come to (`siteGeometryRows`: attributed, or claimed
-    once approved, with an amount, per item number and budget code, "1 flag, 2 segments"), then `SitePayItemsEditor`.
+    segments, and shows one table (`SitePayItemsEditor`): Item · Description · Quantity · Unit · Source · Actions. First
+    the auto rows, what the site's flags and segments come to (`siteGeometryRows`: attributed, or claimed once approved,
+    with an amount, per item number and budget code), Source "auto (8 flags, 1 segment)" (`autoSourceText`), read-only
+    ("from the sketch"): a flag-derived quantity can't be overridden (no column holds an override). Then the pay items
+    entered on the site, Source "entered", the note under the description. Above the table, what another approved IDR
+    already billed here (`claimedElsewhereNote`: "8 flags and 1 curb segment here were billed by IDR-001 (10/16/26).",
+    one sentence per IDR).
     Editable for whom the backend allows (`canChangeIdrFlags`: the inspector on a draft, the stage's reviewer in review,
     an admin; never a demo user or once approved); the backend's 403 stands behind it.
   - **Pay item totals (V1):** `PayItemTotalsSection`, under Imported sites on the SWCB, display only:

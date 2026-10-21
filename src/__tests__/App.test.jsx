@@ -11,6 +11,7 @@ vi.mock('../services/api', () => ({
   getContractItems: vi.fn(),
   listReportSites: vi.fn(() => Promise.resolve([])),
   getPayItemSources: vi.fn(() => Promise.resolve({ pay_items: [] })),
+  getIdrFlags: vi.fn(() => Promise.resolve({ flags: [] })), getIdrSegments: vi.fn(() => Promise.resolve({ segments: [] })),
   getProjectsForUser: vi.fn(),
   getProjectById: vi.fn(),
   getIdr: vi.fn(),

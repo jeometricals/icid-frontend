@@ -15,8 +15,9 @@
  * (TitleBlockEditor; read-only for anyone who can't write here). Opened with `?returnTo=` (an IDR report page;
  * lib/returnTo.js), it also offers Back to report (BackToReportButton), and Back to Site carries it along.
  * Under the sketch area, opened with `?idrId=&reportId=` (an imported site's link, lib/idrSiteContext.js), the site's pay
- * items for that IDR (SitePayItemsPanel, Slice W3), shown with or without a PIR; then its Pay Items Reported
- * (PayItemsReportedSection, Slice V5): what IDRs report here, read again after a change above.
+ * items for that IDR (SitePayItemsPanel, Slice W3), shown with or without a PIR, and under it, folded, what other IDRs
+ * reported here (Slice X); without that context, its Pay Items Reported once it has a PIR (PayItemsReportedSection,
+ * Slice V5). Either is read again after a change above.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -39,6 +40,7 @@ import StatusBadge from '../components/StatusBadge'
 import Toast from '../components/Toast'
 import PayItemsReportedSection from '../components/PayItemsReportedSection'
 import SitePayItemsPanel from '../components/SitePayItemsPanel'
+import { readIdrContext } from '../lib/idrSiteContext'
 import TitleBlockEditor from '../components/TitleBlockEditor'
 import SketchWorkspace from '../components/sketch/SketchWorkspace'
 
@@ -85,6 +87,7 @@ export default function PirPage() {
   const { projectId, propertyId } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const idrContext = readIdrContext(searchParams)
   const { user } = useAuth()
   const admin = isAdmin(user)
 
@@ -370,7 +373,11 @@ export default function PirPage() {
       {/* Opened from an IDR report (?idrId=&reportId=): the site's pay items for it, a PIR or not */}
       <SitePayItemsPanel projectId={projectId} propertyId={propertyId} onChanged={() => setPayItemsChanged(n => n + 1)} />
 
-      {pir && <PayItemsReportedSection projectId={projectId} propertyId={propertyId} refreshKey={payItemsChanged} />}
+      {/* In an IDR's context, the other IDRs' entries as a folded footer (a PIR or not); otherwise Pay Items Reported */}
+      {idrContext ? (
+        <PayItemsReportedSection projectId={projectId} propertyId={propertyId} refreshKey={payItemsChanged}
+          otherThanIdrId={idrContext.idrId} />
+      ) : pir && <PayItemsReportedSection projectId={projectId} propertyId={propertyId} refreshKey={payItemsChanged} />}
 
       {dialog === 'upload' && (
         <PirUploadModal pirId={pir.id} replacing={count > 0} onUploaded={uploaded} onClose={() => setDialog(null)} />

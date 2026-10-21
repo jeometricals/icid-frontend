@@ -48,7 +48,7 @@ vi.mock('../../../services/api', () => ({
   getContractItems: vi.fn(), getIdr: vi.fn(), getProjectById: vi.fn(), saveReport: vi.fn(),
   addReport: vi.fn(), deleteReport: vi.fn(),
   listReportSites: vi.fn(), importReportSite: vi.fn(), updateReportSite: vi.fn(), removeReportSite: vi.fn(),
-  getPayItemSources: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
+  getPayItemSources: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(), listSitePayItems: vi.fn(), addSitePayItem: vi.fn(), updateSitePayItem: vi.fn(),
   removeSitePayItem: vi.fn(),
   listProperties: vi.fn(), listTaskOrders: vi.fn(), getTaskOrder: vi.fn(),
 }))
@@ -134,6 +134,9 @@ describe('Imported sites', () => {
     expect(api.importReportSite).toHaveBeenCalledWith(IDR_ID, REPORT_ID,
       { property_id: 'p-2', work_type: 'concrete', work_type_other: null })
     expect(description()).toHaveValue('Ped ramp concrete was placed at NE corner of 38 St/31 Ave.')
+    // The new site's flags and curb segments count in its Pay items summary (Slice X)
+    await waitFor(() => expect(api.getIdrFlags).toHaveBeenCalledTimes(2))
+    expect(api.getIdrSegments).toHaveBeenCalledTimes(2)
   })
 
   it("keeps a description already written, and Regenerate replaces it", async () => {
@@ -187,6 +190,7 @@ describe('Imported sites', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(screen.getByText('No sites imported yet.')).toBeInTheDocument())
     expect(api.removeReportSite).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1')
+    await waitFor(() => expect(api.getIdrFlags).toHaveBeenCalledTimes(2))
   })
 
   it('shows who last changed each site and when, else who added it', async () => {

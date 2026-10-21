@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readIdrContext, siteGeometryRows, withIdrContext } from '../idrSiteContext'
+import { autoSourceText, claimedElsewhereNote, readIdrContext, siteGeometryRows, withIdrContext } from '../idrSiteContext'
 
 const SITE = 'prop-1'
 
@@ -53,5 +53,32 @@ describe('siteGeometryRows', () => {
       flag({ amount: null })]
     expect(siteGeometryRows(flags, [segment({ amount: null })], SITE)).toEqual([])
     expect(siteGeometryRows(undefined, undefined, SITE)).toEqual([])
+  })
+})
+
+describe('autoSourceText', () => {
+  it('names the flags and segments behind an auto row', () => {
+    expect(autoSourceText({ flags: 8, segments: 0 })).toBe('auto (8 flags)')
+    expect(autoSourceText({ flags: 0, segments: 1 })).toBe('auto (1 segment)')
+    expect(autoSourceText({ flags: 8, segments: 1 })).toBe('auto (8 flags, 1 segment)')
+    expect(autoSourceText({ flags: 1, segments: 2 })).toBe('auto (1 flag, 2 segments)')
+  })
+})
+
+describe('claimedElsewhereNote', () => {
+  const billed = (by, extra = {}) => ({ state: 'claimed_elsewhere', claimed_by_idr_id: `id-${by}`, claimed_by_idr_number: by,
+    constructed_on: '2026-10-16', ...extra })
+
+  it('says what each other IDR billed on the site, by IDR', () => {
+    const flags = [...Array(8)].map(() => flag(billed('IDR-001'))).concat([flag(billed('IDR-002', { constructed_on: '2026-10-02' }))])
+    expect(claimedElsewhereNote(flags, [segment(billed('IDR-001'))], SITE)).toBe(
+      '8 flags and 1 curb segment here were billed by IDR-001 (10/16/26). 1 flag here was billed by IDR-002 (10/2/26).')
+  })
+
+  it("counts only the site's drawings claimed elsewhere; null without any", () => {
+    expect(claimedElsewhereNote([flag(), flag(billed('IDR-001', { property_id: 'other' }))], [segment({ state: 'claimed' })], SITE))
+      .toBeNull()
+    expect(claimedElsewhereNote([], [segment(billed('IDR-001')), segment(billed('IDR-001'))], SITE))
+      .toBe('2 curb segments here were billed by IDR-001 (10/16/26).')
   })
 })
