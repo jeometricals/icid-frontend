@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import PirPage from '../PirPage'
@@ -63,7 +63,8 @@ const CONTRACT_ITEMS = [
 
 // 152 23 ST: 8 flags of 22.5 SF and a 20 LF curb; 160 23 ST: 2 flags of 60 SF; 170 23 ST: a 15 LF curb
 const drawing = (propertyId, ref, description, unit, amount) => ({
-  property_id: propertyId, state: 'attributed', pay_item_ref: ref, budget_code: CODE, pay_item_description: description,
+  property_id: propertyId, state: 'attributed',
+  pay_item_id: CONTRACT_ITEMS.find(ci => ci.item_no === ref).contract_item_id, pay_item_ref: ref, budget_code: CODE, pay_item_description: description,
   unit, amount, claimed_by_idr_id: null, claimed_by_idr_number: null, constructed_on: null,
 })
 const FLAGS = [
@@ -75,7 +76,12 @@ const SEGMENTS = [
   { ...drawing('p-3', '4.08 AA', 'Concrete curb', 'LF', 15), segment_id: 'seg-2' },
 ]
 
-let enteredOnSites // the backend's site pay items: [{site_id, ...row}]
+let enteredOnSites // the backend's site pay items: [{site_id, property_id, ...row}]
+let overrideAudit // the backend's latest override entry per site and contract item: [{site_id, contract_item_id, ...}]
+
+// A site's override for a property's pay item, if any (the backend then leaves its flags and segments out)
+const overrideFor = (propertyId, ref) =>
+  enteredOnSites.find(row => row.overrides_auto && row.property_id === propertyId && row.pay_item_ref === ref)
 
 // The totals the backend gives over every source, from the flags, segments and site pay items as they stand
 function payItemSources() {
@@ -88,13 +94,20 @@ function payItemSources() {
     }
     return items.get(key)
   }
-  for (const flag of FLAGS) { const it = item(flag.pay_item_ref, flag.pay_item_description, flag.unit); it.flags += flag.amount; it.total += flag.amount }
-  for (const seg of SEGMENTS) { const it = item(seg.pay_item_ref, seg.pay_item_description, seg.unit); it.segments += seg.amount; it.total += seg.amount }
+  for (const flag of FLAGS) {
+    if (overrideFor(flag.property_id, flag.pay_item_ref)) continue
+    const it = item(flag.pay_item_ref, flag.pay_item_description, flag.unit); it.flags += flag.amount; it.total += flag.amount
+  }
+  for (const seg of SEGMENTS) {
+    if (overrideFor(seg.property_id, seg.pay_item_ref)) continue
+    const it = item(seg.pay_item_ref, seg.pay_item_description, seg.unit); it.segments += seg.amount; it.total += seg.amount
+  }
   for (const row of enteredOnSites) {
     const it = item(row.pay_item_ref, row.description, row.unit)
     it.sites += row.quantity
     it.total += row.quantity
-    it.site_lines.push({ amount: row.quantity, report_id: REPORT_ID, site_id: row.site_id, property_id: 'p-1', label: '152 23 ST' })
+    it.site_lines.push({ amount: row.quantity, report_id: REPORT_ID, site_id: row.site_id, property_id: row.property_id,
+      label: '152 23 ST', overrides_auto: row.overrides_auto })
   }
   return { pay_items: [...items.values()] }
 }
@@ -102,6 +115,7 @@ function payItemSources() {
 beforeEach(() => {
   vi.clearAllMocks()
   enteredOnSites = []
+  overrideAudit = []
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: TEST_USER })
 
   api.getIdr.mockResolvedValue({
@@ -114,14 +128,30 @@ beforeEach(() => {
   api.getIdrFlags.mockImplementation(async () => ({ flags: structuredClone(FLAGS) }))
   api.getIdrSegments.mockImplementation(async () => ({ segments: structuredClone(SEGMENTS) }))
   api.listReportSites.mockResolvedValue([site(SITE_152), site(SITE_160), site(SITE_170)])
-  api.listSitePayItems.mockImplementation(async (_i, _r, siteId) => enteredOnSites.filter(row => row.site_id === siteId))
+  api.listSitePayItems.mockImplementation(async (_i, _r, siteId) => ({
+    rows: structuredClone(enteredOnSites.filter(row => row.site_id === siteId)),
+    audit: overrideAudit.filter(entry => entry.site_id === siteId),
+  }))
   api.addSitePayItem.mockImplementation(async (_i, _r, siteId, body) => {
     const item = CONTRACT_ITEMS.find(ci => ci.contract_item_id === body.contract_item_id)
-    const row = { id: `spi-${enteredOnSites.length + 1}`, site_id: siteId, contract_item_id: item.contract_item_id,
-      quantity: Number(body.quantity), note: body.note, pay_item_ref: item.item_no, budget_code: item.budget_code,
+    const row = { id: `spi-${enteredOnSites.length + 1}`, site_id: siteId, property_id: siteId.slice(2),
+      contract_item_id: item.contract_item_id, quantity: Number(body.quantity), note: body.note,
+      overrides_auto: body.overrides_auto ?? false, pay_item_ref: item.item_no, budget_code: item.budget_code,
       description: item.description, unit: item.pay_unit }
     enteredOnSites.push(row)
+    if (row.overrides_auto) {
+      overrideAudit.push({ site_id: siteId, contract_item_id: item.contract_item_id, action: 'site_override_set',
+        text: `overrode auto 180 SF → ${row.quantity} SF`, at: '2026-10-21T14:05:00', actor_name: 'Jane Doe' })
+    }
     return row
+  })
+  api.removeSitePayItem.mockImplementation(async (_i, _r, siteId, itemId) => {
+    const row = enteredOnSites.find(r => r.id === itemId)
+    enteredOnSites = enteredOnSites.filter(r => r.id !== itemId)
+    if (row.overrides_auto) {
+      overrideAudit = [{ site_id: siteId, contract_item_id: row.contract_item_id, action: 'site_override_reset',
+        text: 'reset to auto (180 SF)', at: '2026-10-21T14:10:00', actor_name: 'Jane Doe' }]
+    }
   })
   api.getPayItemSources.mockImplementation(async () => payItemSources())
 
@@ -165,9 +195,10 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
     const table = await within(section).findByRole('table', { name: 'Pay items for this site' })
     const bodyRows = () => within(table).getAllByRole('row').slice(1, -1) // less the heads and the add row
     expect(bodyRows().map(row => row.textContent)).toEqual([
-      '4.08 AA (HW-200(S))Concrete curb20LFauto (1 segment)from the sketch',
-      '4.13 AAS (HW-200(S))4in sidewalk180SFauto (8 flags)from the sketch',
+      '4.08 AA (HW-200(S))Concrete curbLFauto (1 segment)Auto Calculate',
+      '4.13 AAS (HW-200(S))4in sidewalkSFauto (8 flags)Auto Calculate',
     ])
+    expect(within(table).getByLabelText('Auto quantity of 4.13 AAS')).toHaveValue(180)
 
     // (b) A pay item entered by hand: MTP, 1 EA
     await user.selectOptions(within(table).getByLabelText('Pay item'), 'ci-mtp')
@@ -175,6 +206,7 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
     await user.click(within(table).getByRole('button', { name: '+ Add pay item' }))
     await waitFor(() => expect(api.addSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1',
       { contract_item_id: 'ci-mtp', quantity: '1', note: null }))
+    expect(enteredOnSites.at(-1).overrides_auto).toBe(false)
     const entered = await within(table).findByLabelText('Quantity of 6.70 AB')
     expect(entered).toHaveValue(1)
     const row = entered.closest('tr')
@@ -197,4 +229,62 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
     expect(siteRows.map(r => [0, 2, 3].map(n => r.querySelectorAll('td')[n].textContent).join(' ')).sort())
       .toEqual(['4.08 AA 35 LF', '4.13 AAS 300 SF', '6.70 AB 1 EA'])
   })
+
+  it("overrides 152 23 ST's 180 SF with 185 SF, which the SWCB shows; Auto Calculate takes it back to 180 (Slice X.1)",
+    async () => {
+      const user = userEvent.setup()
+      const workspace = `/project/HWS0023/properties/p-1/pir?returnTo=${encodeURIComponent(REPORT_URL)}`
+        + `&idrId=${IDR_ID}&reportId=${REPORT_ID}`
+      const swcbShows = async (sidewalk, total) => {
+        const swcb = renderAt(REPORT_URL)
+        await waitFor(() => expect(screen.getByTestId('site-pay-items-s-p-1'))
+          .toHaveTextContent(`2 items · ${sidewalk} SF · 20 LF`))
+        const totals = screen.getByRole('heading', { name: 'Pay item totals' }).closest('.form-section')
+        await waitFor(() => {
+          const first = within(within(totals).getByRole('table')).getAllByRole('row')[1].querySelectorAll('td')
+          expect(`${first[0].textContent} ${first[3].textContent}`).toBe(`4.13 AAS ${total} SF`)
+        })
+        const card = screen.getByRole('table', { name: 'Pay items from imported sites' })
+        const sidewalkRow = within(card).getAllByRole('row').slice(1)
+          .find(r => r.querySelectorAll('td')[0].textContent === '4.13 AAS')
+        expect(sidewalkRow.querySelectorAll('td')[2].textContent).toBe(String(total))
+        expect(sidewalkRow).toHaveTextContent(`152 23 ST (${sidewalk})`)
+        swcb.unmount()
+      }
+
+      // (a) On its PIR workspace, 180 → 185: an override
+      let view = renderAt(workspace)
+      const section = await screen.findByRole('region', { name: 'Pay items for this site' })
+      const box = await within(section).findByLabelText('Auto quantity of 4.13 AAS')
+      expect(box).toHaveValue(180)
+      await user.clear(box)
+      await user.type(box, '185')
+      await user.tab()
+      await waitFor(() => expect(api.addSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1',
+        { contract_item_id: 'ci-sw', quantity: '185', note: null, overrides_auto: true }))
+      expect(await within(section).findByText('auto (8 flags) · edited')).toBeInTheDocument()
+      expect(within(section).getByText('originally 180 SF')).toBeInTheDocument()
+      expect(within(section).getByText(/^overrode auto 180 SF → 185 SF · Jane Doe · 10\/21\/26 2:05 PM$/))
+        .toBeInTheDocument()
+      expect(within(section).queryByText('entered')).not.toBeInTheDocument()
+      view.unmount()
+
+      // (b) The SWCB: 185 in 152's summary, the totals and the Pay Items card (185 + 160's 120)
+      await swcbShows(185, 305)
+
+      // (c) Auto Calculate on the workspace drops it
+      view = renderAt(workspace)
+      const again = await screen.findByRole('region', { name: 'Pay items for this site' })
+      expect(await within(again).findByLabelText('Auto quantity of 4.13 AAS')).toHaveValue(185)
+      fireEvent.click(within(within(again).getByLabelText('Auto quantity of 4.13 AAS').closest('tr'))
+        .getByRole('button', { name: 'Auto Calculate' }))
+      await waitFor(() => expect(api.removeSitePayItem).toHaveBeenCalledWith(IDR_ID, REPORT_ID, 's-p-1', 'spi-1'))
+      await waitFor(() => expect(within(again).getByLabelText('Auto quantity of 4.13 AAS')).toHaveValue(180))
+      expect(within(again).queryByText(/· edited/)).not.toBeInTheDocument()
+      expect(within(again).getByText(/^reset to auto \(180 SF\)/)).toBeInTheDocument()
+      view.unmount()
+
+      // (d) The SWCB is back to 180
+      await swcbShows(180, 300)
+    })
 })

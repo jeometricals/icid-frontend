@@ -42,7 +42,8 @@ const COUNTING = new Set(['attributed', 'claimed'])
 /**
  * Sums what one site's flags and curb segments come to for an IDR, per pay item, from its attributed-flags and
  * attributed-segments responses. Only counting ones on the property with an amount in their pay item's unit add.
- * Returns [{key, pay_item_ref, budget_code, description, unit, amount, flags, segments}], by item number then budget code.
+ * Returns [{key, pay_item_id (the contract item's id), pay_item_ref, budget_code, description, unit, amount, flags,
+ * segments}], by item number then budget code.
  */
 export function siteGeometryRows(flags, segments, propertyId) {
   const rows = new Map()
@@ -50,7 +51,8 @@ export function siteGeometryRows(flags, segments, propertyId) {
     if (drawing.property_id !== propertyId || !COUNTING.has(drawing.state) || drawing.amount == null) return
     const key = `${drawing.pay_item_ref ?? ''}|${drawing.budget_code ?? ''}`
     const row = rows.get(key) ?? {
-      key, pay_item_ref: drawing.pay_item_ref, budget_code: drawing.budget_code,
+      key, pay_item_id: drawing.pay_item_id ?? null, pay_item_ref: drawing.pay_item_ref,
+      budget_code: drawing.budget_code,
       description: drawing.pay_item_description, unit: drawing.unit, amount: 0, flags: 0, segments: 0,
     }
     row.amount += Number(drawing.amount)

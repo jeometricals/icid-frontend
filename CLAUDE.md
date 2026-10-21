@@ -21,7 +21,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - `src/lib/` — third-party client setup and small utilities. Holds `reportData.js` (shared form-state helpers), `personName.js` (the name to show for a user), `useReportForm.js` (the hook every report page uses for load/save/state), `reviewRoles.js` (which review queues and actions a user gets), `fieldEdits.js` (reading an IDR's edit history: one field's chain, pay-item paths, "revised after return"), `useReviewEditing.js` (whether the user may edit, edit mode, the edit calls), `listOrigin.js` (which list opened an IDR, carried in router state), `returnTo.js` (`readReturnTo` and `withReturnTo`: the IDR report page a site page or its PIR workspace was opened from, in `?returnTo=`), `idrSiteContext.js` (`readIdrContext` and `withIdrContext`: the IDR and report a site page or its PIR workspace was opened from, in `?idrId=&reportId=`, and `siteGeometryRows`: what a site's flags and curb segments come to for that IDR; see Imported sites), `shortDate.js` ("Sep 14" for the admin tables), `formErrors.js` (a failed admin form save split into per-field and general messages), `taskOrders.js` (a task order's delete / un-delete wording and "24 properties"), `properties.js` (a property's, and `siteName`: what a site is called in dialogs and toasts), `pirs.js` (a PIR's, `pirStatus` and `pirStatusFromApi`), `flags.js` (a new flag's defaults, `newFlagValues`, and the thickness colours), `flagGeometry.js` (a flag's outline on its page, in page pixels), `flagGroups.js` (how the sketch dresses a page's flags: each one's fill, the "4\" Conc." / "7\" Conc." runs and the areas' A-labels), `pageGeometry.js` (a PIR page's size on screen at its rotation, and `toNativeCoords`: a pointer's place in the page's native pixels; see PIR pages), `flagArea.js` (a flag's area from its shape, as the backend computes it, and "42.50 SF"), `useUserNames.js` (names for the user ids a page shows: the admin's user list for an admin, the members' list for anyone else, none for a demo user), `payItemFormat.js` (how the pay-item pages, the admin's and Progress, print a quantity, dollars, a unit price and a percent, and `formatFlagQuantity`: a flag quantity to two decimals), `idrFlags.js` (an IDR's flags as the pages word them: a flag's site, amount and sketch link, who may exclude or include one, the claim and release sentences; see IDR flags) and `signatureImage.js` (crops a drawn signature to its ink and turns it into the PNG that is uploaded). Also contains the legacy `supabase.js` — see Known technical debt.
 - `src/data/` — static/mock data (report type definitions, `disciplines.js`: the discipline names the archive filters by, and `propertyTypes.js`: the three property types and their labels, `propertyKinds.js`: the two kinds of site, the boroughs, quadrants and ramp types, with `facingStreetName` and `withoutLeadingZeros`, and `flagEnums.js`: a flag's shapes, marks, non-assessable reasons and thicknesses with their labels, and `dspForm.js`: the Daily Site Patrol's checklist items and questions, its blank `report_data` and its save check).
 - `src/test/` — global Vitest + React Testing Library setup (`setup.js`) and shared test helpers: `mockFetch.js`, `users.js` (`TEST_USER`, `DEMO_USER` and `sessionFor`, shaped as the backend returns them), `contractItems.js` (a `getContractItems` response fixture for the pay-item picker) `idrFlags.js` (`idrFlag` and `idrFlagsData`: a `getIdrFlags` response) and `progress.js` (progress rollups shaped on SE384's walkthrough: `PROJECT_PROGRESS`, `TASK_ORDER_PROGRESS`, `EMPTY_PROGRESS`, `progressItem`).
-- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), As-Builts & Assessments' `SidewalkAssessmentTab`, the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, `PedRampsSection` and `PedrampSiteModal`, `FoldingPanel` (a titled panel that folds), the task order list's `SiteKindBadges`, the ped ramp inspection's `PedRampPhotosSection` and As-Builts & Assessments' `PedrampInspectionReportsTab`, the property page's `RampAttributesSection`, a site's pay items for an IDR (`SitePayItemsPanel`), the admin import's `SmartPirImportForm` and `BackToReportButton` (the site page's and PIR workspace's "Back to report"; see returnTo)); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
+- `src/components/` — shared UI components (`AppLayout` and its `AppHeader` and `UserMenu`, `ProtectedRoute`, `GoToProjectButton`, modals, attachments, IDR report rows, save / submit controls, and the review pieces: `ReviewToolbar`, `AcceptStage1Modal`, `ReturnCommentModal`, `ReturnNotice`, `StatusBadge`, `IDRNumberBadge`, `IdrTable`, the archive's `ArchiveFilters`, the Progress page's `BudgetCodeCard`, `Bar` and `ProjectFlagProgress`, the flag-progress pieces both Progress views share (`FlagProgressTable`, `UnmappedFlagsNote`) and the task order page's `TaskOrderProgress`, `DownloadFileButton` (the Construction Reports' and the Assessment Summary's downloads), As-Builts & Assessments' `SidewalkAssessmentTab`, the PIR workspace's `TitleBlockEditor`, and the admin pay-items page's `AssessmentRatesCard`, Site Info's `SiteSection`, `PedRampsSection` and `PedrampSiteModal`, `FoldingPanel` (a titled panel that folds), the task order list's `SiteKindBadges`, the ped ramp inspection's `PedRampPhotosSection` and As-Builts & Assessments' `PedrampInspectionReportsTab`, the property page's `RampAttributesSection`, a site's pay items for an IDR (`SitePayItemsPanel`), the admin import's `SmartPirImportForm` and `BackToReportButton` (the site page's and PIR workspace's "Back to report"; see returnTo)); `src/components/sketch/` holds the PIR sketch workspace (`SketchWorkspace`, `SketchCanvas`, `RotatedPage`, `ShapeToolbar`, `FlagPanel`, `CalibrateControl`, `FlagsFallbackList`, `SegmentsTable`, and for the Smart PIR drawings `SketchPatterns`, `FeatureGlyph`, `SketchLegend`; see PIR pages and Smart PIR drawings); `src/components/reports/` holds the report-form sections (including `PayItemsSection` and its catalog `PayItemPicker`), the report page shell and the addendums section.
 - Tests live beside the code in `__tests__/` folders (`src/pages/__tests__/`, `src/services/__tests__/`, …).
 
 ## Modularity rules
@@ -920,7 +920,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     `onImageError`; keyed by the page ids, so a new upload reads afresh): reads `listFlags` and `getContractItems`
     once, with the Smart PIR drawings (see Smart PIR drawings). Above the page, `ShapeToolbar`, `CalibrateControl`
     and the coming tool (Auto-detect with AI); then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
-    shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`.
+    shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`, then
+    `SegmentsTable`.
     - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc) and the thickness
       legend. Picking one arms it (the cursor is a crosshair over the page) until it is picked again or Esc. Off
       without a scale ("Set this page's scale (or calibrate) to draw flags.") or while calibrating.
@@ -954,6 +955,11 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       then display order: Page, #, Shape, Thickness, Pay item ("item no — description", "—" for none, "Not in the
       catalog"), Area (computed), Reported. Clicking a row (or Enter) goes to its page (`?page=`) and selects it.
       No flags reads "No flags yet."
+    - **`SegmentsTable`** (Slice X.1): "Curb segments", every live segment of the PIR (`listPirSegments`, already read),
+      read-only, by page then as listed: Page, Segment # (1..n), Shape (`segmentTypeLabel`: Concrete curb, Depressed
+      concrete curb, ...), Dimensions ("34.25 ft · 3 runs", the runs being `points.length - 1`; "no scale" while
+      `length_ft` is null), Pay item (as the flags', from the contract items) and Derived quantity ("34.25 LF" when the
+      pay item's unit is LF, periods and capitals aside, and there is a length; else "—"). Not shown without segments.
   - **`ContractItemPicker`** (`items`, `value`, `onChange`): the picked contract item as "item no — description"
     with Change and Clear, or "No pay item" with Choose. Choose opens a panel with a search box (item no. or
     description, any case) and one entry per contract item, its budget code beside it: `pay_item_id` is a
@@ -1119,9 +1125,13 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     segments, come to for this IDR (`siteGeometryRows` over `lib/useIdrGeometry.js` through `lib/useReportSitePayItems.js`, the IDR's attributed flags and segments,
     read once and again after a site is imported or removed), then the pay items entered on it (the totals'
     `site_lines`). "3 items · 180 SF · 20 LF · 1 EA": the row count, then the total per unit in the order the units first
-    appear; "1 item · 40 SF"; "—" for none. They are entered on the site's own page, which the site's link opens with the IDR's context
+    appear; "1 item · 40 SF"; "—" for none. A site line that `overrides_auto` (Slice X.1) replaces the auto row of the
+    same item number and budget code instead of adding (185 SF over 180 SF reads 185 SF, not 365); without an auto row
+    it counts as it stands. They are entered on the site's own page, which the site's link opens with the IDR's context
     (`sitePagePath`: a sidewalk's PIR workspace, a ped ramp's site page, `?returnTo=&idrId=&reportId=`), in
-    `SitePayItemsEditor`: the site's pay items (`listSitePayItems`), and where editable a "+ Add pay item" row
+    `SitePayItemsEditor`: the site's pay items (`listSitePayItems`, which answers `{rows, audit}`: the rows, overrides
+    included, and the latest override entry per contract item, `{contract_item_id, action, text, at, actor_name}`), and
+    where editable a "+ Add pay item" row
     (contract-item picker, quantity above 0, note; `addSitePayItem`), the quantity and note saved on blur
     (`updateSitePayItem`) and Delete (`removeSitePayItem`); `services/reportSitePayItems.js`. Not checked against the
     site's flags; the backend refuses a report save holding by hand a pay item a site holds (400 naming the sites).
@@ -1131,9 +1141,20 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     isn't imported into that report." otherwise), the project's contract items and the IDR's attributed flags and
     segments, and shows one table (`SitePayItemsEditor`): Item · Description · Quantity · Unit · Source · Actions. First
     the auto rows, what the site's flags and segments come to (`siteGeometryRows`: attributed, or claimed once approved,
-    with an amount, per item number and budget code), Source "auto (8 flags, 1 segment)" (`autoSourceText`), read-only
-    ("from the sketch"): a flag-derived quantity can't be overridden (no column holds an override). Then the pay items
-    entered on the site, Source "entered", the note under the description. Above the table, what another approved IDR
+    with an amount, per item number and budget code, each carrying its contract item's `pay_item_id`), Source "auto (8
+    flags, 1 segment)" (`autoSourceText`).
+    - **Overrides (Slice X.1):** where editable an auto row's quantity is a box ("Auto quantity of 4.13 AAS"); a changed
+      value (0 or more, higher or lower; a negative or a blank is refused here) saved on blur becomes the site's
+      override for that contract item: POSTed `{contract_item_id, quantity, note: null, overrides_auto: true}` the first
+      time, its quantity PATCHed after. It replaces what the flags and segments come to for that pay item in this IDR.
+      Every auto row has "Auto Calculate": it DELETEs the override, if any, re-reads the IDR's attributed flags and
+      segments (the panel's `onReloadAuto`) and shows what they come to. An overridden row shows the override in the
+      box, Source "auto (8 flags) · edited" and "originally 180 SF" (the auto amount now) under it; under any auto row,
+      muted, the latest override entry for its contract item (`auditLine`: "overrode auto 180 SF → 185 SF · Jane Doe ·
+      10/21/26 2:05 PM"). Read-only, the quantity is text and the Actions cell reads "from the sketch".
+    - Then the pay items entered on the site, Source "entered", the note under the description. An override isn't
+      listed there (it lives in its auto row), unless its pay item has no auto row left (its flags removed): then it is
+      listed with Source "override (no flags left)", its quantity (0 or more) and Delete, so it isn't lost silently. Above the table, what another approved IDR
     already billed here (`claimedElsewhereNote`: "8 flags and 1 curb segment here were billed by IDR-001 (10/16/26).",
     one sentence per IDR).
     Editable for whom the backend allows (`canChangeIdrFlags`: the inspector on a draft, the stage's reviewer in review,
@@ -1144,7 +1165,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     report's own (as saved), each expanding ("Source breakdown") to its sources, the sites named.
   - **Pay Items card on the SWCB (Slice X):** `PayItemsSection`'s `siteRows` opens it with "From imported sites"
     (`SitePayItemRows`), read-only: each pay item summed over the report's sites' flags, curb segments and entered pay
-    items (`useReportSitePayItems`' `siteRows`), its sites named (with each one's part when several), each linking to its
+    items (`useReportSitePayItems`' `siteRows`; a site's override replaces its auto amount, as in the summary), its sites named (with each one's part when several), each linking to its
     page in this IDR's context; then "Cross-site extras", the report's own items, editable with Add Item as before (and
     past draft the review table, under the site rows' own card). A sum is changed on its sites' pages, never here.
   - **Toggles on a read-only report:** "Source breakdown" is a `DisclosureToggle` (a span with the
