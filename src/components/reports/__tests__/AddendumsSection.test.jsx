@@ -149,6 +149,16 @@ describe('AddendumsSection — a DSP filed as an addendum before V4', () => {
   })
 })
 
+describe('AddendumsSection — on a Daily Site Patrol', () => {
+  const dspMain = { report_id: REPORT_ID, report_type: 'DSP', is_addendum: false, parent_report_id: null }
+
+  it('offers no Add addendum, and still lists one filed under it', () => {
+    renderSection({ reports: [dspMain, mix] })
+    expect(screen.queryByRole('button', { name: /add addendum/i })).not.toBeInTheDocument()
+    expect(rows().map(r => r.textContent)).toEqual([expect.stringContaining('Concrete Truck & Mix Info')])
+  })
+})
+
 describe('AddendumsSection — saving the parent before leaving', () => {
   // Stands in for useReportForm's navigateSafely: records the parent save, then runs the navigation (or not)
   const safeNav = (order, saveSucceeds = true) => vi.fn(async (action) => {

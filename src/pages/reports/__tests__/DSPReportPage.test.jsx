@@ -180,6 +180,22 @@ describe('DSPReportPage — editing and saving', () => {
   })
 })
 
+describe('DSPReportPage — attachments and addendums', () => {
+  it('shows its Attachments on a top-level DSP, for this report', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByTestId('attachments-section')).toHaveAttribute('data-report', REPORT_ID)
+  })
+
+  it('shows the Addendums card without Add addendum', async () => {
+    renderPage()
+    await loaded()
+    expect(screen.getByRole('heading', { name: 'Addendums' })).toBeInTheDocument()
+    expect(screen.getByText('No addendums yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add addendum/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('DSPReportPage — read-only', () => {
   it('disables every input once the IDR is submitted', async () => {
     api.getIdr.mockResolvedValue(parentIdr({ status: 'submitted', submitted_at: SAVED_AT }))

@@ -396,7 +396,9 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   (already added)`, disabled and titled "DSP already added to this IDR." (`DSP_TAKEN_TOOLTIP`); the backend's 409 (`This
   IDR already has a Daily Site Patrol`) shows as `Couldn't add report: ...` and the page refetches. A DSP filed as an
   addendum under U1 still lists and opens in its parent's Addendums card; one made as a main
-  report before U1 still opens and lists as before. Its `report_data` is the one the backend checks (`DspReport`; 400 otherwise):
+  report before U1 still opens and lists as before. Like every report page it has Attachments (its sketches and photos,
+  printed after DSP Fr); its Addendums card lists but has no Add addendum (W1, `addendumTypesFor`: no Conc Mix or Conc
+  Cyl under a patrol). Its `report_data` is the one the backend checks (`DspReport`; 400 otherwise):
   `{timeOfPatrol, mosChecklist, mptChecklist, fieldOrderIssued, fieldOrderNumber}`, each checklist a row per item of
   `dspForm.js` in its order (`{item, answer: 'yes' | 'no' | 'na' | null, details}`); the page always saves the whole
   form. The date, day of week, I.R. No. and sheet show read-only (the export works them out). A field order issued

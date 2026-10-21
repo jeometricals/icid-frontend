@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   REPORT_TYPES, reportTypeLabel, reportTypeRoute, isAddendumType, isReportTypeAvailable, findDsp, reportPagePath,
+  addendumTypesFor,
 } from '../reportTypes'
 
 // The backend's ReportType enum, in order
@@ -60,5 +61,12 @@ describe('reportTypes', () => {
 
   it("builds a report's page path", () => {
     expect(reportPagePath('P1', 'idr-1', { report_id: 'r9', report_type: 'CONC_CYL' })).toBe('/project/P1/idr/idr-1/conc-cyl/r9')
+  })
+
+  it('gives a main report the addendum types that have a page, and a Daily Site Patrol none', () => {
+    for (const parent of ['GEN', 'SWCB', 'AC']) {
+      expect(addendumTypesFor(parent).map(t => t.code)).toEqual(['CONC_MIX', 'CONC_CYL'])
+    }
+    expect(addendumTypesFor('DSP')).toEqual([])
   })
 })
