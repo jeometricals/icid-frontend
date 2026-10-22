@@ -11,6 +11,7 @@ import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
+  updateSegment: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -392,6 +393,29 @@ describe('SketchWorkspace — features, segments and non-assessable areas', () =
     const table = screen.getByRole('table', { name: 'Curb segments' })
     expect(within(table).getAllByRole('row')).toHaveLength(3)
     expect(within(table).getAllByRole('row')[2]).toHaveTextContent(/^22Concrete curb/)
+  })
+
+  it("lets a writer report a segment's length in the table, and shows what it now counts (Slice X.2)", async () => {
+    api.updateSegment.mockImplementation(async (id, body) => ({
+      ...segment(id, 'page-1'), length_ft: 10, pay_item_id: null, reported_length_ft: body.reported_length_ft,
+      effective_length_ft: body.reported_length_ft, is_overridden: true,
+    }))
+    await renderLoaded()
+    const table = screen.getByRole('table', { name: 'Curb segments' })
+    const [first] = within(table).getAllByRole('spinbutton', { name: 'Reported length (LF)' })
+    await userEvent.type(first, '12.5')
+    await userEvent.tab()
+    await waitFor(() => expect(api.updateSegment).toHaveBeenCalledWith('sg-1', { reported_length_ft: 12.5 }))
+    expect(await within(table).findByRole('button', { name: 'Clear override' })).toBeInTheDocument()
+    expect(within(table).getAllByRole('spinbutton', { name: 'Reported length (LF)' })[0]).toHaveValue(12.5)
+  })
+
+  it('shows reported lengths read-only to a reader', async () => {
+    api.listPirSegments.mockResolvedValue([{ ...segment('sg-1', 'page-1'), reported_length_ft: 7 }])
+    await renderLoaded({ writer: false })
+    const table = screen.getByRole('table', { name: 'Curb segments' })
+    expect(within(table).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('7.00 LF')
   })
 
   it('has no Curb segments table without segments', async () => {
