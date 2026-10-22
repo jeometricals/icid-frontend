@@ -3,14 +3,17 @@ import { Plus } from 'lucide-react'
 import { DSP_TAKEN_TOOLTIP, REPORT_TYPES, isAddendumType, isReportTypeAvailable } from '../data/reportTypes'
 
 /**
- * Report-type dropdown (every main report type; ones without a form page yet are "coming soon") plus Add button.
+ * Report-type dropdown (every main report type; ones without a form page yet are "coming soon") plus Add button. It
+ * starts on "Choose a report type…", so nothing (a General included) is added until the inspector picks a type.
  * Addendum types are left out: they're added from their parent report's page.
  * Props: onAdd(reportType), adding (an add is running), disabled (another action is running),
  * generalExists (the IDR already has its one main General, so that option is unavailable),
  * dspExists (the IDR already has its one Daily Site Patrol, addendum or not, so that option is unavailable).
  */
+export const CHOOSE_REPORT_TYPE = 'Choose a report type…'
+
 export default function AddReportControl({ onAdd, adding, disabled, generalExists, dspExists = false }) {
-  const [reportType, setReportType] = useState('GEN')
+  const [reportType, setReportType] = useState('')
   const optionSuffix = code => {
     if (!isReportTypeAvailable(code)) return ' (coming soon)'
     if (code === 'GEN' && generalExists) return ' (already added)'
@@ -18,7 +21,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
     return ''
   }
   const optionTitle = code => (code === 'DSP' && dspExists ? DSP_TAKEN_TOOLTIP : undefined)
-  const canAdd = optionSuffix(reportType) === '' && !adding && !disabled
+  const canAdd = reportType !== '' && optionSuffix(reportType) === '' && !adding && !disabled
   const mainReportTypes = REPORT_TYPES.filter(({ code }) => !isAddendumType(code))
 
   return (
@@ -30,6 +33,7 @@ export default function AddReportControl({ onAdd, adding, disabled, generalExist
         value={reportType}
         onChange={e => setReportType(e.target.value)}
       >
+        <option value="" disabled>{CHOOSE_REPORT_TYPE}</option>
         {mainReportTypes.map(({ code, label }) => (
           <option key={code} value={code} disabled={optionSuffix(code) !== ''} title={optionTitle(code)}>
             {label}{optionSuffix(code)}
