@@ -956,10 +956,17 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       catalog"), Area (computed), Reported. Clicking a row (or Enter) goes to its page (`?page=`) and selects it.
       No flags reads "No flags yet."
     - **`SegmentsTable`** (Slice X.1): "Curb segments", every live segment of the PIR (`listPirSegments`, already read),
-      read-only, by page then as listed: Page, Segment # (1..n), Shape (`segmentTypeLabel`: Concrete curb, Depressed
-      concrete curb, ...), Dimensions ("34.25 ft · 3 runs", the runs being `points.length - 1`; "no scale" while
-      `length_ft` is null), Pay item (as the flags', from the contract items) and Derived quantity ("34.25 LF" when the
-      pay item's unit is LF, periods and capitals aside, and there is a length; else "—"). Not shown without segments.
+      by page then as listed: Page, Segment # (1..n), Shape (`segmentTypeLabel`: Concrete curb, Depressed concrete
+      curb, ...), Dimensions ("34.25 ft · 3 runs" as drawn, the runs being `points.length - 1`; "no scale" while
+      `length_ft` is null), Pay item (as the flags', from the contract items), Reported (LF) and Derived quantity
+      ("34.25 LF" when the pay item's unit is LF, periods and capitals aside, and there is a length, the reported one
+      over the drawn; else "—"). Not shown without segments.
+      - **Reported (Slice X.2)**, as a flag's "Reported quantity" with "Clear override": a writer types a reported
+        length (0 or more; placeholder "Same as drawn"), saved when the input loses focus or on Enter through
+        `updateSegment(segmentId, {reported_length_ft})` (`services/segments.js`, the segment's PATCH; blank or "Clear
+        override" sends null, which reverts to the drawn length and clears its reason). Below 0 isn't sent; a refusal
+        shows under the input. The saved segment replaces its row in the workspace (`onSaved`). A reader sees the
+        reported length or "—". What bills is the reported length, unless the site overrides the pay item (X.1).
   - **`ContractItemPicker`** (`items`, `value`, `onChange`): the picked contract item as "item no — description"
     with Change and Clear, or "No pay item" with Choose. Choose opens a panel with a search box (item no. or
     description, any case) and one entry per contract item, its budget code beside it: `pay_item_id` is a
@@ -971,8 +978,8 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
 - **Smart PIR drawings (R1e.1).** What else migration 034 lets a PIR's page carry, drawn on the sketch: a flag's
   non-assessable areas, features and curb segments, each flag's defect codes and the DOT report's fills and labels.
   **Rendering only:** nothing here is edited in the UI yet (R1e.2), only imported.
-  - **Services** (reading only): `listPirFeatures(pirId)` (`services/features.js`) and `listPirSegments(pirId)`
-    (`services/segments.js`), each the PIR's live ones on its live pages; `listFlagNonAssessableAreas(flagId)`
+  - **Services** (reading, but a segment's reported length): `listPirFeatures(pirId)` (`services/features.js`) and
+    `listPirSegments(pirId)` (`services/segments.js`, with `updateSegment` for the Reported column), each the PIR's live ones on its live pages; `listFlagNonAssessableAreas(flagId)`
     (`services/nonAssessableAreas.js`). There is no list of areas per PIR, so `SketchWorkspace` asks only each flag
     whose `non_assessable_areas_count` is above 0, and a failure of any of these is the workspace's load error. A
     feature is `{feature_id, pir_page_id, feature_type, area_impact (marker_only, subtract, sits_on_top),
