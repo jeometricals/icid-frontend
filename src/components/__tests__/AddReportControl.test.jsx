@@ -12,7 +12,7 @@ function renderControl(props = {}) {
 describe('AddReportControl', () => {
   it('lists the 16 main report types, with only General, SWCB, AC and Daily Site Patrol enabled and the rest "coming soon"', () => {
     renderControl()
-    const options = screen.getAllByRole('option')
+    const options = screen.getAllByRole('option').filter(o => o.value !== '')
     expect(options).toHaveLength(16)
     const available = ['General', 'Sidewalk, Curb, Concrete Base', 'Asphaltic Concrete', 'Daily Site Patrol']
     for (const option of options) {
@@ -40,14 +40,18 @@ describe('AddReportControl', () => {
     expect(screen.getByRole('option', { name: 'Water Main (Sheet 1) (coming soon)' })).toBeInTheDocument()
   })
 
-  it('starts on General', () => {
+  it('starts on "Choose a report type…", which can\'t be picked, with Add disabled', () => {
     renderControl()
-    expect(screen.getByLabelText('Add report')).toHaveValue('GEN')
+    expect(screen.getByLabelText('Add report')).toHaveValue('')
+    expect(screen.getByRole('option', { name: 'Choose a report type…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /add/i })).toBeDisabled()
   })
 
-  it('adds the selected type', async () => {
+  it('adds a General only once it is picked', async () => {
     const onAdd = renderControl()
-    await userEvent.setup().click(screen.getByRole('button', { name: /add/i }))
+    const user = userEvent.setup()
+    await user.selectOptions(screen.getByLabelText('Add report'), 'GEN')
+    await user.click(screen.getByRole('button', { name: /add/i }))
     expect(onAdd).toHaveBeenCalledWith('GEN')
   })
 
@@ -59,10 +63,9 @@ describe('AddReportControl', () => {
     expect(onAdd).toHaveBeenCalledWith('SWCB')
   })
 
-  it('marks General unavailable and disables Add once the IDR has a General', () => {
+  it('marks General unavailable once the IDR has a General', () => {
     renderControl({ generalExists: true })
     expect(screen.getByRole('option', { name: 'General (already added)' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /add/i })).toBeDisabled()
   })
 
   it('offers a Daily Site Patrol as a top-level report', async () => {
@@ -84,16 +87,19 @@ describe('AddReportControl', () => {
     expect(option).toHaveAttribute('title', 'DSP already added to this IDR.')
     // General stays available
     expect(screen.getByRole('option', { name: 'General' })).toBeEnabled()
+    await userEvent.setup().selectOptions(screen.getByLabelText('Add report'), 'GEN')
     expect(screen.getByRole('button', { name: /add/i })).toBeEnabled()
   })
 
-  it('shows "Adding..." and disables Add while adding', () => {
+  it('shows "Adding..." and disables Add while adding', async () => {
     renderControl({ adding: true })
+    await userEvent.setup().selectOptions(screen.getByLabelText('Add report'), 'SWCB')
     expect(screen.getByRole('button', { name: /adding/i })).toBeDisabled()
   })
 
-  it('disables Add while another action is running', () => {
+  it('disables Add while another action is running', async () => {
     renderControl({ disabled: true })
+    await userEvent.setup().selectOptions(screen.getByLabelText('Add report'), 'SWCB')
     expect(screen.getByRole('button', { name: /add/i })).toBeDisabled()
   })
 })

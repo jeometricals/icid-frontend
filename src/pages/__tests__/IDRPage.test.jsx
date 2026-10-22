@@ -281,6 +281,7 @@ describe('IDRPage — reports', () => {
     await ready()
     expect(screen.getByText('No reports yet. Add one below.')).toBeInTheDocument()
 
+    await user.selectOptions(screen.getByLabelText('Add report'), 'GEN')
     await user.click(screen.getByRole('button', { name: /^add$/i }))
     expect(api.addReport).toHaveBeenCalledWith(IDR_ID, { reportType: 'GEN' })
     await waitFor(() => expect(reportRows()).toHaveLength(1))
@@ -293,6 +294,7 @@ describe('IDRPage — reports', () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
+    await user.selectOptions(screen.getByLabelText('Add report'), 'GEN')
     await user.click(screen.getByRole('button', { name: /^add$/i }))
     expect(await screen.findByText("Couldn't add report: Only draft IDRs can be edited")).toBeInTheDocument()
   })
