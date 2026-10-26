@@ -41,6 +41,7 @@ let approve
 // acceptedAt: when each stage was last accepted, as every reader of the table gets it
 function renderTable({
   payItems = [SIDEWALK, CURB], edits = [], canEdit = false, attesting = null, highlightItemId = null, acceptedAt,
+  siteRows = null,
 } = {}) {
   return render(
     <RedlineProvider
@@ -49,7 +50,7 @@ function renderTable({
         acceptedAt: acceptedAt ?? attesting?.acceptedAt,
       }}
     >
-      <PayItemsReview payItems={payItems} contractItems={MOCK_CONTRACT_ITEMS} />
+      <PayItemsReview payItems={payItems} contractItems={MOCK_CONTRACT_ITEMS} siteRows={siteRows} />
     </RedlineProvider>
   )
 }
@@ -514,5 +515,22 @@ describe('PayItemsReview — Approve', () => {
   it('drops the outline once that item is approved', () => {
     renderTable({ edits: [mine(1, 'item-2', '29.00')], attesting: REVIEWER, highlightItemId: 'item-2' })
     expect(screen.getAllByTestId('pay-item-row')[1]).not.toHaveAttribute('data-untouched')
+  })
+})
+
+describe('PayItemsReview — one card with the imported sites', () => {
+  it('shows the site rows above the review table under a single Pay Items heading', () => {
+    renderTable({ canEdit: true, siteRows: <p>Site rows here</p> })
+    expect(screen.getAllByRole('heading', { name: 'Pay Items' })).toHaveLength(1)
+    const card = screen.getByRole('heading', { name: 'Pay Items' }).closest('div.bg-white')
+    expect(within(card).getByText('Site rows here')).toBeInTheDocument()
+    expect(within(card).getByRole('heading', { name: 'Cross-site extras' })).toBeInTheDocument()
+    expect(within(card).getByRole('table')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Add Pay Item' })).toBeInTheDocument()
+  })
+
+  it('has no Cross-site extras heading without site rows', () => {
+    renderTable()
+    expect(screen.queryByRole('heading', { name: 'Cross-site extras' })).not.toBeInTheDocument()
   })
 })

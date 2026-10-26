@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import SWCBReportPage from '../SWCBReportPage'
 import * as api from '../../../services/api'
 
 // ---------------------------------------------------------------------------
-// The SWCB report's imported sites' pay-item summaries (W4) and pay-item totals (Slice V1)
+// The SWCB report's imported sites' pay-item summaries (W4)
 // ---------------------------------------------------------------------------
 
 const IDR_ID = 'idr-1'
@@ -201,38 +200,6 @@ describe("Pay Items card: the sites' pay items, read-only, above the extras (Sli
     api.getPayItemSources.mockResolvedValue({ pay_items: [] })
     renderPage()
     expect(await screen.findByText('No pay items from imported sites.')).toBeInTheDocument()
-  })
-})
-
-describe('Pay item totals', () => {
-  it('lists each pay item with its total and expands to its sources, sites named', async () => {
-    api.getPayItemSources.mockResolvedValue(SOURCES)
-    const user = userEvent.setup()
-    renderPage()
-    expect(await screen.findByText('125 SF')).toBeInTheDocument()
-    expect(screen.getByText('12.5 LS')).toBeInTheDocument()
-    const [first] = screen.getAllByRole('button', { name: 'Source breakdown' })
-    await user.click(first)
-    const list = screen.getByRole('list', { name: 'Sources of 4.01 AAS' })
-    expect(within(list).getByText('PIR flags: 100 SF')).toBeInTheDocument()
-    expect(within(list).getByText(/Imported sites: 5 SF/)).toBeInTheDocument()
-    expect(within(list).getByText('138-22 227 Street: 5 SF')).toBeInTheDocument()
-    expect(within(list).getByText('Entered on this report: 20 SF')).toBeInTheDocument()
-    expect(within(list).queryByText(/Curb segments/)).not.toBeInTheDocument()
-  })
-
-  it('expands on a read-only report too', async () => {
-    api.getIdr.mockResolvedValue(parentIdr({ status: 'submitted' }))
-    api.getPayItemSources.mockResolvedValue(SOURCES)
-    renderPage()
-    await screen.findByText('125 SF')
-    fireEvent.click(screen.getAllByRole('button', { name: 'Source breakdown' })[1])
-    expect(screen.getByRole('list', { name: 'Sources of 6.70 AB' })).toHaveTextContent('Imported sites: 12.5 LS')
-  })
-
-  it('says when there are none', async () => {
-    renderPage()
-    expect(await screen.findByText('No pay items yet.')).toBeInTheDocument()
   })
 })
 

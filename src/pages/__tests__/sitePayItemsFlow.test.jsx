@@ -10,7 +10,7 @@ import { TEST_USER } from '../../test/users'
 
 // ---------------------------------------------------------------------------
 // A site's pay items end to end (Slice X): on the site's PIR workspace opened from a draft IDR's SWCB, the one table of
-// its auto rows (flags, a curb segment) and a pay item entered by hand; then the SWCB's imported sites and totals.
+// its auto rows (flags, a curb segment) and a pay item entered by hand; then the SWCB's imported sites and its Pay Items card.
 // The backend is a mock holding the state between the two pages.
 // ---------------------------------------------------------------------------
 
@@ -215,17 +215,13 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
     expect(within(row).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     unmount()
 
-    // (c) The SWCB: 152 23 ST's summary counts its auto rows and the entered one; the totals sum the three sites
+    // (c) The SWCB: 152 23 ST's summary counts its auto rows and the entered one; the Pay Items card sums the three sites
     renderAt(REPORT_URL)
     expect(await screen.findByTestId('site-pay-items-s-p-1')).toHaveTextContent('3 items · 180 SF · 20 LF · 1 EA')
     expect(screen.getByTestId('site-pay-items-s-p-2')).toHaveTextContent('1 item · 120 SF')
     expect(screen.getByTestId('site-pay-items-s-p-3')).toHaveTextContent('1 item · 15 LF')
-    const totals = screen.getByRole('heading', { name: 'Pay item totals' }).closest('.form-section')
-    const totalRows = within(await within(totals).findByRole('table')).getAllByRole('row').slice(1)
-    expect(totalRows.map(r => r.querySelectorAll('td')[0].textContent + ' ' + r.querySelectorAll('td')[3].textContent))
-      .toEqual(['4.13 AAS 300 SF', '4.08 AA 35 LF', '6.70 AB 1 EA'])
-    // The Pay Items card mirrors them, read-only, summed over the sites
-    const siteRows = within(screen.getByRole('table', { name: 'Pay items from imported sites' })).getAllByRole('row').slice(1)
+    // The Pay Items card, read-only, summed over the sites
+    const siteRows = within(await screen.findByRole('table', { name: 'Pay items from imported sites' })).getAllByRole('row').slice(1)
     expect(siteRows.map(r => [0, 2, 3].map(n => r.querySelectorAll('td')[n].textContent).join(' ')).sort())
       .toEqual(['4.08 AA 35 LF', '4.13 AAS 300 SF', '6.70 AB 1 EA'])
   })
@@ -239,15 +235,14 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
         const swcb = renderAt(REPORT_URL)
         await waitFor(() => expect(screen.getByTestId('site-pay-items-s-p-1'))
           .toHaveTextContent(`2 items · ${sidewalk} SF · 20 LF`))
-        const totals = screen.getByRole('heading', { name: 'Pay item totals' }).closest('.form-section')
+        const card = await screen.findByRole('table', { name: 'Pay items from imported sites' })
         await waitFor(() => {
-          const first = within(within(totals).getByRole('table')).getAllByRole('row')[1].querySelectorAll('td')
-          expect(`${first[0].textContent} ${first[3].textContent}`).toBe(`4.13 AAS ${total} SF`)
+          const sidewalkRow = within(card).getAllByRole('row').slice(1)
+            .find(r => r.querySelectorAll('td')[0].textContent === '4.13 AAS')
+          expect(sidewalkRow.querySelectorAll('td')[2].textContent).toBe(String(total))
         })
-        const card = screen.getByRole('table', { name: 'Pay items from imported sites' })
         const sidewalkRow = within(card).getAllByRole('row').slice(1)
           .find(r => r.querySelectorAll('td')[0].textContent === '4.13 AAS')
-        expect(sidewalkRow.querySelectorAll('td')[2].textContent).toBe(String(total))
         expect(sidewalkRow).toHaveTextContent(`152 23 ST (${sidewalk})`)
         swcb.unmount()
       }
@@ -269,7 +264,7 @@ describe("A site's pay items, from its PIR workspace to the SWCB (Slice X)", () 
       expect(within(section).queryByText('entered')).not.toBeInTheDocument()
       view.unmount()
 
-      // (b) The SWCB: 185 in 152's summary, the totals and the Pay Items card (185 + 160's 120)
+      // (b) The SWCB: 185 in 152's summary and the Pay Items card (185 + 160's 120)
       await swcbShows(185, 305)
 
       // (c) Auto Calculate on the workspace drops it

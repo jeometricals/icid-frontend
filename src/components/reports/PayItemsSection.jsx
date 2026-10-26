@@ -10,7 +10,7 @@
  * disabled (makes the buttons and inputs natively disabled), siteRows (optional: the report's imported sites' pay items,
  * read-only (SitePayItemRows, Slice X), shown first; the editable rows are then its cross-site extras).
  * Once the IDR is past draft the table is drawn by PayItemsReview instead: read-only rows with the reviewers'
- * revisions and additions, and their Revise / Add Pay Item buttons.
+ * revisions and additions, and their Revise / Add Pay Item buttons, siteRows above it in the same card.
  */
 import { useCallback, useMemo, useRef, useState } from 'react'
 import PayItemPicker, { catalogEntries } from './PayItemPicker'
@@ -159,17 +159,7 @@ export default function PayItemsSection({
 
   // Past draft there is nothing to type here: the review table shows the items with their revisions
   if (redline && !redline.isDraft) {
-    const review = <PayItemsReview payItems={payItems} contractItems={contractItems} />
-    if (!siteRows) return review
-    return (
-      <>
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="form-section-title">Pay Items</h3>
-          {siteRows}
-        </div>
-        {review}
-      </>
-    )
+    return <PayItemsReview payItems={payItems} contractItems={contractItems} siteRows={siteRows} />
   }
 
   return (

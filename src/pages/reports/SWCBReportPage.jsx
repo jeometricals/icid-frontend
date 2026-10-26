@@ -6,7 +6,7 @@
  * and the Inspection Matrix. Its equipment rows follow the DDC form, which has no Excavator or Pavement Cutter row.
  * Its Imported sites (Slice U2) are the sites whose PIR flags and curb segments the IDR covers; the description can be
  * written from them ("Regenerate from sites", and on the first import into an empty description). Each site takes pay
- * items entered by hand, and Pay item totals sums every source per pay item (Slice V1). Each site's Pay items summary
+ * items entered by hand (Slice V1). Each site's Pay items summary
  * counts its flags' and curb segments' pay items too, and the Pay Items card opens with them summed per pay item,
  * read-only, each linking to its sites, above the report's own cross-site extras (Slice X, useReportSitePayItems).
  * Load / save / layout: useReportForm + ReportPageShell.
@@ -29,7 +29,6 @@ import ImportedSitesSection from '../../components/reports/ImportedSitesSection'
 import useReportSites from '../../lib/useReportSites'
 import useReportSitePayItems from '../../lib/useReportSitePayItems'
 import SitePayItemRows from '../../components/reports/SitePayItemRows'
-import PayItemTotalsSection from '../../components/reports/PayItemTotalsSection'
 import { descriptionFromSites } from '../../lib/reportSites'
 
 const DESCRIPTION_SUBHEADING =
@@ -187,9 +186,6 @@ export default function SWCBReportPage() {
       {/* Imported sites: their PIR flags and curb segments are the IDR's */}
       <ImportedSitesSection form={form} sites={sites} onImported={handleImported} onChanged={sites.changed}
         onRemoved={handleSiteRemoved} sitePayItems={sitePayItems} />
-
-      {/* Pay item totals: every source, per pay item */}
-      <PayItemTotalsSection sources={sources} />
 
       {/* Pay Items */}
       <PayItemsSection
