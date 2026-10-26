@@ -25,9 +25,10 @@ const CELL = 'px-4 py-2 text-sm align-top'
  * The item the backend's gate sent them here for is outlined and scrolled into view.
  * Reads the edits and the edit calls from the RedlineProvider around it.
  * Props: payItems (the report's saved pay items, each with its id), contractItems (the project's catalog, for the
- * Add Pay Item picker).
+ * Add Pay Item picker), siteRows (optional: the imported sites' pay items, shown first in the same card, the table
+ * then headed as their cross-site extras, as on a draft).
  */
-export default function PayItemsReview({ payItems, contractItems = [] }) {
+export default function PayItemsReview({ payItems, contractItems = [], siteRows = null }) {
   const redline = useRedline()
   const [revising, setRevising] = useState(null) // the item whose quantity is being revised
   const [adding, setAdding] = useState(false)
@@ -116,6 +117,8 @@ export default function PayItemsReview({ payItems, contractItems = [] }) {
           )}
         </div>
       </div>
+      {siteRows}
+      {siteRows && <h4 className="text-sm font-semibold text-gray-800 mb-1">Cross-site extras</h4>}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">

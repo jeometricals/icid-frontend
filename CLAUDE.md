@@ -1166,18 +1166,15 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     one sentence per IDR).
     Editable for whom the backend allows (`canChangeIdrFlags`: the inspector on a draft, the stage's reviewer in review,
     an admin; never a demo user or once approved); the backend's 403 stands behind it.
-  - **Pay item totals (V1):** `PayItemTotalsSection`, under Imported sites on the SWCB, display only:
-    `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site changes and
-    after a save), a row per pay item with its total over the IDR's flags, curb segments, site pay items and this
-    report's own (as saved), each expanding ("Source breakdown") to its sources, the sites named.
+  - **No Pay item totals section** (removed pre-pilot: the Pay Items card below shows the same). The SWCB still reads
+    `getPayItemSources(idrId, reportId)` (`lib/usePayItemSources.js`, reloaded after a site changes and after a save)
+    for the card's "From imported sites" rows.
   - **Pay Items card on the SWCB (Slice X):** `PayItemsSection`'s `siteRows` opens it with "From imported sites"
     (`SitePayItemRows`), read-only: each pay item summed over the report's sites' flags, curb segments and entered pay
     items (`useReportSitePayItems`' `siteRows`; a site's override replaces its auto amount, as in the summary), its sites named (with each one's part when several), each linking to its
     page in this IDR's context; then "Cross-site extras", the report's own items, editable with Add Item as before (and
-    past draft the review table, under the site rows' own card). A sum is changed on its sites' pages, never here.
-  - **Toggles on a read-only report:** "Source breakdown" is a `DisclosureToggle` (a span with the
-    button role), which the read-only page's disabled fieldset doesn't disable. user-event refuses to click inside a
-    disabled fieldset, so tests of them on a read-only report use `fireEvent.click`.
+    past draft `PayItemsReview`'s table, the site rows above it in the same card). A sum is changed on its sites' pages,
+    never here.
 - **IDR flags (R1f).** An IDR's sidewalk quantities come from the PIR flags it covers, as a live rollup, beside its
   reports' hand-entered pay items.
   - **Scope (Slice U).** An IDR covers the live flags on the sites its reports imported (see Imported sites), without
