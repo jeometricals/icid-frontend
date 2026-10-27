@@ -26,7 +26,7 @@ vi.mock('../../services/api', () => ({
   listPirPages: vi.fn(),
   listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
   listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), saveRampLabel: vi.fn(),
-  getPropertyWorkHistory: vi.fn(),
+  getPropertyWorkHistory: vi.fn(), refreshTaxMap: vi.fn(),
 }))
 vi.mock('../../components/SitePayItemsPanel', () => ({
   default: (props) => <div data-testid="site-pay-items" data-property={props.propertyId} />,
@@ -676,5 +676,32 @@ describe("PropertyPage — a site's pay items for an IDR (W3)", () => {
   it("leaves them to a sidewalk's PIR workspace", async () => {
     await renderLoaded(ADMIN, '?idrId=idr-1&reportId=rep-1')
     expect(screen.queryByTestId('site-pay-items')).not.toBeInTheDocument()
+  })
+})
+
+describe('PropertyPage: tax map frontage (Slice Y1)', () => {
+  it('shows a sidewalk its MapPLUTO frontage', async () => {
+    property = { ...property, tax_map_frontage_ft: 16.67, tax_map_source: 'mappluto_26v2', tax_map_fetched_at: '2026-11-05T14:00:00Z' }
+    await renderLoaded(TEST_USER)
+    expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('16.67 ft · MapPLUTO 26v2 · fetched 2026-11-05')
+    expect(within(propertyCard()).queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
+  })
+
+  it('lets an admin refresh it, and says how many title blocks took it', async () => {
+    api.refreshTaxMap.mockResolvedValue({ frontage_ft: 18.75, source: 'mappluto_26v2', fetched_at: '2026-11-06T10:00:00Z', pages_updated: 1 })
+    await renderLoaded(ADMIN)
+    expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('— · unavailable')
+    await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('18.75 ft · MapPLUTO 26v2 · fetched 2026-11-06'))
+    expect(api.refreshTaxMap).toHaveBeenCalledWith(PROPERTY_ID)
+    expect(screen.getByRole('status')).toHaveTextContent('Tax map frontage refreshed; 1 title block updated.')
+  })
+
+  it('shows a ped ramp none', async () => {
+    property = { ...property, kind: 'ped_ramp', block: null, lot: null, address: null, property_type: null,
+      intersection_street_1: 'Main St', intersection_street_2: '1st Ave', quadrant: 'NE', facing_street: 'street_2',
+      ramp_type: 'PERPENDICULAR', display_address: '12 Main St' }
+    await renderLoaded(ADMIN)
+    expect(within(propertyCard()).queryByText('Tax map frontage')).not.toBeInTheDocument()
   })
 })

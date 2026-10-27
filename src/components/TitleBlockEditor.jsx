@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { updatePirTitleBlock } from '../services/api'
+import { taxMapSourceLabel } from '../lib/taxMap'
 
 export const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 export const FIELDS = ['contract_no', 'date_notice_issued', 'date_excavated', 'date_constructed', 'north_bearing',
@@ -24,7 +25,9 @@ const valuesOf = (block) => Object.fromEntries(FIELDS.map(field => [field, block
  * the tax-map and curb-to-curb widths, sent as typed for the backend to check). Save sends only the fields changed ('' as null, which clears
  * one) and hands the saved block to onSaved; it is off until something changes. A refusal shows under Save and the
  * dialog stays open; a 404 (the PIR is gone) goes to onGone instead. A soft warning shows when Date Excavated is after
- * Date Constructed. A reader (a demo user, or anyone the page doesn't let write) sees the fields disabled and no Save.
+ * Date Constructed. Under the tax-map width, where it came from ("Current source: MapPLUTO 26v2" or "Manual", Slice Y1;
+ * nothing without one): the backend stamps a width changed here Manual. A reader (a demo user, or anyone the page
+ * doesn't let write) sees the fields disabled and no Save.
  * Props: pirId, titleBlock (the current values), canEdit, onSaved(block), onGone(message), onClose.
  */
 export default function TitleBlockEditor({ pirId, titleBlock, canEdit, onSaved, onGone, onClose }) {
@@ -128,6 +131,11 @@ export default function TitleBlockEditor({ pirId, titleBlock, canEdit, onSaved, 
                 </label>
                 <input id={`title-block-${field}`} type="text" inputMode="decimal" className="input-field"
                   value={values[field]} disabled={disabled} onChange={set(field)} />
+                {field === 'tax_map_width_ft' && taxMapSourceLabel(titleBlock?.tax_map_source) && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Current source: {taxMapSourceLabel(titleBlock.tax_map_source)}
+                  </p>
+                )}
               </div>
             ))}
           </div>

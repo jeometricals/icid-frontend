@@ -3,7 +3,8 @@ import { apiFetch } from './apiClient'
 // A project's properties ("sites"), each a sidewalk or a ped ramp (kind). A property is {id, project_id, kind, boro,
 // block, lot, address, property_type, violation_no (a sidewalk's), intersection_street_1, intersection_street_2,
 // quadrant, facing_street, ramp_type (a ped ramp's), notes, display_address, created_at, updated_at,
-// created_by, deleted_at, deleted_by}; property_type is one of '1_3_family', '4_plus_family', 'expedited'. The list
+// created_by, deleted_at, deleted_by, tax_map_frontage_ft, tax_map_source, tax_map_fetched_at (a sidewalk's frontage
+// from MapPLUTO, Slice Y1; all null until it is fetched, and always for a ped ramp)}; property_type is one of '1_3_family', '4_plus_family', 'expedited'. The list
 // adds pir_status, status ({state: 'none' | 'task_ordered' | 'constructed_on', date}) and task_order_no. Reading is for
 // a user on the project, or an admin; adding and editing for a member but a demo user (the UI keeps them to an
 // admin); deleting and un-deleting for an admin.
@@ -63,5 +64,16 @@ export async function softDeleteProperty(propertyId) {
  */
 export async function undeleteProperty(propertyId) {
   const json = await apiFetch(`/v1/properties/${propertyId}/admin/undelete`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only (Slice Y1): asks MapPLUTO for a sidewalk's tax-map frontage now, writes it onto the property and onto its
+ * PIR's title blocks but those typed by hand, and returns {frontage_ft, source, fetched_at, pages_updated}. The backend
+ * answers 400 for a ped ramp, 409 when the site moved meanwhile, 422 when MapPLUTO has no usable frontage for its lot
+ * and 503 when MapPLUTO can't be reached; nothing is written for any of them.
+ */
+export async function refreshTaxMap(propertyId) {
+  const json = await apiFetch(`/v1/properties/${propertyId}/admin/refresh-tax-map`, { method: 'POST' })
   return json.data
 }
