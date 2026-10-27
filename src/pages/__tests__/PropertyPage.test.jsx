@@ -26,7 +26,8 @@ vi.mock('../../services/api', () => ({
   listPirPages: vi.fn(),
   listFlags: vi.fn(), downloadConstructionReport: vi.fn(),
   listCorners: vi.fn(), getRampAttributes: vi.fn(), saveRampAttributes: vi.fn(), saveRampLabel: vi.fn(),
-  getPropertyWorkHistory: vi.fn(), refreshTaxMap: vi.fn(),
+  getPropertyWorkHistory: vi.fn(), refreshTaxMap: vi.fn(), getTaxMapPdf: vi.fn(), refreshTaxMapPdf: vi.fn(),
+  uploadTaxMapPdf: vi.fn(),
 }))
 vi.mock('../../components/SitePayItemsPanel', () => ({
   default: (props) => <div data-testid="site-pay-items" data-property={props.propertyId} />,
@@ -684,14 +685,14 @@ describe('PropertyPage: tax map frontage (Slice Y1)', () => {
     property = { ...property, tax_map_frontage_ft: 16.67, tax_map_source: 'mappluto_26v2', tax_map_fetched_at: '2026-11-05T14:00:00Z' }
     await renderLoaded(TEST_USER)
     expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('16.67 ft · MapPLUTO 26v2 · fetched 2026-11-05')
-    expect(within(propertyCard()).queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
+    expect(within(valueOf(propertyCard(), 'Tax map frontage')).queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
   })
 
   it('lets an admin refresh it, and says how many title blocks took it', async () => {
     api.refreshTaxMap.mockResolvedValue({ frontage_ft: 18.75, source: 'mappluto_26v2', fetched_at: '2026-11-06T10:00:00Z', pages_updated: 1 })
     await renderLoaded(ADMIN)
     expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('— · unavailable')
-    await userEvent.click(within(propertyCard()).getByRole('button', { name: 'Refresh' }))
+    await userEvent.click(within(valueOf(propertyCard(), 'Tax map frontage')).getByRole('button', { name: 'Refresh' }))
     await waitFor(() => expect(valueOf(propertyCard(), 'Tax map frontage')).toHaveTextContent('18.75 ft · MapPLUTO 26v2 · fetched 2026-11-06'))
     expect(api.refreshTaxMap).toHaveBeenCalledWith(PROPERTY_ID)
     expect(screen.getByRole('status')).toHaveTextContent('Tax map frontage refreshed; 1 title block updated.')
@@ -703,5 +704,27 @@ describe('PropertyPage: tax map frontage (Slice Y1)', () => {
       ramp_type: 'PERPENDICULAR', display_address: '12 Main St' }
     await renderLoaded(ADMIN)
     expect(within(propertyCard()).queryByText('Tax map frontage')).not.toBeInTheDocument()
+  })
+})
+
+
+describe('PropertyPage: tax map PDF (Slice Y1.5)', () => {
+  it('reads none, and an admin refreshes it from DOF', async () => {
+    api.refreshTaxMapPdf.mockResolvedValue({ source: 'dof_map_library', map_id: '30001230', effective_date: '2013-07-25',
+      fetched_at: '2026-11-06T10:00:00Z', uploaded_by: null })
+    await renderLoaded(ADMIN)
+    expect(valueOf(propertyCard(), 'Tax map PDF')).toHaveTextContent('— · none')
+    await userEvent.click(within(valueOf(propertyCard(), 'Tax map PDF')).getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(valueOf(propertyCard(), 'Tax map PDF')).toHaveTextContent('Queens block 123 · effective 2013-07-25'))
+    expect(screen.getByRole('status')).toHaveTextContent('Tax map PDF refreshed from DOF.')
+  })
+
+  it("shows a member the site's map with no admin buttons", async () => {
+    property = { ...property, has_tax_map_pdf: true, tax_map_pdf_source: 'dof_map_library', tax_map_pdf_map_id: '30001230',
+      tax_map_pdf_effective_date: '2013-07-25' }
+    await renderLoaded(TEST_USER)
+    const line = valueOf(propertyCard(), 'Tax map PDF')
+    expect(within(line).getByRole('link', { name: 'View' })).toBeInTheDocument()
+    expect(within(line).queryByRole('button', { name: 'Upload' })).not.toBeInTheDocument()
   })
 })

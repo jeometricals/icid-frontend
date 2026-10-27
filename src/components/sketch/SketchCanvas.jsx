@@ -27,6 +27,8 @@ const segmentStyle = (type) => SEGMENT_STYLES[type] ?? SEGMENT_STYLES.other
 const AREA_INK = '#a16207'
 // The fill of the badge on a flag an approved IDR claimed (constructed)
 const CLAIM_INK = '#047857'
+// The sidewalk strip's ink (Slice Y1.5), and the tint of a flag the strip being drawn would mark non-assessable
+export const STRIP_INK = '#dc2626'
 
 /** What a claimed flag's badge reads: "IDR #042" (or "IDR" for one without a number). */
 export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${flag.claimed_by_idr_number}` : 'IDR')
@@ -51,18 +53,26 @@ export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${fl
  *   writer, dragging an already selected flag moves it, even with a shape armed: the overlay alone follows the
  *   pointer, and letting go hands the new place to onMove; Esc while dragging puts it back.
  * - While calibrating, the points picked so far are marked and joined by a thin line.
+ * - The page's sidewalk strip (Slice Y1.5), when shown: a red outline with a faint fill, its first edge (the property
+ *   line) heavier. While drawing one (drawingStrip), a click anywhere, a flag included, adds a point (onStripPoint) and
+ *   a double-click finishes it (onStripFinish); the points so far are joined by a dashed red line, on to the pointer,
+ *   and the flags it would mark non-assessable (tintedIds) are tinted red.
  * Pointer positions are turned into page pixels with toNativeCoords against the page's on-screen box.
  * Props: page, flags, areas, features and segments (this page's), selectedId, activeShape, calibrating,
- * calibratePoints ([{x, y}]), writer,
+ * calibratePoints ([{x, y}]), writer, strip (the saved strip's points, or null), stripShown, drawingStrip,
+ * stripPoints ([{x, y}]), tintedIds (flag ids), onStripPoint({x, y}), onStripFinish(),
  * onPlace({x, y}), onSelect(id or null), onMove(id, {x, y}), onCalibratePoint({x, y}), onOpenIdr(flag), onImageError, showCorners
  * (marks the overlay's corners (0, 0) and (width, height), to check its alignment by eye).
  */
 export default function SketchCanvas({
   page, flags, areas = [], features = [], segments = [], selectedId = null, activeShape = null, calibrating = false, calibratePoints = [], writer = false,
+  strip = null, stripShown = true, drawingStrip = false, stripPoints = [], tintedIds = [], onStripPoint, onStripFinish,
   onPlace, onSelect, onMove, onCalibratePoint, onOpenIdr, onImageError, showCorners = false,
 }) {
   const boxRef = useRef(null)
   const [drag, setDrag] = useState(null) // {id, start, origin, at}: a selected flag being moved
+  const [hover, setHover] = useState(null) // where the pointer is while drawing the strip
+  const tinted = new Set(tintedIds)
   const scale = page.scale_px_per_ft
   const patterns = `sketch-${useId().replace(/:/g, '')}`
 
@@ -83,13 +93,14 @@ export default function SketchCanvas({
   const pressPage = (e) => {
     if (e.button !== undefined && e.button !== 0) return
     const point = native(e)
-    if (calibrating) onCalibratePoint?.(point)
+    if (drawingStrip) onStripPoint?.(point)
+    else if (calibrating) onCalibratePoint?.(point)
     else if (activeShape) onPlace?.(point)
     else onSelect?.(null)
   }
 
   const pressFlag = (e, flag) => {
-    if (calibrating) return // the page takes it as a calibration point
+    if (calibrating || drawingStrip) return // the page takes it as a calibration or strip point
     e.stopPropagation()
     if (e.button !== undefined && e.button !== 0) return
     const wasSelected = flag.id === selectedId
@@ -102,6 +113,7 @@ export default function SketchCanvas({
   }
 
   const movePointer = (e) => {
+    if (drawingStrip) setHover(native(e))
     if (!drag) return
     const point = native(e)
     setDrag(current => current && {
@@ -119,7 +131,7 @@ export default function SketchCanvas({
     }
   }
 
-  const crosshair = activeShape || calibrating
+  const crosshair = activeShape || calibrating || drawingStrip
   const text = labelSize(scale)
   // This page's flags as drawn: a dragged one at the pointer, and none that can't be drawn (no scale, no place)
   const drawn = flags
@@ -141,6 +153,7 @@ export default function SketchCanvas({
         onPointerMove={movePointer}
         onPointerUp={release}
         onPointerCancel={() => setDrag(null)}
+        onDoubleClick={() => { if (drawingStrip) onStripFinish?.() }}
       >
         <SketchPatterns prefix={patterns} unit={Math.max(4, (scale ?? 10) * 0.6)} />
 
@@ -181,6 +194,7 @@ export default function SketchCanvas({
               aria-pressed={selected}
               data-flag-id={flag.id}
               data-fill={fill}
+              data-would-flip={tinted.has(flag.id) || undefined}
               className={writer && selected && !calibrating ? 'cursor-move' : 'cursor-pointer'}
               onPointerDown={(e) => pressFlag(e, flag)}
             >
@@ -193,6 +207,17 @@ export default function SketchCanvas({
                 strokeDasharray={selected ? '6 3' : undefined}
                 vectorEffect="non-scaling-stroke"
               />
+              {tinted.has(flag.id) && (
+                <polygon
+                  points={svgPoints(outline)}
+                  fill={STRIP_INK}
+                  fillOpacity="0.35"
+                  stroke={STRIP_INK}
+                  strokeWidth="2.5"
+                  vectorEffect="non-scaling-stroke"
+                  className="pointer-events-none"
+                />
+              )}
               {flag.surveyed_is_assessable === false && (
                 <path
                   data-testid="non-assessable-cross"
@@ -353,6 +378,36 @@ export default function SketchCanvas({
             )
           })}
         </g>
+
+        {strip && stripShown && !drawingStrip && strip.length >= 3 && (
+          <g data-testid="sidewalk-strip" className="pointer-events-none">
+            <title>Sidewalk strip</title>
+            <polygon points={svgPoints(strip)} fill={STRIP_INK} fillOpacity="0.06" stroke={STRIP_INK} strokeWidth="2"
+              vectorEffect="non-scaling-stroke" />
+            <line data-testid="property-line" x1={strip[0].x} y1={strip[0].y} x2={strip[1].x} y2={strip[1].y}
+              stroke={STRIP_INK} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+          </g>
+        )}
+
+        {drawingStrip && stripPoints.length > 0 && (
+          <g data-testid="strip-drawing-preview" className="pointer-events-none">
+            <polyline
+              points={svgPoints(hover ? [...stripPoints, hover] : stripPoints)}
+              fill="none"
+              stroke={STRIP_INK}
+              strokeWidth="2"
+              strokeDasharray="8 4"
+              vectorEffect="non-scaling-stroke"
+            />
+            {stripPoints.length >= 2 && (
+              <line x1={stripPoints[0].x} y1={stripPoints[0].y} x2={stripPoints[1].x} y2={stripPoints[1].y}
+                stroke={STRIP_INK} strokeWidth="4" vectorEffect="non-scaling-stroke" />
+            )}
+            {stripPoints.map((point, index) => (
+              <circle key={index} cx={point.x} cy={point.y} r="4" fill={STRIP_INK} vectorEffect="non-scaling-stroke" />
+            ))}
+          </g>
+        )}
 
         {calibrating && first && (
           <g data-testid="calibration" className="pointer-events-none">

@@ -41,6 +41,8 @@ export const FLAG_NON_ASSESSABLE_REASONS = [
   { value: 'scaffolding', label: 'Scaffolding' },
   { value: 'other_perm_obstruction', label: 'Other permanent obstruction' },
   { value: 'other_temp_obstruction', label: 'Other temporary obstruction' },
+  // Slice Y1.5: wholly outside the page's sidewalk strip (the strip marks it; it can be chosen by hand too)
+  { value: 'outside_property_line', label: 'Outside property line' },
 ]
 
 // A flag's DOT defect codes, in the order the backend stores them
@@ -56,6 +58,7 @@ export const AREA_REASONS = [
   { value: 'tree_pit', label: 'Tree pit' },
   { value: 'landmark', label: 'Landmark' },
   { value: 'other', label: 'Other' },
+  { value: 'outside_property_line', label: 'Outside property line' },
 ]
 
 // A feature's type (a point obstruction or a sized feature on the page), as the backend spells it

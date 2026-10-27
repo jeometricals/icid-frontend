@@ -1,22 +1,39 @@
 import { useEffect, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import {
-  createFlagOnPage, deleteFlag, getContractItems, listFlagNonAssessableAreas, listFlags, listPirFeatures,
-  listPirSegments, updateFlag,
+  createFlagOnPage, deleteFlag, getContractItems, getPageTitleBlock, listFlagNonAssessableAreas, listFlags,
+  listPirFeatures, listPirSegments, putSidewalkStrip, updateFlag,
 } from '../../services/api'
 import { newFlagValues } from '../../lib/flags'
+import { flagsToFlip, stripFrontageFt, stripProblem } from '../../lib/stripGeometry'
+import ConfirmDialog from '../ConfirmDialog'
 import CalibrateControl from './CalibrateControl'
 import FlagPanel from './FlagPanel'
 import FlagsFallbackList from './FlagsFallbackList'
 import SegmentsTable from './SegmentsTable'
 import ShapeToolbar from './ShapeToolbar'
 import SketchCanvas from './SketchCanvas'
+import StripControl, { STRIP_NO_ROLE, STRIP_NO_SCALE } from './StripControl'
 import Toast from '../Toast'
 
 export const NO_SCALE_REASON = "Set this page's scale (or calibrate) to draw flags."
 export const PANEL_EMPTY_TEXT = 'Select a flag to see its details.'
 export const PANEL_EMPTY_WRITER_TEXT = 'Pick a shape and click the page to add a flag, or select one to edit it.'
 export const AI_DETECT_TOOLTIP = 'Available when Vercel Pro is enabled (R1k).'
+export const STRIP_CLEAR_TITLE = 'Clear the sidewalk strip?'
+export const STRIP_CLEAR_MESSAGE = 'The strip is removed. Flags it marked non-assessable stay non-assessable: revert each '
+  + 'one in the flag editor if needed.'
+// Two clicks closer than this (page pixels) are one point: a double-click's two clicks, say
+const SAME_POINT_PX = 3
+
+/** What a saved strip did, for its toast. */
+export function stripSavedText(flipped, claimed) {
+  let text = `Sidewalk strip saved; ${flipped} flag${flipped === 1 ? '' : 's'} marked non-assessable (outside the strip).`
+  if (claimed > 0) {
+    text += ` ${claimed} claimed flag${claimed === 1 ? ' is' : 's are'} outside it but ${claimed === 1 ? 'was' : 'were'} not changed.`
+  }
+  return text
+}
 
 const TOOL_BUTTON = 'inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm '
   + 'font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed'
@@ -54,11 +71,17 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * is imported on the admin's /admin/import-smart-pirs). "Auto-detect with AI" is a disabled stub whose tooltip says
  * when it comes. A flag an approved IDR claimed carries an "IDR #042" badge on the page and a line in its panel; either
  * opens that IDR (onOpenIdr).
- * Props: pir (id, project_id), page, pages, writer, onPageSaved(page), onJump(pageNumber), onImageError,
+ * The page's sidewalk strip (Slice Y1.5; StripControl): read off the page's title block, drawn red with its property line
+ * heavier, shown or hidden. A strip writer (an OE or RE on the project, or an admin) draws it on a scaled page: clicks
+ * add points (the property line first), Enter, a double-click or Finish saves it (putSidewalkStrip), Esc or Cancel
+ * drops it; while drawing, the flags it would mark non-assessable are tinted red (lib/stripGeometry.js, the backend's
+ * own test). The save's toast says how many flags were marked and how many claimed ones were left; the marked flags
+ * are updated in place. Clear asks first and warns that marked flags stay so.
+ * Props: pir (id, project_id), page, pages, writer, stripWriter, onPageSaved(page), onJump(pageNumber), onImageError,
  * initialFlagId (the flag selected to start, from the URL's ?flag=), onOpenIdr(flag).
  */
 export default function SketchWorkspace({
-  pir, page, pages, writer, onPageSaved, onJump, onImageError, initialFlagId = null, onOpenIdr,
+  pir, page, pages, writer, stripWriter = false, onPageSaved, onJump, onImageError, initialFlagId = null, onOpenIdr,
 }) {
   const [flags, setFlags] = useState([])
   const [areas, setAreas] = useState([])
@@ -75,6 +98,24 @@ export default function SketchWorkspace({
   const [calibratePoints, setCalibratePoints] = useState([])
   const [actionError, setActionError] = useState(null)
   const [toast, setToast] = useState(null)
+  const [strip, setStrip] = useState(null) // the page's saved strip points, or null
+  const [stripShown, setStripShown] = useState(true)
+  const [drawingStrip, setDrawingStrip] = useState(false)
+  const [stripPoints, setStripPoints] = useState([])
+  const [stripBusy, setStripBusy] = useState(false)
+  const [clearing, setClearing] = useState(null) // {error} while the clear is being confirmed
+
+  // The page's strip, off its title block (none when it has no title block, or it can't be read)
+  useEffect(() => {
+    let ignore = false
+    setStrip(null)
+    setDrawingStrip(false)
+    setStripPoints([])
+    getPageTitleBlock(page.pir_page_id)
+      .then(block => { if (!ignore) setStrip(block?.sidewalk_strip_points ?? null) })
+      .catch(() => { if (!ignore) setStrip(null) })
+    return () => { ignore = true }
+  }, [page.pir_page_id])
 
   useEffect(() => {
     let ignore = false
@@ -102,6 +143,8 @@ export default function SketchWorkspace({
   const pageFlags = flags.filter(flag => flag.pir_page_id === page.pir_page_id)
   const onPage = (item) => item.pir_page_id === page.pir_page_id
   const selected = pageFlags.find(flag => flag.id === selectedId) ?? null
+  const canDrawStrip = stripWriter && scaled
+  const wouldFlip = drawingStrip && stripPoints.length >= 3 ? flagsToFlip(stripPoints, pageFlags, page.scale_px_per_ft) : []
 
   const stopCalibrating = () => {
     setCalibrating(false)
@@ -109,6 +152,70 @@ export default function SketchWorkspace({
   }
 
   const replaceFlag = (saved) => setFlags(current => current.map(flag => (flag.id === saved.id ? saved : flag)))
+
+  const startStrip = () => {
+    stopCalibrating()
+    setActiveShape(null)
+    setActionError(null)
+    setStripPoints([])
+    setDrawingStrip(true)
+  }
+
+  const cancelStrip = () => {
+    setDrawingStrip(false)
+    setStripPoints([])
+  }
+
+  // A click close to the last point (a double-click's second click) adds nothing
+  const addStripPoint = (point) => setStripPoints(current => {
+    const last = current[current.length - 1]
+    return last && Math.hypot(point.x - last.x, point.y - last.y) < SAME_POINT_PX ? current : [...current, point]
+  })
+
+  const finishStrip = async () => {
+    if (!drawingStrip || stripBusy) return
+    const points = stripPoints.map(({ x, y }) => ({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }))
+    const problem = stripProblem(points)
+    if (problem) {
+      setActionError(problem)
+      return
+    }
+    setStripBusy(true)
+    setActionError(null)
+    try {
+      const { data } = await putSidewalkStrip(page.pir_page_id, points)
+      const marked = new Set(data.flipped.map(flag => flag.id))
+      setFlags(current => current.map(flag => (marked.has(flag.id)
+        ? { ...flag, surveyed_is_assessable: false, surveyed_non_assessable_reason: 'outside_property_line' }
+        : flag)))
+      setStrip(data.points)
+      setStripShown(true)
+      cancelStrip()
+      setToast(stripSavedText(data.flipped.length, data.outside_claimed.length))
+    } catch (err) {
+      setActionError(`Couldn't save the sidewalk strip: ${err.message}`)
+    } finally {
+      setStripBusy(false)
+    }
+  }
+
+  const clearStrip = async () => {
+    setStripBusy(true)
+    try {
+      await putSidewalkStrip(page.pir_page_id, null)
+    } catch (err) {
+      setClearing({ error: err.message })
+      setStripBusy(false)
+      return
+    }
+    const left = pageFlags.filter(flag => flag.surveyed_non_assessable_reason === 'outside_property_line').length
+    setStrip(null)
+    setClearing(null)
+    setStripBusy(false)
+    setToast(left > 0
+      ? `Sidewalk strip cleared. ${left} flag${left === 1 ? '' : 's'} it marked stay${left === 1 ? 's' : ''} non-assessable: open the flag editor to revert each.`
+      : 'Sidewalk strip cleared.')
+  }
 
   const place = async (point) => {
     if (!canDraw || !activeShape) return
@@ -151,6 +258,12 @@ export default function SketchWorkspace({
   useEffect(() => {
     const onKeyDown = (e) => {
       if (typingIn(e)) return
+      if (drawingStrip && (e.key === 'Escape' || e.key === 'Enter')) {
+        e.preventDefault()
+        if (e.key === 'Escape') cancelStrip()
+        else finishStrip()
+        return
+      }
       if (e.key === 'Escape') {
         if (calibrating) stopCalibrating()
         else setActiveShape(null)
@@ -173,8 +286,8 @@ export default function SketchWorkspace({
       <div className="flex flex-wrap items-start gap-3 mb-4">
         <ShapeToolbar
           activeShape={activeShape}
-          onPick={(shape) => { stopCalibrating(); setActiveShape(shape) }}
-          disabled={!canDraw || calibrating}
+          onPick={(shape) => { stopCalibrating(); cancelStrip(); setActiveShape(shape) }}
+          disabled={!canDraw || calibrating || drawingStrip}
           disabledReason={writer && !scaled ? NO_SCALE_REASON : null}
         />
         <div className="flex items-center gap-2">
@@ -182,7 +295,7 @@ export default function SketchWorkspace({
             page={page}
             active={calibrating}
             points={calibratePoints}
-            disabled={!writer}
+            disabled={!writer || drawingStrip}
             onToggle={() => {
               if (calibrating) stopCalibrating()
               else {
@@ -197,6 +310,22 @@ export default function SketchWorkspace({
             }}
           />
         </div>
+        <StripControl
+          strip={strip}
+          drawing={drawingStrip}
+          points={stripPoints}
+          wouldFlip={wouldFlip.length}
+          frontageFt={strip ? stripFrontageFt(strip, page.scale_px_per_ft) : null}
+          canDraw={canDrawStrip}
+          disabledReason={!stripWriter ? STRIP_NO_ROLE : STRIP_NO_SCALE}
+          busy={stripBusy}
+          shown={stripShown}
+          onStart={startStrip}
+          onFinish={finishStrip}
+          onCancel={cancelStrip}
+          onClear={() => setClearing({ error: null })}
+          onToggleShown={() => setStripShown(shown => !shown)}
+        />
         <ComingButton icon={Sparkles} label="Auto-detect with AI" tooltip={AI_DETECT_TOOLTIP} />
       </div>
 
@@ -218,6 +347,13 @@ export default function SketchWorkspace({
           onSelect={setSelectedId}
           onMove={move}
           onCalibratePoint={(point) => setCalibratePoints(current => (current.length < 2 ? [...current, point] : current))}
+          strip={strip}
+          stripShown={stripShown}
+          drawingStrip={drawingStrip}
+          stripPoints={stripPoints}
+          tintedIds={wouldFlip.map(flag => flag.id)}
+          onStripPoint={addStripPoint}
+          onStripFinish={finishStrip}
           onOpenIdr={onOpenIdr}
           onImageError={onImageError}
         />
@@ -253,6 +389,19 @@ export default function SketchWorkspace({
           <SegmentsTable segments={segments} pages={pages} contractItems={contractItems} writer={writer}
             onSaved={saved => setSegments(current => current.map(s => (s.segment_id === saved.segment_id ? saved : s)))} />
         </>
+      )}
+
+      {clearing && (
+        <ConfirmDialog
+          title={STRIP_CLEAR_TITLE}
+          message={STRIP_CLEAR_MESSAGE}
+          confirmLabel="Clear strip"
+          cancelLabel="Keep it"
+          onConfirm={clearStrip}
+          onCancel={() => setClearing(null)}
+          busy={stripBusy}
+          error={clearing.error}
+        />
       )}
 
       <Toast message={toast} onDone={() => setToast(null)} />
