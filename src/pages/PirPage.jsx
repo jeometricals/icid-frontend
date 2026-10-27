@@ -62,6 +62,7 @@ const titleBlockOf = (pir, annotation) => ({
   cross_street_right: annotation?.cross_street_right ?? null,
   frontage_street: annotation?.frontage_street ?? null,
   tax_map_width_ft: annotation?.tax_map_width_ft ?? null,
+  tax_map_source: annotation?.tax_map_source ?? null,
   cc_curb_to_curb_ft: annotation?.cc_curb_to_curb_ft ?? null,
 })
 

@@ -121,3 +121,24 @@ describe('TitleBlockEditor', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('tax_map_width_ft must be a number of feet')
   })
 })
+
+describe('TitleBlockEditor: the tax-map width source (Slice Y1)', () => {
+  it('says where the width came from', () => {
+    renderEditor({ titleBlock: { ...BLOCK, tax_map_source: 'mappluto_26v2' } })
+    expect(screen.getByText('Current source: MapPLUTO 26v2')).toBeInTheDocument()
+  })
+
+  it('says Manual for one typed by hand', () => {
+    renderEditor({ titleBlock: { ...BLOCK, tax_map_source: 'manual' } })
+    expect(screen.getByText('Current source: Manual')).toBeInTheDocument()
+  })
+
+  it('says nothing without a source, and never sends one', async () => {
+    api.updatePirTitleBlock.mockResolvedValue({ ...BLOCK, tax_map_width_ft: 41, tax_map_source: 'manual' })
+    renderEditor()
+    expect(screen.queryByText(/Current source/)).not.toBeInTheDocument()
+    fireEvent.change(field('Tax map width (ft) (optional)'), { target: { value: '41' } })
+    await userEvent.click(save())
+    expect(api.updatePirTitleBlock).toHaveBeenCalledWith(PIR_ID, { tax_map_width_ft: '41' })
+  })
+})
