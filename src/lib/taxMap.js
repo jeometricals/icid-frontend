@@ -14,3 +14,6 @@ export function taxMapSourceLabel(source) {
 export function frontageText(feet) {
   return feet == null ? null : `${Number(feet).toFixed(2)} ft`
 }
+
+/** DOF's own page of one of its tax maps (Slice Y1.5), which lists the block's inset maps too; null for none. */
+export const dofMapUrl = (mapId) => (mapId ? `https://propertyinformationportal.nyc.gov/pdf/home/index/map_library/${mapId}` : null)

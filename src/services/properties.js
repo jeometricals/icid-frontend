@@ -77,3 +77,43 @@ export async function refreshTaxMap(propertyId) {
   const json = await apiFetch(`/v1/properties/${propertyId}/admin/refresh-tax-map`, { method: 'POST' })
   return json.data
 }
+
+// A sidewalk's DOF tax-map PDF (Slice Y1.5): its block's current sheet of DOF's Digital Tax Map, fetched by the backend
+// after the site is added or moved to another block, refreshed by an admin, or uploaded by one. A property carries
+// has_tax_map_pdf and tax_map_pdf_source ('dof_map_library' or 'upload'), _map_id, _effective_date, _fetched_at and
+// _uploaded_by. Each route below returns {url (signed, short-lived), source, map_id, effective_date, dof_url (DOF's own
+// page of the map, listing its insets; null for an upload), fetched_at, uploaded_by}.
+
+/** The site's tax-map PDF; the backend answers 404 when there is none on file. */
+export async function getTaxMapPdf(propertyId) {
+  const json = await apiFetch(`/v1/properties/${propertyId}/tax-map-pdf`)
+  return json.data
+}
+
+/**
+ * Admin only: fetches the block's current map from DOF now, replacing the site's PDF. The backend answers 422 when DOF
+ * has no current map for the block and 503 when DOF can't be reached (upload one instead); nothing changes then.
+ */
+export async function refreshTaxMapPdf(propertyId) {
+  const json = await apiFetch(`/v1/properties/${propertyId}/admin/refresh-tax-map-pdf`, { method: 'POST' })
+  return json.data
+}
+
+/**
+ * Admin only: uploads a PDF as the site's tax-map PDF, in the backend's two steps: a signed URL, the file PUT there,
+ * then complete (the backend checks it is a PDF by its bytes: 400 otherwise, 413 over 10 MB). Returns as getTaxMapPdf.
+ */
+export async function uploadTaxMapPdf(propertyId, file) {
+  const request = await apiFetch(`/v1/properties/${propertyId}/admin/tax-map-pdf/upload-request`, { method: 'POST' })
+  const { upload_url: uploadUrl, staging_path: stagingPath } = request.data
+  let res
+  try {
+    res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: file })
+  } catch {
+    throw new Error('Could not reach file storage. Please try again.')
+  }
+  if (!res.ok) throw new Error(`File storage rejected the PDF (HTTP ${res.status}). Please try again.`)
+  const json = await apiFetch(`/v1/properties/${propertyId}/admin/tax-map-pdf/upload-complete`,
+    { method: 'POST', body: { staging_path: stagingPath } })
+  return json.data
+}

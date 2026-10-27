@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw, Ruler, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import {
   deletePirPages, getPageTitleBlock, getPirByProperty, getProperty, listPirPages, nextRotation, setPirPageRotation,
 } from '../services/api'
@@ -90,6 +91,7 @@ export default function PirPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const idrContext = readIdrContext(searchParams)
   const { user } = useAuth()
+  const { rolesByProject } = useProjectRoles()
   const admin = isAdmin(user)
 
   const [property, setProperty] = useState(null)
@@ -246,6 +248,9 @@ export default function PirPage() {
   const deleted = Boolean(property.deleted_at)
   // A demo user only reads; a deleted site is the admin's (the backend refuses anyone else with 400)
   const writer = !user?.is_demo && (!deleted || admin)
+  // The sidewalk strip changes what homeowners are assessed: an OE or RE on the project, or an admin (Slice Y1.5)
+  const projectRoles = rolesByProject?.[projectId] ?? []
+  const stripWriter = writer && (admin || projectRoles.includes('oe') || projectRoles.includes('re'))
 
   return shell(
     <>
@@ -358,6 +363,7 @@ export default function PirPage() {
               page={page}
               pages={pages}
               writer={writer}
+              stripWriter={stripWriter}
               onPageSaved={(saved) => {
                 replacePage(saved)
                 setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)

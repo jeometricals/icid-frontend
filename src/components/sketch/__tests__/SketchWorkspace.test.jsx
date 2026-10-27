@@ -11,7 +11,7 @@ import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
-  updateSegment: vi.fn(),
+  updateSegment: vi.fn(), getPageTitleBlock: vi.fn(), putSidewalkStrip: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -38,6 +38,7 @@ beforeEach(() => {
   api.listPirFeatures.mockResolvedValue([])
   api.listPirSegments.mockResolvedValue([])
   api.listFlagNonAssessableAreas.mockResolvedValue([])
+  api.getPageTitleBlock.mockResolvedValue(null) // no title block, so no sidewalk strip
   api.createFlagOnPage.mockImplementation(async (pageId, body) => ({ ...flag('new'), ...body, pir_page_id: pageId }))
   api.updateFlag.mockImplementation(async (id, body) => ({ ...flags.find(found => found.id === id), ...body }))
   api.deleteFlag.mockResolvedValue(undefined)
@@ -461,5 +462,107 @@ describe('SketchWorkspace — R1f: the flag to start with, and claims', () => {
     expect(onOpenIdr).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1' }))
     await userEvent.click(within(screen.getByRole('complementary', { name: 'Flag #1' })).getByRole('button', { name: 'IDR 042' }))
     expect(onOpenIdr).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+describe('SketchWorkspace: the sidewalk strip (Slice Y1.5)', () => {
+  // Around flag #1 (275..325, 175..225) and not flag #2 (775..825, 475..525); its property line is 200 px = 20.00 ft
+  const STRIP = [{ x: 200, y: 150 }, { x: 400, y: 150 }, { x: 400, y: 300 }, { x: 200, y: 300 }]
+  const saved = (flipped = [{ id: 'f2', display_order: 2 }], claimed = []) => ({
+    status: 'success', message: 'saved',
+    data: { pir_page_id: 'page-1', points: STRIP, source: 'manual', frontage_ft: 20, flipped, outside_claimed: claimed },
+  })
+  const drawStrip = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Sidewalk strip' }))
+    STRIP.forEach(({ x, y }) => click(overlay(), x, y))
+  }
+
+  it('is off, with its reason, for a writer who is neither OE, RE nor admin', async () => {
+    await renderLoaded()
+    const button = screen.getByRole('button', { name: 'Sidewalk strip' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Only an OE, an RE or an admin draws the sidewalk strip.')
+  })
+
+  it('is off on a page without a scale', async () => {
+    await renderLoaded({ stripWriter: true, page: { ...PAGES[0], scale_px_per_ft: null } })
+    expect(screen.getByRole('button', { name: 'Sidewalk strip' })).toHaveAttribute('title', "Set this page's scale to draw its sidewalk strip.")
+  })
+
+  it('tints the flags it would mark while drawing, and saves on Enter', async () => {
+    api.putSidewalkStrip.mockResolvedValue(saved())
+    await renderLoaded({ stripWriter: true })
+    await drawStrip()
+    expect(screen.getByText('4 points · 1 flag would be marked non-assessable')).toBeInTheDocument()
+    expect(flagShape(2)).toHaveAttribute('data-would-flip', 'true')
+    expect(flagShape(1)).not.toHaveAttribute('data-would-flip')
+    fireEvent.keyDown(document, { key: 'Enter' })
+    await waitFor(() => expect(api.putSidewalkStrip).toHaveBeenCalledWith('page-1', STRIP))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Sidewalk strip saved; 1 flag marked non-assessable (outside the strip).')
+    // the marked flag is crossed out in place, and the strip is drawn with its frontage
+    expect(within(flagShape(2)).getByTestId('non-assessable-cross')).toBeInTheDocument()
+    expect(screen.getByTestId('sidewalk-strip')).toBeInTheDocument()
+    expect(screen.getByText('Strip frontage 20.00 ft')).toBeInTheDocument()
+  })
+
+  it('says how many claimed flags outside it were left as they were', async () => {
+    api.putSidewalkStrip.mockResolvedValue(saved([], [{ id: 'f2', display_order: 2, claimed_by_idr_id: 'idr-1' }]))
+    await renderLoaded({ stripWriter: true })
+    await drawStrip()
+    await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Sidewalk strip saved; 0 flags marked non-assessable (outside the strip). 1 claimed flag is outside it but was not changed.')
+  })
+
+  it("doesn't tint a claimed flag", async () => {
+    flags = [flag('f1'), flag('f2', { display_order: 2, sketch_x: 800, sketch_y: 500, claimed_by_idr_id: 'idr-1' })]
+    await renderLoaded({ stripWriter: true })
+    await drawStrip()
+    expect(flagShape(2)).not.toHaveAttribute('data-would-flip')
+  })
+
+  it('drops the strip on Esc, saving nothing', async () => {
+    await renderLoaded({ stripWriter: true })
+    await drawStrip()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('strip-drawing')).not.toBeInTheDocument()
+    expect(api.putSidewalkStrip).not.toHaveBeenCalled()
+  })
+
+  it("refuses a strip whose edges cross, in the backend's words, saving nothing", async () => {
+    await renderLoaded({ stripWriter: true })
+    await userEvent.click(screen.getByRole('button', { name: 'Sidewalk strip' }))
+    ;[[200, 150], [400, 300], [400, 150], [200, 250]].forEach(([x, y]) => click(overlay(), x, y))
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(await screen.findByRole('alert')).toHaveTextContent("A sidewalk strip's edges must not cross")
+    expect(api.putSidewalkStrip).not.toHaveBeenCalled()
+  })
+
+  it("draws the page's saved strip, hides it, and clears it after asking, warning that marked flags stay", async () => {
+    flags = [flag('f1'), flag('f2', { display_order: 2, sketch_x: 800, sketch_y: 500, surveyed_is_assessable: false,
+      surveyed_non_assessable_reason: 'outside_property_line' })]
+    api.getPageTitleBlock.mockResolvedValue({ sidewalk_strip_points: STRIP })
+    api.putSidewalkStrip.mockResolvedValue({ status: 'success', message: 'cleared', data: { points: null } })
+    await renderLoaded({ stripWriter: true })
+    expect(await screen.findByTestId('sidewalk-strip')).toBeInTheDocument()
+    expect(api.getPageTitleBlock).toHaveBeenCalledWith('page-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Hide strip' }))
+    expect(screen.queryByTestId('sidewalk-strip')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear strip' }))
+    const dialog = screen.getByRole('dialog', { name: 'Clear the sidewalk strip?' })
+    expect(dialog).toHaveTextContent('stay non-assessable')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear strip' }))
+    await waitFor(() => expect(api.putSidewalkStrip).toHaveBeenCalledWith('page-1', null))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Sidewalk strip cleared. 1 flag it marked stays non-assessable: open the flag editor to revert each.')
+  })
+
+  it('shows a reader the saved strip, with no Clear', async () => {
+    api.getPageTitleBlock.mockResolvedValue({ sidewalk_strip_points: STRIP })
+    await renderLoaded({ writer: false })
+    expect(await screen.findByTestId('sidewalk-strip')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear strip' })).not.toBeInTheDocument()
   })
 })

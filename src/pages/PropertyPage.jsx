@@ -1,7 +1,8 @@
 /**
  * One property (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId, for anyone
  * on the project: a card with the site's details (a sidewalk's borough, block, lot, CB, address, violation no., property
- * type and tax map frontage from MapPLUTO, with an admin's Refresh (TaxMapFrontage, Slice Y1); a ped ramp's borough, CB, intersection, quadrant, the street it faces and ramp type; then notes and when it was
+ * type, tax map frontage from MapPLUTO, with an admin's Refresh (TaxMapFrontage, Slice Y1), and its block's DOF tax map
+ * PDF, with an admin's Refresh and Upload (TaxMapPdfLine, Slice Y1.5); a ped ramp's borough, CB, intersection, quadrant, the street it faces and ramp type; then notes and when it was
  * added), headed by its display_address; then its PIR card. With a live
  * PIR the card gives the inspector's initials, the date they signed, who digitized it when and whether the
  * as-built is signed, under the way into its sketch workspace (PirWorkspaceLink: its page count and "Open sketch
@@ -56,6 +57,7 @@ import PropertyFormModal from '../components/PropertyFormModal'
 import RampAttributesSection from '../components/RampAttributesSection'
 import StatusBadge from '../components/StatusBadge'
 import TaxMapFrontage from '../components/TaxMapFrontage'
+import TaxMapPdfLine from '../components/TaxMapPdfLine'
 import Toast from '../components/Toast'
 import WorkHistorySection from '../components/WorkHistorySection'
 import SitePayItemsPanel from '../components/SitePayItemsPanel'
@@ -384,6 +386,20 @@ export default function PropertyPage() {
                       tax_map_fetched_at: refreshed.fetched_at,
                     })
                     setToast(`Tax map frontage refreshed; ${refreshed.pages_updated} title block${refreshed.pages_updated === 1 ? '' : 's'} updated.`)
+                  }}
+                />
+              </Detail>
+              <Detail term="Tax map PDF" wide>
+                <TaxMapPdfLine
+                  property={property}
+                  admin={admin}
+                  onChanged={(pdf) => {
+                    setWritten({
+                      ...property, has_tax_map_pdf: true, tax_map_pdf_source: pdf.source, tax_map_pdf_map_id: pdf.map_id,
+                      tax_map_pdf_effective_date: pdf.effective_date, tax_map_pdf_fetched_at: pdf.fetched_at,
+                      tax_map_pdf_uploaded_by: pdf.uploaded_by,
+                    })
+                    setToast(pdf.source === 'upload' ? 'Tax map PDF uploaded.' : 'Tax map PDF refreshed from DOF.')
                   }}
                 />
               </Detail>

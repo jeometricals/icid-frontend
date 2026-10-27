@@ -106,6 +106,14 @@ describe('FlagPanel — editing', () => {
     await waitFor(() => expect(sent()).toEqual([{ surveyed_is_assessable: false, surveyed_non_assessable_reason: 'hydrant' }]))
   })
 
+  it('offers "Outside property line" as a reason (Slice Y1.5)', async () => {
+    renderPanel()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Assessable' }))
+    await userEvent.selectOptions(screen.getByLabelText('Non-assessable reason'), 'Outside property line')
+    await waitFor(() => expect(sent()).toEqual([
+      { surveyed_is_assessable: false, surveyed_non_assessable_reason: 'outside_property_line' }]))
+  })
+
   it('picks a pay item from the contract items', async () => {
     renderPanel()
     await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
