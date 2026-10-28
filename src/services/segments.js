@@ -26,3 +26,18 @@ export async function updateSegment(segmentId, data) {
   const json = await apiFetch(`/v1/segments/${segmentId}`, { method: 'PATCH', body: data })
   return json.data
 }
+
+/**
+ * Draws a curb run on a page (Slice Y4a): {segment_type, points ([{x, y}], two or more, in the page's native pixels),
+ * pay_item_id (an LF item of the project, or null)}. Returns the segment, its length worked out from the page's scale.
+ * The backend answers 400 for a pay item of another project and 422 for fewer than two points.
+ */
+export async function createSegment(pirPageId, data) {
+  const json = await apiFetch(`/v1/pir-pages/${pirPageId}/segments`, { method: 'POST', body: data })
+  return json.data
+}
+
+/** Deletes a curb run (a soft delete; Slice Y4a). */
+export async function deleteSegment(segmentId) {
+  await apiFetch(`/v1/segments/${segmentId}`, { method: 'DELETE' })
+}

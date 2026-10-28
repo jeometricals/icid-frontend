@@ -29,6 +29,11 @@ const AREA_INK = '#a16207'
 const CLAIM_INK = '#047857'
 // The sidewalk strip's ink (Slice Y1.5), and the tint of a flag the strip being drawn would mark non-assessable
 export const STRIP_INK = '#dc2626'
+// A bundle's ink (Slice Y4a): its members' shared outline and its M label
+export const BUNDLE_INK = '#7c3aed'
+// A selected curb run's halo, and a curb being drawn (Slice Y4a)
+const SEGMENT_SELECTED_INK = '#f59e0b'
+const CURB_DRAW_INK = '#374151'
 
 /** What a claimed flag's badge reads: "IDR #042" (or "IDR" for one without a number). */
 export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${flag.claimed_by_idr_number}` : 'IDR')
@@ -57,8 +62,17 @@ export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${fl
  *   line) heavier. While drawing one (drawingStrip), a click anywhere, a flag included, adds a point (onStripPoint) and
  *   a double-click finishes it (onStripFinish); the points so far are joined by a dashed red line, on to the pointer,
  *   and the flags it would mark non-assessable (tintedIds) are tinted red.
+ * - Bundles (Slice Y4a): each member's outline is stroked in violet over its own, and an "M1" label sits in the middle
+ *   of the members' box; clicking the label opens the bundle (onSelectBundle).
+ * - Ctrl- or Cmd-click on a flag adds it to the selection, or takes it out (onToggleSelect); a plain click selects it
+ *   alone. Every flag in selectedIds is drawn selected; only a single selected flag (selectedId) is dragged.
+ * - Curb runs take clicks (onSelectSegment) when nothing is being drawn; the selected one (selectedSegmentId) has an
+ *   amber halo. While drawing a curb (drawingCurb), a click anywhere adds a point (onCurbPoint), a double-click
+ *   finishes it (onCurbFinish), and the points so far are joined by a dashed line on to the pointer.
  * Pointer positions are turned into page pixels with toNativeCoords against the page's on-screen box.
- * Props: page, flags, areas, features and segments (this page's), selectedId, activeShape, calibrating,
+ * Props: page, flags, areas, features and segments (this page's), selectedId, selectedIds, bundles ([{id, number,
+ * flagIds}]), selectedBundleId, selectedSegmentId, drawingCurb, curbPoints, onCurbPoint, onCurbFinish,
+ * onToggleSelect(id), onSelectBundle(id), onSelectSegment(id), activeShape, calibrating,
  * calibratePoints ([{x, y}]), writer, strip (the saved strip's points, or null), stripShown, drawingStrip,
  * stripPoints ([{x, y}]), tintedIds (flag ids), onStripPoint({x, y}), onStripFinish(),
  * onPlace({x, y}), onSelect(id or null), onMove(id, {x, y}), onCalibratePoint({x, y}), onOpenIdr(flag), onImageError, showCorners
@@ -68,11 +82,15 @@ export default function SketchCanvas({
   page, flags, areas = [], features = [], segments = [], selectedId = null, activeShape = null, calibrating = false, calibratePoints = [], writer = false,
   strip = null, stripShown = true, drawingStrip = false, stripPoints = [], tintedIds = [], onStripPoint, onStripFinish,
   onPlace, onSelect, onMove, onCalibratePoint, onOpenIdr, onImageError, showCorners = false,
+  selectedIds = null, bundles = [], selectedBundleId = null, selectedSegmentId = null, drawingCurb = false, curbPoints = [],
+  onCurbPoint, onCurbFinish, onToggleSelect, onSelectBundle, onSelectSegment,
 }) {
   const boxRef = useRef(null)
   const [drag, setDrag] = useState(null) // {id, start, origin, at}: a selected flag being moved
   const [hover, setHover] = useState(null) // where the pointer is while drawing the strip
   const tinted = new Set(tintedIds)
+  const chosen = new Set(selectedIds ?? (selectedId ? [selectedId] : []))
+  const drawingLine = drawingStrip || drawingCurb
   const scale = page.scale_px_per_ft
   const patterns = `sketch-${useId().replace(/:/g, '')}`
 
@@ -94,15 +112,20 @@ export default function SketchCanvas({
     if (e.button !== undefined && e.button !== 0) return
     const point = native(e)
     if (drawingStrip) onStripPoint?.(point)
+    else if (drawingCurb) onCurbPoint?.(point)
     else if (calibrating) onCalibratePoint?.(point)
     else if (activeShape) onPlace?.(point)
     else onSelect?.(null)
   }
 
   const pressFlag = (e, flag) => {
-    if (calibrating || drawingStrip) return // the page takes it as a calibration or strip point
+    if (calibrating || drawingLine) return // the page takes it as a calibration, strip or curb point
     e.stopPropagation()
     if (e.button !== undefined && e.button !== 0) return
+    if ((e.ctrlKey || e.metaKey) && onToggleSelect) {
+      onToggleSelect(flag.id)
+      return
+    }
     const wasSelected = flag.id === selectedId
     onSelect?.(flag.id)
     if (!writer || !wasSelected) return
@@ -113,7 +136,7 @@ export default function SketchCanvas({
   }
 
   const movePointer = (e) => {
-    if (drawingStrip) setHover(native(e))
+    if (drawingLine) setHover(native(e))
     if (!drag) return
     const point = native(e)
     setDrag(current => current && {
@@ -131,7 +154,7 @@ export default function SketchCanvas({
     }
   }
 
-  const crosshair = activeShape || calibrating || drawingStrip
+  const crosshair = activeShape || calibrating || drawingLine
   const text = labelSize(scale)
   // This page's flags as drawn: a dragged one at the pointer, and none that can't be drawn (no scale, no place)
   const drawn = flags
@@ -153,14 +176,18 @@ export default function SketchCanvas({
         onPointerMove={movePointer}
         onPointerUp={release}
         onPointerCancel={() => setDrag(null)}
-        onDoubleClick={() => { if (drawingStrip) onStripFinish?.() }}
+        onDoubleClick={() => {
+          if (drawingStrip) onStripFinish?.()
+          else if (drawingCurb) onCurbFinish?.()
+        }}
       >
         <SketchPatterns prefix={patterns} unit={Math.max(4, (scale ?? 10) * 0.6)} />
 
-        <g data-testid="segments" className="pointer-events-none">
+        <g data-testid="segments" className={onSelectSegment && !drawingLine && !calibrating ? undefined : 'pointer-events-none'}>
           {segments.map(segment => {
             const style = segmentStyle(segment.segment_type)
-            return (
+            const picked = segment.segment_id === selectedSegmentId
+            const line = (
               <polyline
                 key={segment.segment_id}
                 data-segment-type={segment.segment_type}
@@ -176,11 +203,36 @@ export default function SketchCanvas({
                 <title>{segmentTypeLabel(segment.segment_type)}</title>
               </polyline>
             )
+            // Without curb selection a run is drawn as it always was: one polyline
+            if (!onSelectSegment) return line
+            return (
+              <g
+                key={segment.segment_id}
+                role="button"
+                aria-label={`Curb: ${segmentTypeLabel(segment.segment_type)}`}
+                aria-pressed={picked}
+                data-segment-id={segment.segment_id}
+                className="cursor-pointer"
+                onPointerDown={(e) => {
+                  if (drawingLine || calibrating) return
+                  e.stopPropagation()
+                  onSelectSegment(segment.segment_id)
+                }}
+              >
+                {picked && (
+                  <polyline points={svgPoints(segment.points)} fill="none" stroke={SEGMENT_SELECTED_INK} strokeOpacity="0.6"
+                    strokeWidth={style.width + 6} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                )}
+                {line}
+                <polyline points={svgPoints(segment.points)} fill="none" stroke="transparent" strokeWidth="12"
+                  vectorEffect="non-scaling-stroke" />
+              </g>
+            )
           })}
         </g>
 
         {drawn.map(({ flag, outline }) => {
-          const selected = flag.id === selectedId
+          const selected = chosen.has(flag.id)
           const color = thicknessColor(flag.surveyed_thickness)
           const box = boundsOf(outline)
           const centre = centreOf(outline)
@@ -378,6 +430,59 @@ export default function SketchCanvas({
             )
           })}
         </g>
+
+        <g data-testid="bundles" className="select-none">
+          {bundles.map(bundle => {
+            const members = drawn.filter(({ flag }) => bundle.flagIds.includes(flag.id))
+            if (members.length === 0) return null
+            const box = boundsOf(members.flatMap(({ outline }) => outline))
+            const picked = bundle.id === selectedBundleId
+            const size = text * 0.9
+            const label = `M${bundle.number}`
+            return (
+              <g key={bundle.id} data-bundle-id={bundle.id}>
+                {members.map(({ flag, outline }) => (
+                  <polygon key={flag.id} points={svgPoints(outline)} fill="none" stroke={BUNDLE_INK}
+                    strokeWidth={picked ? 4 : 2.5} strokeOpacity="0.85" vectorEffect="non-scaling-stroke"
+                    className="pointer-events-none" />
+                ))}
+                <g
+                  role={onSelectBundle ? 'button' : undefined}
+                  aria-label={`Bundle ${label}`}
+                  tabIndex={onSelectBundle ? 0 : undefined}
+                  className={onSelectBundle ? 'cursor-pointer' : undefined}
+                  onPointerDown={(e) => {
+                    if (!onSelectBundle || drawingLine || calibrating) return
+                    e.stopPropagation()
+                    onSelectBundle(bundle.id)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || !onSelectBundle) return
+                    e.preventDefault()
+                    onSelectBundle(bundle.id)
+                  }}
+                >
+                  <title>{`Bundle ${label}: ${members.length} flags`}</title>
+                  <rect x={(box.minX + box.maxX) / 2 - size * 1.3} y={(box.minY + box.maxY) / 2 - size * 0.8}
+                    width={size * 2.6} height={size * 1.6} rx={size * 0.4} fill={BUNDLE_INK}
+                    stroke="#ffffff" strokeWidth={picked ? 2 : 1} vectorEffect="non-scaling-stroke" />
+                  <text x={(box.minX + box.maxX) / 2} y={(box.minY + box.maxY) / 2} textAnchor="middle"
+                    dominantBaseline="central" fontSize={size} fontWeight="700" fill="#ffffff">{label}</text>
+                </g>
+              </g>
+            )
+          })}
+        </g>
+
+        {drawingCurb && curbPoints.length > 0 && (
+          <g data-testid="curb-drawing-preview" className="pointer-events-none">
+            <polyline points={svgPoints(hover ? [...curbPoints, hover] : curbPoints)} fill="none" stroke={CURB_DRAW_INK}
+              strokeWidth="2.5" strokeDasharray="8 4" vectorEffect="non-scaling-stroke" />
+            {curbPoints.map((point, index) => (
+              <circle key={index} cx={point.x} cy={point.y} r="4" fill={CURB_DRAW_INK} vectorEffect="non-scaling-stroke" />
+            ))}
+          </g>
+        )}
 
         {strip && stripShown && !drawingStrip && strip.length >= 3 && (
           <g data-testid="sidewalk-strip" className="pointer-events-none">

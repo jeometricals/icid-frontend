@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SketchWorkspace, {
-  AI_DETECT_TOOLTIP, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
+  AI_DETECT_TOOLTIP, BUNDLE_LINE_READER, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
 } from '../SketchWorkspace'
 import { EMPTY_TEXT } from '../FlagsFallbackList'
 import * as api from '../../../services/api'
@@ -11,7 +11,8 @@ import { MOCK_CONTRACT_ITEMS } from '../../../test/contractItems'
 vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
-  updateSegment: vi.fn(), getPageTitleBlock: vi.fn(), putSidewalkStrip: vi.fn(),
+  updateSegment: vi.fn(), getPageTitleBlock: vi.fn(), putSidewalkStrip: vi.fn(), createSegment: vi.fn(), deleteSegment: vi.fn(),
+  getMeasurement: vi.fn(), bundleFlags: vi.fn(), updateMeasurement: vi.fn(), unbundleMeasurement: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -375,7 +376,7 @@ describe('SketchWorkspace — features, segments and non-assessable areas', () =
     expect(api.listFlagNonAssessableAreas).toHaveBeenCalledWith('f1')
     const features = [...screen.getByTestId('features').querySelectorAll('[data-testid="feature"]')]
     expect(features.map(found => found.dataset.featureType)).toEqual(['hydrant'])
-    expect(screen.getByTestId('segments').querySelectorAll('polyline')).toHaveLength(1)
+    expect(screen.getByTestId('segments').querySelectorAll('polyline[data-segment-type]')).toHaveLength(1)
     const labels = [...screen.getByTestId('non-assessable-areas').querySelectorAll('[data-area-label]')]
     expect(labels.map(found => found.dataset.areaLabel)).toEqual(['A1', 'A2'])
   })
@@ -564,5 +565,89 @@ describe('SketchWorkspace: the sidewalk strip (Slice Y1.5)', () => {
     await renderLoaded({ writer: false })
     expect(await screen.findByTestId('sidewalk-strip')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear strip' })).not.toBeInTheDocument()
+  })
+})
+
+describe('SketchWorkspace — bundles and curbs (Slice Y4a)', () => {
+  const ctrlPress = (target, x, y) => fireEvent.pointerDown(target, { clientX: x, clientY: y, button: 0, pointerId: 1, ctrlKey: true })
+  const BUNDLE = {
+    measurement_id: 'm1', outer_dimensions: { rectangles: [{ L: 10, W: 5 }] }, outer_area: 50, deductions: [],
+    needs_remeasure: false, surveyed_thickness: '4in', surveyed_is_assessable: true, frozen: false, created_at: '2026-10-29T10:00:00Z',
+    members: [{ flag_id: 'f1', display_order: 1, area_share_fraction: 0.5, quantity: 25 },
+      { flag_id: 'f4', display_order: 4, area_share_fraction: 0.5, quantity: 25 }],
+  }
+
+  beforeEach(() => {
+    // f4 sits just right of f1 (5 ft at 10 px/ft): they share an edge
+    flags = [flag('f1'), flag('f4', { display_order: 4, sketch_x: 350 })]
+    api.getMeasurement.mockResolvedValue(BUNDLE)
+  })
+
+  it('Ctrl-click selects several flags and bundles them from the toolbar', async () => {
+    api.bundleFlags.mockResolvedValue(BUNDLE)
+    await renderLoaded({ bundleWriter: true })
+    const bundleButton = screen.getByRole('button', { name: /Bundle flags/ })
+    expect(bundleButton).toBeDisabled()
+    click(flagShape(1), 300, 200)
+    ctrlPress(flagShape(4), 350, 200)
+    expect(screen.getByTestId('multi-selection')).toHaveTextContent('2 flags selected (#1, #4)')
+    await userEvent.click(screen.getByRole('button', { name: 'Bundle flags (2)' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText('Rectangle A length (ft)'), '10')
+    await userEvent.type(within(dialog).getByLabelText('Rectangle A width (ft)'), '5')
+    flags = flags.map(f => ({ ...f, bundled: true, measurement_id: 'm1' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bundle' }))
+    expect(api.bundleFlags).toHaveBeenCalledWith('page-1', ['f1', 'f4'], [{ L: 10, W: 5 }])
+    expect(await screen.findByTestId('bundle-panel')).toBeInTheDocument()
+    expect(api.listFlags).toHaveBeenCalledTimes(2) // read again: the flags now carry their bundle
+    expect(screen.getByRole('button', { name: 'Bundle M1' })).toBeInTheDocument()
+  })
+
+  it('Ctrl-click takes a flag back out of the selection', async () => {
+    await renderLoaded({ bundleWriter: true })
+    click(flagShape(1), 300, 200)
+    ctrlPress(flagShape(4), 350, 200)
+    ctrlPress(flagShape(4), 350, 200)
+    expect(flagShape(4)).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByTestId('multi-selection')).not.toBeInTheDocument()
+  })
+
+  it("a bundle's label opens its panel for an OE, an RE or an admin", async () => {
+    flags = flags.map(f => ({ ...f, bundled: true, measurement_id: 'm1' }))
+    await renderLoaded({ bundleWriter: true })
+    press(screen.getByRole('button', { name: 'Bundle M1' }), 325, 200)
+    expect(await screen.findByRole('heading', { name: 'Bundle M1' })).toBeInTheDocument()
+    expect(api.getMeasurement).toHaveBeenCalledWith('m1')
+  })
+
+  it('anyone else sees a bundled flag as bundled, without the bundle button or its panel', async () => {
+    flags = flags.map(f => ({ ...f, bundled: true, measurement_id: 'm1' }))
+    await renderLoaded({ bundleWriter: false })
+    expect(screen.queryByRole('button', { name: /Bundle flags/ })).not.toBeInTheDocument()
+    click(flagShape(1), 300, 200)
+    expect(screen.getByTestId('flag-bundle-line')).toHaveTextContent(BUNDLE_LINE_READER)
+    expect(api.getMeasurement).not.toHaveBeenCalled()
+  })
+
+  it('draws a curb: clicks add points, Finish saves it with its type and pay item', async () => {
+    api.createSegment.mockImplementation(async (pageId, body) => ({ segment_id: 'sg-new', pir_page_id: pageId,
+      length_ft: 10, reported_length_ft: null, length_delta_reason: null, ...body }))
+    await renderLoaded()
+    await userEvent.selectOptions(screen.getByLabelText('Curb type'), 'curb_granite')
+    await userEvent.click(screen.getByRole('button', { name: 'Draw curb' }))
+    press(overlay(), 100, 600)
+    press(overlay(), 200, 600)
+    await userEvent.click(screen.getByRole('button', { name: 'Finish' }))
+    expect(api.createSegment).toHaveBeenCalledWith('page-1', { segment_type: 'curb_granite',
+      points: [{ x: 100, y: 600 }, { x: 200, y: 600 }], pay_item_id: null })
+    expect(await screen.findByTestId('segment-panel')).toBeInTheDocument()
+  })
+
+  it('a click on a curb opens its panel', async () => {
+    api.listPirSegments.mockResolvedValue([{ segment_id: 'sg-1', pir_page_id: 'page-1', segment_type: 'curb_concrete',
+      points: [{ x: 100, y: 700 }, { x: 400, y: 700 }], length_ft: 30, pay_item_id: null, reported_length_ft: null }])
+    await renderLoaded()
+    press(screen.getByRole('button', { name: 'Curb: Concrete curb' }), 200, 700)
+    expect(await screen.findByTestId('segment-panel')).toHaveTextContent('Drawn length 30.00 LF')
   })
 })

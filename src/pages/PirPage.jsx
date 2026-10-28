@@ -364,6 +364,7 @@ export default function PirPage() {
               pages={pages}
               writer={writer}
               stripWriter={stripWriter}
+              bundleWriter={stripWriter}
               onPageSaved={(saved) => {
                 replacePage(saved)
                 setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)

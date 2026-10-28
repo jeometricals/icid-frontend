@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Combine, Sparkles } from 'lucide-react'
 import {
-  createFlagOnPage, deleteFlag, getContractItems, getPageTitleBlock, listFlagNonAssessableAreas, listFlags,
+  createFlagOnPage, createSegment, deleteFlag, getContractItems, getPageTitleBlock, listFlagNonAssessableAreas, listFlags,
   listPirFeatures, listPirSegments, putSidewalkStrip, updateFlag,
 } from '../../services/api'
 import { newFlagValues } from '../../lib/flags'
+import { bundleNumbers } from '../../lib/bundleGeometry'
+import { isLinearFoot, mostUsedLfItem } from '../../lib/segmentItems'
 import { flagsToFlip, stripFrontageFt, stripProblem } from '../../lib/stripGeometry'
 import ConfirmDialog from '../ConfirmDialog'
+import BundleModal from './BundleModal'
+import BundlePanel from './BundlePanel'
 import CalibrateControl from './CalibrateControl'
+import CurbControl, { CURB_NO_ROLE, CURB_NO_SCALE } from './CurbControl'
 import FlagPanel from './FlagPanel'
 import FlagsFallbackList from './FlagsFallbackList'
 import SegmentsTable from './SegmentsTable'
+import SegmentPanel from './SegmentPanel'
 import ShapeToolbar from './ShapeToolbar'
 import SketchCanvas from './SketchCanvas'
 import StripControl, { STRIP_NO_ROLE, STRIP_NO_SCALE } from './StripControl'
@@ -25,6 +31,16 @@ export const STRIP_CLEAR_MESSAGE = 'The strip is removed. Flags it marked non-as
   + 'one in the flag editor if needed.'
 // Two clicks closer than this (page pixels) are one point: a double-click's two clicks, say
 const SAME_POINT_PX = 3
+// The bundle button's reasons for being disabled (Slice Y4a)
+export const BUNDLE_NO_ROLE = 'Only an OE, an RE or an admin bundles flags.'
+export const BUNDLE_SELECT = 'Ctrl- or Cmd-click two or more flags to bundle them.'
+export const BUNDLE_LINE_READER = 'Bundled with other flags into one measurement.'
+
+// Adds a point unless it is on the last (a double-click's second click)
+const withPoint = (current, point) => {
+  const last = current[current.length - 1]
+  return last && Math.hypot(point.x - last.x, point.y - last.y) < SAME_POINT_PX ? current : [...current, point]
+}
 
 /** What a saved strip did, for its toast. */
 export function stripSavedText(flipped, claimed) {
@@ -77,11 +93,21 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * drops it; while drawing, the flags it would mark non-assessable are tinted red (lib/stripGeometry.js, the backend's
  * own test). The save's toast says how many flags were marked and how many claimed ones were left; the marked flags
  * are updated in place. Clear asks first and warns that marked flags stay so.
- * Props: pir (id, project_id), page, pages, writer, stripWriter, onPageSaved(page), onJump(pageNumber), onImageError,
- * initialFlagId (the flag selected to start, from the URL's ?flag=), onOpenIdr(flag).
+ * Bundles (Slice Y4a): Ctrl- or Cmd-click adds flags to the selection; "Bundle flags" (an OE, an RE or an admin, two
+ * or more selected) opens BundleModal for the outline measured. Bundles are drawn with their members outlined in
+ * violet and an "M1" label (numbered per PIR by lowest flag number); the label, or "Open bundle" on a bundled flag's
+ * panel, opens BundlePanel (mark re-measured, edit the outline, unbundle). Anyone else sees "Bundled" on a bundled
+ * flag. The PIR's flags are read again after a bundle is formed, changed or broken up.
+ * Curbs (Slice Y4a; CurbControl): a writer picks the type and pay item (the project's LF items, the one the PIR's curbs
+ * use most to start) and draws a curb as the strip is drawn, its points saved on Finish, Enter or a double-click
+ * (createSegment). Clicking a curb opens SegmentPanel (type, pay item, reported length, delete).
+ * Props: pir (id, project_id), page, pages, writer, stripWriter, bundleWriter (an OE, an RE or an admin: bundles),
+ * onPageSaved(page), onJump(pageNumber), onImageError, initialFlagId (the flag selected to start, from the URL's
+ * ?flag=), onOpenIdr(flag).
  */
 export default function SketchWorkspace({
-  pir, page, pages, writer, stripWriter = false, onPageSaved, onJump, onImageError, initialFlagId = null, onOpenIdr,
+  pir, page, pages, writer, stripWriter = false, bundleWriter = false, onPageSaved, onJump, onImageError,
+  initialFlagId = null, onOpenIdr,
 }) {
   const [flags, setFlags] = useState([])
   const [areas, setAreas] = useState([])
@@ -92,7 +118,15 @@ export default function SketchWorkspace({
   const [loadError, setLoadError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
 
-  const [selectedId, setSelectedId] = useState(initialFlagId)
+  const [selectedIds, setSelectedIds] = useState(initialFlagId ? [initialFlagId] : [])
+  const [selectedBundle, setSelectedBundle] = useState(null)
+  const [selectedSegment, setSelectedSegment] = useState(null)
+  const [bundling, setBundling] = useState(false)
+  const [drawingCurb, setDrawingCurb] = useState(false)
+  const [curbPoints, setCurbPoints] = useState([])
+  const [curbBusy, setCurbBusy] = useState(false)
+  const [curbType, setCurbType] = useState('curb_concrete')
+  const [curbPayItem, setCurbPayItem] = useState(undefined) // undefined until the PIR's curbs are read
   const [activeShape, setActiveShape] = useState(null)
   const [calibrating, setCalibrating] = useState(false)
   const [calibratePoints, setCalibratePoints] = useState([])
@@ -132,6 +166,8 @@ export default function SketchWorkspace({
         setFeatures(foundFeatures)
         setSegments(foundSegments)
         setAreas(foundAreas)
+        setCurbPayItem(current => (current === undefined
+          ? mostUsedLfItem(foundItems.filter(isLinearFoot), foundSegments) : current))
       })
       .catch(err => { if (!ignore) setLoadError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
@@ -142,7 +178,72 @@ export default function SketchWorkspace({
   const canDraw = writer && scaled
   const pageFlags = flags.filter(flag => flag.pir_page_id === page.pir_page_id)
   const onPage = (item) => item.pir_page_id === page.pir_page_id
-  const selected = pageFlags.find(flag => flag.id === selectedId) ?? null
+  // One flag selected: its panel; several: the bundle button
+  const selectedFlags = pageFlags.filter(flag => selectedIds.includes(flag.id))
+  const selected = selectedFlags.length === 1 ? selectedFlags[0] : null
+  const numbers = bundleNumbers(flags)
+  const bundles = Object.entries(numbers).map(([id, number]) => ({
+    id, number, flagIds: pageFlags.filter(flag => flag.bundled && flag.measurement_id === id).map(flag => flag.id),
+  })).filter(bundle => bundle.flagIds.length > 0)
+  const lfItems = contractItems.filter(isLinearFoot)
+  const canDrawCurb = writer && scaled
+  const pickedSegment = segments.find(segment => segment.segment_id === selectedSegment && onPage(segment)) ?? null
+
+  const setSelectedId = (id) => {
+    setSelectedIds(id ? [id] : [])
+    setSelectedBundle(null)
+    setSelectedSegment(null)
+  }
+  const toggleSelected = (id) => {
+    setSelectedIds(current => (current.includes(id) ? current.filter(found => found !== id) : [...current, id]))
+    setSelectedBundle(null)
+    setSelectedSegment(null)
+  }
+  const openBundle = (id) => {
+    setSelectedIds([])
+    setSelectedSegment(null)
+    setSelectedBundle(id)
+  }
+  const openSegment = (id) => {
+    setSelectedIds([])
+    setSelectedBundle(null)
+    setSelectedSegment(id)
+  }
+  // The PIR's flags again, quietly: a bundle formed, changed or broken up changes their measurement and quantities
+  const refreshFlags = async () => {
+    try {
+      setFlags(await listFlags(pir.id))
+    } catch (err) {
+      setActionError(`Couldn't read the flags again: ${err.message}`)
+    }
+  }
+
+  const cancelCurb = () => {
+    setDrawingCurb(false)
+    setCurbPoints([])
+  }
+
+  const finishCurb = async () => {
+    if (!drawingCurb || curbBusy) return
+    if (curbPoints.length < 2) {
+      setActionError('A curb takes two points or more.')
+      return
+    }
+    setCurbBusy(true)
+    setActionError(null)
+    try {
+      const points = curbPoints.map(({ x, y }) => ({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }))
+      const created = await createSegment(page.pir_page_id, { segment_type: curbType, points, pay_item_id: curbPayItem ?? null })
+      setSegments(current => [...current, created])
+      cancelCurb()
+      openSegment(created.segment_id)
+      setToast('Curb drawn.')
+    } catch (err) {
+      setActionError(`Couldn't save the curb: ${err.message}`)
+    } finally {
+      setCurbBusy(false)
+    }
+  }
   const canDrawStrip = stripWriter && scaled
   const wouldFlip = drawingStrip && stripPoints.length >= 3 ? flagsToFlip(stripPoints, pageFlags, page.scale_px_per_ft) : []
 
@@ -155,6 +256,7 @@ export default function SketchWorkspace({
 
   const startStrip = () => {
     stopCalibrating()
+    cancelCurb()
     setActiveShape(null)
     setActionError(null)
     setStripPoints([])
@@ -167,10 +269,7 @@ export default function SketchWorkspace({
   }
 
   // A click close to the last point (a double-click's second click) adds nothing
-  const addStripPoint = (point) => setStripPoints(current => {
-    const last = current[current.length - 1]
-    return last && Math.hypot(point.x - last.x, point.y - last.y) < SAME_POINT_PX ? current : [...current, point]
-  })
+  const addStripPoint = (point) => setStripPoints(current => withPoint(current, point))
 
   const finishStrip = async () => {
     if (!drawingStrip || stripBusy) return
@@ -250,7 +349,7 @@ export default function SketchWorkspace({
       return
     }
     setFlags(current => current.filter(found => found.id !== flag.id))
-    setSelectedId(current => (current === flag.id ? null : current))
+    setSelectedIds(current => current.filter(id => id !== flag.id))
     setToast(`Flag #${flag.display_order} deleted.`)
   }
 
@@ -262,6 +361,12 @@ export default function SketchWorkspace({
         e.preventDefault()
         if (e.key === 'Escape') cancelStrip()
         else finishStrip()
+        return
+      }
+      if (drawingCurb && (e.key === 'Escape' || e.key === 'Enter')) {
+        e.preventDefault()
+        if (e.key === 'Escape') cancelCurb()
+        else finishCurb()
         return
       }
       if (e.key === 'Escape') {
@@ -286,8 +391,8 @@ export default function SketchWorkspace({
       <div className="flex flex-wrap items-start gap-3 mb-4">
         <ShapeToolbar
           activeShape={activeShape}
-          onPick={(shape) => { stopCalibrating(); cancelStrip(); setActiveShape(shape) }}
-          disabled={!canDraw || calibrating || drawingStrip}
+          onPick={(shape) => { stopCalibrating(); cancelStrip(); cancelCurb(); setActiveShape(shape) }}
+          disabled={!canDraw || calibrating || drawingStrip || drawingCurb}
           disabledReason={writer && !scaled ? NO_SCALE_REASON : null}
         />
         <div className="flex items-center gap-2">
@@ -326,6 +431,30 @@ export default function SketchWorkspace({
           onClear={() => setClearing({ error: null })}
           onToggleShown={() => setStripShown(shown => !shown)}
         />
+        <CurbControl
+          drawing={drawingCurb}
+          points={curbPoints}
+          canDraw={canDrawCurb && !drawingStrip && !calibrating}
+          disabledReason={!writer ? CURB_NO_ROLE : CURB_NO_SCALE}
+          busy={curbBusy}
+          type={curbType}
+          onType={setCurbType}
+          payItemId={curbPayItem ?? null}
+          onPayItem={setCurbPayItem}
+          lfItems={lfItems}
+          onStart={() => { stopCalibrating(); cancelStrip(); setActiveShape(null); setActionError(null); setCurbPoints([]); setDrawingCurb(true) }}
+          onFinish={finishCurb}
+          onCancel={cancelCurb}
+        />
+        {bundleWriter && (
+          <span title={selectedFlags.length >= 2 ? undefined : BUNDLE_SELECT} className="inline-flex">
+            <button type="button" onClick={() => setBundling(true)} disabled={selectedFlags.length < 2}
+              title={selectedFlags.length >= 2 ? undefined : BUNDLE_SELECT} className={TOOL_BUTTON}>
+              <Combine className="h-4 w-4 text-violet-600" />
+              <span>Bundle flags{selectedFlags.length >= 2 ? ` (${selectedFlags.length})` : ''}</span>
+            </button>
+          </span>
+        )}
         <ComingButton icon={Sparkles} label="Auto-detect with AI" tooltip={AI_DETECT_TOOLTIP} />
       </div>
 
@@ -339,6 +468,17 @@ export default function SketchWorkspace({
           features={features.filter(onPage)}
           segments={segments.filter(onPage)}
           selectedId={selected?.id ?? null}
+          selectedIds={selectedIds}
+          bundles={bundles}
+          selectedBundleId={selectedBundle}
+          selectedSegmentId={pickedSegment?.segment_id ?? null}
+          drawingCurb={drawingCurb}
+          curbPoints={curbPoints}
+          onCurbPoint={(point) => setCurbPoints(current => withPoint(current, point))}
+          onCurbFinish={finishCurb}
+          onToggleSelect={toggleSelected}
+          onSelectBundle={bundleWriter ? openBundle : undefined}
+          onSelectSegment={openSegment}
           activeShape={canDraw ? activeShape : null}
           calibrating={calibrating}
           calibratePoints={calibratePoints}
@@ -367,16 +507,56 @@ export default function SketchWorkspace({
               <p className="text-red-600 mb-4">Couldn't load the flags: {loadError}</p>
               <button type="button" onClick={() => setAttempt(a => a + 1)} className="btn-primary">Retry</button>
             </div>
-          ) : selected ? (
-            <FlagPanel
-              key={selected.id}
-              flag={selected}
-              contractItems={contractItems}
-              writer={writer}
-              onSaved={replaceFlag}
-              onDelete={remove}
-              onOpenIdr={onOpenIdr}
+          ) : selectedBundle && bundleWriter ? (
+            <BundlePanel
+              key={selectedBundle}
+              measurementId={selectedBundle}
+              number={numbers[selectedBundle] ?? '?'}
+              flags={flags}
+              onChanged={() => { refreshFlags() }}
+              onUnbundled={() => { setSelectedBundle(null); refreshFlags(); setToast('Bundle broken up: each flag measured on its own again.') }}
             />
+          ) : pickedSegment ? (
+            <SegmentPanel
+              key={pickedSegment.segment_id}
+              segment={pickedSegment}
+              lfItems={lfItems}
+              writer={writer}
+              onSaved={saved => setSegments(current => current.map(s => (s.segment_id === saved.segment_id ? saved : s)))}
+              onDeleted={gone => {
+                setSegments(current => current.filter(s => s.segment_id !== gone.segment_id))
+                setSelectedSegment(null)
+                setToast('Curb deleted.')
+              }}
+            />
+          ) : selected ? (
+            <>
+              {selected.bundled && (
+                <p className="mb-3 rounded-md bg-violet-50 px-2 py-1.5 text-sm text-violet-800" data-testid="flag-bundle-line">
+                  {bundleWriter ? (
+                    <>
+                      In bundle M{numbers[selected.measurement_id] ?? '?'}{' '}
+                      <button type="button" onClick={() => openBundle(selected.measurement_id)}
+                        className="font-medium underline">Open bundle</button>
+                    </>
+                  ) : BUNDLE_LINE_READER}
+                </p>
+              )}
+              <FlagPanel
+                key={selected.id}
+                flag={selected}
+                contractItems={contractItems}
+                writer={writer}
+                onSaved={replaceFlag}
+                onDelete={remove}
+                onOpenIdr={onOpenIdr}
+              />
+            </>
+          ) : selectedFlags.length >= 2 ? (
+            <p className="text-sm text-gray-700" data-testid="multi-selection">
+              {selectedFlags.length} flags selected ({selectedFlags.map(flag => `#${flag.display_order}`).join(', ')}).
+              {bundleWriter ? ' Bundle them from the toolbar.' : ''}
+            </p>
           ) : (
             <p className="text-sm text-gray-600">{writer ? PANEL_EMPTY_WRITER_TEXT : PANEL_EMPTY_TEXT}</p>
           )}
@@ -389,6 +569,20 @@ export default function SketchWorkspace({
           <SegmentsTable segments={segments} pages={pages} contractItems={contractItems} writer={writer}
             onSaved={saved => setSegments(current => current.map(s => (s.segment_id === saved.segment_id ? saved : s)))} />
         </>
+      )}
+
+      {bundling && (
+        <BundleModal
+          page={page}
+          flags={selectedFlags}
+          onClose={() => setBundling(false)}
+          onBundled={async (formed) => {
+            setBundling(false)
+            await refreshFlags()
+            openBundle(formed.measurement_id)
+            setToast(`Bundle formed: ${formed.members.length} flags.`)
+          }}
+        />
       )}
 
       {clearing && (
