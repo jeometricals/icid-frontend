@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SketchWorkspace, {
-  AI_DETECT_TOOLTIP, BUNDLE_LINE_READER, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
+  AI_DETECT_TOOLTIP, BUNDLE_CROSS_PAGE, BUNDLE_LINE_READER, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
 } from '../SketchWorkspace'
 import { EMPTY_TEXT } from '../FlagsFallbackList'
 import * as api from '../../../services/api'
@@ -12,7 +12,7 @@ vi.mock('../../../services/api', () => ({
   listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
   setPirPageScale: vi.fn(), listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
   updateSegment: vi.fn(), getPageTitleBlock: vi.fn(), putSidewalkStrip: vi.fn(), createSegment: vi.fn(), deleteSegment: vi.fn(),
-  getMeasurement: vi.fn(), bundleFlags: vi.fn(), updateMeasurement: vi.fn(), unbundleMeasurement: vi.fn(),
+  getMeasurement: vi.fn(), bundleFlags: vi.fn(), updateMeasurement: vi.fn(), unbundleMeasurement: vi.fn(), listPirMatchLines: vi.fn(),
 }))
 
 const PIR = { id: 'pir-1', project_id: 'HWS0023' }
@@ -38,6 +38,7 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue(MOCK_CONTRACT_ITEMS)
   api.listPirFeatures.mockResolvedValue([])
   api.listPirSegments.mockResolvedValue([])
+  api.listPirMatchLines.mockResolvedValue([])
   api.listFlagNonAssessableAreas.mockResolvedValue([])
   api.getPageTitleBlock.mockResolvedValue(null) // no title block, so no sidewalk strip
   api.createFlagOnPage.mockImplementation(async (pageId, body) => ({ ...flag('new'), ...body, pir_page_id: pageId }))
@@ -58,8 +59,11 @@ afterEach(() => {
 })
 
 function renderWorkspace(props = {}) {
-  const handlers = { onPageSaved: vi.fn(), onJump: vi.fn(), onImageError: vi.fn() }
-  const view = render(<SketchWorkspace pir={PIR} page={PAGES[0]} pages={PAGES} writer {...handlers} {...props} />)
+  const handlers = { onPageSaved: vi.fn(), onPageVisible: vi.fn(), onImageError: vi.fn(), onRotate: vi.fn(), onSetScale: vi.fn() }
+  // One page unless the test asks for more (Slice Y4b draws every page it is given); `page` picks which
+  const { page, ...rest } = props
+  const pages = rest.pages ?? [page ?? PAGES[0]]
+  const view = render(<SketchWorkspace pir={PIR} pages={pages} writer {...handlers} {...rest} />)
   return { ...handlers, ...view }
 }
 
@@ -299,7 +303,7 @@ describe('SketchWorkspace — calibrating', () => {
 
 describe('SketchWorkspace — the fallback list', () => {
   it('lists every flag across the pages, read-only', async () => {
-    await renderLoaded()
+    await renderLoaded({ pages: PAGES })
     const list = screen.getByRole('region', { name: 'All flags' })
     const rows = within(list).getAllByRole('row').slice(1)
     expect(rows.map(row => row.textContent)).toEqual([
@@ -311,12 +315,13 @@ describe('SketchWorkspace — the fallback list', () => {
     expect(within(list).queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it("jumps to a flag's page and selects it there", async () => {
-    const { onJump, rerender } = await renderLoaded()
+  it("scrolls to a flag's page and selects it there (Slice Y4b)", async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const { onPageVisible } = await renderLoaded({ pages: PAGES })
     const list = screen.getByRole('region', { name: 'All flags' })
     await userEvent.click(within(list).getAllByRole('row')[3])
-    expect(onJump).toHaveBeenCalledWith(2)
-    rerender(<SketchWorkspace pir={PIR} page={PAGES[1]} pages={PAGES} writer onPageSaved={vi.fn()} onJump={onJump} onImageError={vi.fn()} />)
+    await waitFor(() => expect(onPageVisible).toHaveBeenCalledWith(2))
+    expect(scrollTo).toHaveBeenCalled()
     expect(flagShape(3)).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('complementary', { name: 'Flag #3' })).toBeInTheDocument()
   })
@@ -391,7 +396,7 @@ describe('SketchWorkspace — features, segments and non-assessable areas', () =
   })
 
   it("lists the PIR's curb segments under the flags, every page's (Slice X.1)", async () => {
-    await renderLoaded()
+    await renderLoaded({ pages: PAGES })
     const table = screen.getByRole('table', { name: 'Curb segments' })
     expect(within(table).getAllByRole('row')).toHaveLength(3)
     expect(within(table).getAllByRole('row')[2]).toHaveTextContent(/^22Concrete curb/)
@@ -649,5 +654,147 @@ describe('SketchWorkspace — bundles and curbs (Slice Y4a)', () => {
     await renderLoaded()
     press(screen.getByRole('button', { name: 'Curb: Concrete curb' }), 200, 700)
     expect(await screen.findByTestId('segment-panel')).toHaveTextContent('Drawn length 30.00 LF')
+  })
+})
+
+describe('SketchWorkspace — the scrollable page stack (Slice Y4b)', () => {
+  const A1 = { match_line_id: 'a1', pir_id: PIR.id, pir_page_id: 'page-1', page_number: 1, label: 'A', x1: 100, y1: 700, x2: 1100, y2: 700 }
+  const A2 = { match_line_id: 'a2', pir_id: PIR.id, pir_page_id: 'page-2', page_number: 2, label: 'A', x1: 100, y1: 50, x2: 1100, y2: 50 }
+  let scrollTo
+
+  beforeEach(() => {
+    scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  })
+
+  it('draws every page under its own header, each with its own flags, Rotate and Set scale', async () => {
+    const { onRotate, onSetScale } = await renderLoaded({ pages: [page(1), page(2, { scale_px_per_ft: 12.5 })] })
+    expect(screen.getAllByTestId('page-box')).toHaveLength(2)
+    expect(within(screen.getByTestId('page-header-1')).getByText('Page 1 of 2')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-header-2')).getByText('Scale: 12.5 px/ft')).toBeInTheDocument()
+    const second = screen.getByRole('region', { name: 'Page 2' })
+    expect(within(second).getByRole('button', { name: 'Flag #3' })).toBeInTheDocument()
+    expect(within(second).queryByRole('button', { name: 'Flag #1' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate page 2' }))
+    expect(onRotate).toHaveBeenCalledWith(expect.objectContaining({ pir_page_id: 'page-2' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Set the scale of page 1' }))
+    expect(onSetScale).toHaveBeenCalledWith(expect.objectContaining({ pir_page_id: 'page-1' }))
+  })
+
+  it('keeps the toolbar and the panel sticky', async () => {
+    await renderLoaded({ pages: PAGES })
+    expect(screen.getByTestId('sketch-toolbar')).toHaveClass('sticky', 'top-0', 'flex-nowrap')
+    expect(screen.getByTestId('sketch-panel')).toHaveClass('lg:sticky')
+  })
+
+  it('opens scrolled to the page asked for, and reports it once there', async () => {
+    const { onPageVisible } = await renderLoaded({ pages: PAGES, initialPageNumber: 2 })
+    await waitFor(() => expect(onPageVisible).toHaveBeenCalledWith(2))
+    expect(scrollTo).toHaveBeenCalled()
+  })
+
+  it('stays put on page 1', async () => {
+    const { onPageVisible } = await renderLoaded({ pages: PAGES })
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(onPageVisible).not.toHaveBeenCalled()
+  })
+
+  it('scrolls with ] and [ and the number keys, not with a modifier held', async () => {
+    const pages = [page(1), page(2), page(3)]
+    const { onPageVisible } = await renderLoaded({ pages })
+    await userEvent.keyboard(']')
+    await waitFor(() => expect(onPageVisible).toHaveBeenLastCalledWith(2))
+    await userEvent.keyboard('3')
+    await waitFor(() => expect(onPageVisible).toHaveBeenLastCalledWith(3))
+    await userEvent.keyboard('[[')
+    await waitFor(() => expect(onPageVisible).toHaveBeenLastCalledWith(2))
+    await userEvent.keyboard('9') // no page 9
+    expect(onPageVisible).toHaveBeenCalledTimes(3)
+
+    await userEvent.keyboard('{Control>}]{/Control}') // a modifier: not a page key
+    expect(onPageVisible).toHaveBeenCalledTimes(3)
+  })
+
+  it('refuses to bundle flags on more than one page, saying why', async () => {
+    await renderLoaded({ pages: PAGES, bundleWriter: true })
+    press(flagShape(1), 300, 200)
+    fireEvent.pointerUp(screen.getAllByTestId('sketch-overlay')[0], { clientX: 300, clientY: 200, pointerId: 1 })
+    fireEvent.pointerDown(flagShape(3), { clientX: 300, clientY: 200, button: 0, pointerId: 1, ctrlKey: true })
+    expect(screen.getByTestId('multi-selection')).toHaveTextContent('2 flags selected')
+    const button = screen.getByRole('button', { name: /Bundle flags/ })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', BUNDLE_CROSS_PAGE)
+  })
+
+  it("reads the PIR's match lines and captions each with its partner page", async () => {
+    api.listPirMatchLines.mockResolvedValue([A1, A2])
+    await renderLoaded({ pages: PAGES })
+    expect(api.listPirMatchLines).toHaveBeenCalledWith(PIR.id)
+    expect(within(screen.getByRole('region', { name: 'Page 1' })).getByRole('button', { name: /SEE PAGE 2/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Page 2' })).getByRole('button', { name: /SEE PAGE 1/ })).toBeInTheDocument()
+  })
+
+  it("draws the pages without lines when they can't be read", async () => {
+    api.listPirMatchLines.mockRejectedValue(new Error('boom'))
+    await renderLoaded({ pages: PAGES })
+    expect(screen.queryByRole('button', { name: /MATCH LINE/ })).not.toBeInTheDocument()
+    expect(flagShape(1)).toBeInTheDocument()
+  })
+
+  it("a caption scrolls to its partner line, centred, reports the page and lights the partner's caption a moment", async () => {
+    api.listPirMatchLines.mockResolvedValue([A1, A2])
+    const { onPageVisible } = await renderLoaded({ pages: PAGES })
+    const captionText = (id) => document.querySelector(`[data-match-caption="${id}"] text`)
+    await userEvent.click(screen.getByRole('button', { name: /SEE PAGE 2/ }))
+    await waitFor(() => expect(onPageVisible).toHaveBeenCalledWith(2))
+    expect(scrollTo).toHaveBeenCalled()
+    expect(captionText('a2')).toHaveAttribute('fill', '#d97706')
+    expect(captionText('a1')).toHaveAttribute('fill', '#111827')
+    await waitFor(() => expect(captionText('a2')).toHaveAttribute('fill', '#111827'), { timeout: 2500 })
+  })
+})
+
+describe('SketchWorkspace — the page in view (Slice Y4b)', () => {
+  let report // the observer's callback
+  const section = (number) => document.querySelector(`section[data-page-number="${number}"]`)
+  const cross = (number, isIntersecting) => act(() => report([{ target: section(number), isIntersecting }]))
+
+  beforeEach(() => {
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback) { report = callback }
+      observe() {}
+      disconnect() {}
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reports the page across the line, and the first page once above it', async () => {
+    const { onPageVisible } = await renderLoaded({ pages: [page(1), page(2), page(3)] })
+    cross(2, true)
+    expect(onPageVisible).toHaveBeenLastCalledWith(2)
+    cross(2, false) // between pages: page 2 stands
+    expect(onPageVisible).toHaveBeenCalledTimes(1)
+    cross(3, true)
+    expect(onPageVisible).toHaveBeenLastCalledWith(3)
+    // Back above the first page: its top below the line
+    const rect = section(1).getBoundingClientRect
+    section(1).getBoundingClientRect = () => ({ top: window.innerHeight, left: 0, width: 0, height: 0, right: 0, bottom: 0 })
+    cross(3, false)
+    expect(onPageVisible).toHaveBeenLastCalledWith(1)
+    section(1).getBoundingClientRect = rect
+  })
+
+  it('reports nothing before the flags are read and the page asked for is reached', async () => {
+    let read
+    api.listFlags.mockImplementation(() => new Promise(resolve => { read = resolve }))
+    const { onPageVisible } = renderWorkspace({ pages: [page(1), page(2), page(3)], initialPageNumber: 3 })
+    await waitFor(() => expect(section(2)).toBeInTheDocument())
+    cross(2, true)
+    expect(onPageVisible).not.toHaveBeenCalled()
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    await act(async () => read(structuredClone(flags)))
+    await waitFor(() => expect(onPageVisible).toHaveBeenCalledWith(3))
+    expect(onPageVisible).toHaveBeenCalledTimes(1)
   })
 })

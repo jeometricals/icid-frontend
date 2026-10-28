@@ -22,7 +22,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     getProperty: vi.fn(), getPirByProperty: vi.fn(), listPirPages: vi.fn(), deletePirPages: vi.fn(),
     setPirPageRotation: vi.fn(), setPirPageScale: vi.fn(),
     listFlags: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
-    listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
+    listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listPirMatchLines: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
     getPageTitleBlock: vi.fn(), updatePirTitleBlock: vi.fn(), getPropertyPayItemSummary: vi.fn(),
     // The IDR, its sites and their pay items
     getIdr: vi.fn(), getContractItems: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(),
@@ -163,6 +163,7 @@ beforeEach(() => {
   api.listFlags.mockResolvedValue([])
   api.listPirFeatures.mockResolvedValue([])
   api.listPirSegments.mockResolvedValue([])
+  api.listPirMatchLines.mockResolvedValue([])
   api.getPageTitleBlock.mockResolvedValue(null)
   api.getPropertyPayItemSummary.mockResolvedValue([])
 

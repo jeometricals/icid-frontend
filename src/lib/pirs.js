@@ -44,3 +44,6 @@ export const PIR_ACTIONS = {
     done: () => 'PIR restored.',
   },
 }
+
+/** A page's scale as the workspace shows it: "15 px/ft", or "not set". */
+export const scaleText = (scale) => (scale == null ? 'not set' : `${Number(Number(scale).toFixed(2))} px/ft`)

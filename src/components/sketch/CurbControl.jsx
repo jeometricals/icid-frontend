@@ -14,8 +14,8 @@ const SELECT = 'rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm t
 
 /**
  * The sketch toolbar's curb tool (Slice Y4a), as the sidewalk strip's: the curb's type and pay item (the project's LF
- * items; none to leave it unmapped), then "Draw curb"; while drawing, the hint, how many points, Finish (two points or
- * more) and Cancel. Disabled, with its reason as a tooltip, for anyone who may not draw or on a page without a scale.
+ * items; none to leave it unmapped), then "Draw curb"; while drawing, how many points, Finish (two points or more) and
+ * Cancel, the hint a tooltip on "Drawing a curb" (Slice Y4b: one row, so the sticky toolbar never changes height). Disabled, with its reason as a tooltip, for anyone who may not draw or on a page without a scale.
  * Props: drawing, points (drawn so far), canDraw, disabledReason, busy, type, onType, payItemId, onPayItem, lfItems,
  * onStart, onFinish, onCancel.
  */
@@ -38,24 +38,25 @@ export default function CurbControl({
   )
   if (drawing) {
     return (
-      <div className="flex flex-wrap items-center gap-2" data-testid="curb-drawing">
-        <span className={ACTIVE}><Route className="h-4 w-4" />Drawing a curb</span>
+      <div className="flex shrink-0 flex-nowrap items-center gap-2" data-testid="curb-drawing">
+        <span className={`${ACTIVE} whitespace-nowrap`} title={CURB_HINT}><Route className="h-4 w-4" />Drawing a curb</span>
         {pickers}
-        <span className="text-xs text-gray-600 max-w-xs">{CURB_HINT}</span>
-        <span className="text-xs text-gray-700" aria-live="polite">{points.length} point{points.length === 1 ? '' : 's'}</span>
-        <button type="button" onClick={onFinish} disabled={busy || points.length < 2} className="btn-primary text-sm">
+        <span className="whitespace-nowrap text-xs text-gray-700" aria-live="polite">
+          {points.length} point{points.length === 1 ? '' : 's'}
+        </span>
+        <button type="button" onClick={onFinish} disabled={busy || points.length < 2} className="btn-primary whitespace-nowrap text-sm">
           {busy ? 'Saving...' : 'Finish'}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy} className="btn-secondary text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} disabled={busy} className="btn-secondary whitespace-nowrap text-sm">Cancel</button>
       </div>
     )
   }
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex shrink-0 flex-nowrap items-center gap-2">
       {pickers}
       <span title={canDraw ? undefined : disabledReason} className="inline-flex">
         <button type="button" onClick={onStart} disabled={!canDraw || busy} title={canDraw ? undefined : disabledReason}
-          className={PLAIN}>
+          className={`${PLAIN} whitespace-nowrap`}>
           <Route className="h-4 w-4" /><span>Draw curb</span>
         </button>
       </span>

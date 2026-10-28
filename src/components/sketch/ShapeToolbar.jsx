@@ -18,8 +18,8 @@ const ICONS = {
  */
 export default function ShapeToolbar({ activeShape, onPick, disabled = false, disabledReason = null }) {
   return (
-    <div className="space-y-2">
-      <div role="toolbar" aria-label="Shapes" className="flex flex-wrap items-center gap-2">
+    <div className="shrink-0 space-y-2">
+      <div role="toolbar" aria-label="Shapes" className="flex flex-nowrap items-center gap-2">
         {FLAG_SHAPES.map(({ value, label }) => {
           const active = activeShape === value
           return (
@@ -43,7 +43,7 @@ export default function ShapeToolbar({ activeShape, onPick, disabled = false, di
             </button>
           )
         })}
-        <ul aria-label="Thickness colours" className="flex flex-wrap items-center gap-3 ml-2 text-xs text-gray-600">
+        <ul aria-label="Thickness colours" className="flex flex-nowrap items-center gap-3 ml-2 whitespace-nowrap text-xs text-gray-600">
           {FLAG_THICKNESSES.map(({ value, label }) => (
             <li key={value} className="inline-flex items-center gap-1">
               <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: thicknessColor(value) }} aria-hidden="true" />

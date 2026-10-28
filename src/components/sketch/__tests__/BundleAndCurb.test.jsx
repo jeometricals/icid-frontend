@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import BundleModal from '../BundleModal'
 import BundlePanel, { FROZEN_UNBUNDLE } from '../BundlePanel'
-import CurbControl from '../CurbControl'
+import CurbControl, { CURB_HINT } from '../CurbControl'
 import SegmentPanel from '../SegmentPanel'
 import * as api from '../../../services/api'
 
@@ -141,6 +141,9 @@ describe('CurbControl and SegmentPanel (Slice Y4a)', () => {
     expect(props.onStart).toHaveBeenCalled()
     rerender(<CurbControl drawing points={[{ x: 0, y: 0 }]} {...props} />)
     expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled()
+    // One row while drawing: the hint is a tooltip, not text that wraps the toolbar (Slice Y4b)
+    expect(screen.getByText('Drawing a curb')).toHaveAttribute('title', CURB_HINT)
+    expect(screen.getByTestId('curb-drawing')).toHaveClass('flex-nowrap')
     rerender(<CurbControl drawing points={[{ x: 0, y: 0 }, { x: 5, y: 0 }]} {...props} />)
     expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled()
   })
