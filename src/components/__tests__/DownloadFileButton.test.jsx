@@ -62,3 +62,40 @@ describe('DownloadFileButton', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
+
+describe('DownloadFileButton — a menu of formats (the Assessment Summary polish)', () => {
+  const menuButton = () => screen.getByRole('button', { name: 'Download Construction Report' })
+
+  it('opens a menu of the formats and downloads the one picked', async () => {
+    const download = renderButton({ formats: ['xlsx', 'csv'] })
+    expect(menuButton()).toHaveAttribute('aria-haspopup', 'menu')
+    await userEvent.click(menuButton())
+    expect(download).not.toHaveBeenCalled()
+    expect(menuButton()).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'CSV' }))
+    expect(download).toHaveBeenCalledWith('csv')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('closes on a click elsewhere', async () => {
+    renderButton({ formats: ['xlsx', 'csv'] })
+    await userEvent.click(menuButton())
+    await userEvent.click(document.body)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('retries the format picked', async () => {
+    const download = vi.fn().mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValueOnce('a.csv')
+    renderButton({ download, formats: ['xlsx', 'csv'] })
+    await userEvent.click(menuButton())
+    await userEvent.click(screen.getByRole('menuitem', { name: 'CSV' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+    expect(download.mock.calls).toEqual([['csv'], ['csv']])
+  })
+
+  it('opens nothing while off', async () => {
+    renderButton({ formats: ['xlsx', 'csv'], enabled: false, disabledTitle: 'No sites in this view' })
+    expect(menuButton()).toBeDisabled()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   downloadAssessmentSummary, downloadConstructionReport, downloadTailoredAssessmentSummary, getAssessmentSites,
+  listTaskOrders,
 } from '../services/api'
 import { formatDollars } from '../lib/payItemFormat'
 import DownloadFileButton from './DownloadFileButton'
@@ -43,6 +44,9 @@ export function matchesSearch(site, text) {
   return fields.some(field => field?.toLowerCase().includes(needle))
 }
 
+// What each download comes as (the polish slice's CSV mirror)
+export const DOWNLOAD_FORMATS = ['xlsx', 'csv']
+
 // The shown rows' totals: each figure summed to the cent; an amount stays null when no row has one
 function totalsOf(sites) {
   return Object.fromEntries(FIGURES.map(name => {
@@ -56,11 +60,13 @@ function totalsOf(sites) {
  * The Sidewalk Assessment Summary tab of As-Builts & Assessments: a project's constructed sites, a row each (a site
  * approved over several months is one row, its figures summed over the range). From and To (the date-constructed
  * period, ?from=&to=, YYYY-MM-DD; a flag counts on its site's Date Constructed, else its IDR's approval day) ask the
- * backend again; From after To says so and asks nothing. The search box (?q=) narrows the rows in the page by block,
- * lot, address or violation no. The table: the address (a link to the site's page, its block, lot and violation
- * under it), CB, the workbook's 4" and 7" columns, Grand Total, Remarks and a Construction Report download (the most
- * recently approved IDR's); a totals row of the rows shown. Below it "Download tailored report" (the rows shown, one
- * tab, off when none is) and "Download accumulative report" (the whole project's workbook, a tab per month).
+ * backend again; From after To says so and asks nothing. Task order (?task_order=, the project's task orders, "All task
+ * orders" to start) asks again for its sites only, and narrows both downloads too. The search box (?q=) narrows the
+ * rows in the page by block, lot, address or violation no. The table: the address (a link to the site's page, its
+ * block, lot and violation under it), CB, the workbook's 4" and 7" columns, Grand Total, Remarks and a Construction
+ * Report download (the most recently approved IDR's); a totals row of the rows shown. Below it "Download tailored
+ * report" (the rows shown, one tab, off when none is) and "Download accumulative report" (the project's workbook, a tab
+ * per month), each XLSX or CSV from its menu.
  * Props: projectId.
  */
 export default function SidewalkAssessmentTab({ projectId }) {
@@ -68,23 +74,34 @@ export default function SidewalkAssessmentTab({ projectId }) {
   const from = searchParams.get('from') || ''
   const to = searchParams.get('to') || ''
   const search = searchParams.get('q') || ''
+  const taskOrderId = searchParams.get('task_order') || ''
   const backwards = Boolean(from && to && from > to)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0) // bump to retry
+  const [taskOrders, setTaskOrders] = useState([])
+
+  // The project's task orders, for the filter; without them the filter offers "All task orders" alone
+  useEffect(() => {
+    let ignore = false
+    listTaskOrders(projectId)
+      .then(found => { if (!ignore) setTaskOrders(found ?? []) })
+      .catch(() => { if (!ignore) setTaskOrders([]) })
+    return () => { ignore = true }
+  }, [projectId])
 
   useEffect(() => {
     if (backwards) return // the backend would refuse it; the hint under the pickers says why nothing loads
     let ignore = false
     setLoading(true)
     setError(null)
-    getAssessmentSites(projectId, { from, to })
+    getAssessmentSites(projectId, { from, to, taskOrderId: taskOrderId || undefined })
       .then(found => { if (!ignore) setData(found) })
       .catch(err => { if (!ignore) setError(err.message) })
       .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
-  }, [projectId, from, to, backwards, attempt])
+  }, [projectId, from, to, taskOrderId, backwards, attempt])
 
   // Written with replace, so typing doesn't pile up history; an emptied value leaves the URL
   const change = (key, value) => {
@@ -113,7 +130,15 @@ export default function SidewalkAssessmentTab({ projectId }) {
             <input id="assessment-to" type="date" className="input-field" value={to}
               onChange={(e) => change('to', e.target.value)} />
           </div>
-          <div className="sm:col-span-2">
+          <div>
+            <label htmlFor="assessment-task-order" className="input-label">Task order</label>
+            <select id="assessment-task-order" className="input-field" value={taskOrderId}
+              onChange={(e) => change('task_order', e.target.value)}>
+              <option value="">All task orders</option>
+              {taskOrders.map(order => <option key={order.id} value={order.id}>{order.task_order_number}</option>)}
+            </select>
+          </div>
+          <div>
             <label htmlFor="assessment-search" className="input-label">Search</label>
             <input
               id="assessment-search"
@@ -207,15 +232,18 @@ export default function SidewalkAssessmentTab({ projectId }) {
       <div className="flex flex-wrap justify-end gap-4 mt-6">
         <DownloadFileButton
           label="Download tailored report"
+          formats={DOWNLOAD_FORMATS}
           enabled={Boolean(shown) && sites.length > 0}
           disabledTitle="No sites in this view"
-          download={() => downloadTailoredAssessmentSummary(projectId, {
-            from, to, propertyIds: searching ? sites.map(site => site.property_id) : undefined,
+          download={(format) => downloadTailoredAssessmentSummary(projectId, {
+            from, to, format, taskOrderId: taskOrderId || undefined,
+            propertyIds: searching ? sites.map(site => site.property_id) : undefined,
           })}
         />
         <DownloadFileButton
           label="Download accumulative report"
-          download={() => downloadAssessmentSummary(projectId)}
+          formats={DOWNLOAD_FORMATS}
+          download={(format) => downloadAssessmentSummary(projectId, { format, taskOrderId: taskOrderId || undefined })}
         />
       </div>
     </section>
