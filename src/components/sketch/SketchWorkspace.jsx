@@ -41,6 +41,7 @@ export const BUNDLE_NO_ROLE = 'Only an OE, an RE or an admin bundles flags.'
 export const BUNDLE_SELECT = 'Ctrl- or Cmd-click two or more flags to bundle them.'
 export const BUNDLE_LINE_READER = 'Bundled with other flags into one measurement.'
 export const BUNDLE_CROSS_PAGE = 'The flags are on more than one page'
+export const BUNDLE_CORNER_QUADRANT = "Corner-quadrant flags can't be bundled"
 
 // Adds a point unless it is on the last (a double-click's second click)
 const withPoint = (current, point) => {
@@ -99,7 +100,7 @@ const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
  * (lib/stripGeometry.js, the backend's own test). The save's toast says how many flags were marked and how many
  * claimed ones were left. Clear asks first and warns that marked flags stay so. One page is drawn on at a time.
  * Bundles (Slice Y4a): Ctrl- or Cmd-click adds flags to the selection; "Bundle flags" (an OE, an RE or an admin, two
- * or more selected, all on one page) opens BundleModal for the outline measured. Bundles are drawn with their members
+ * or more selected, all on one page, none a corner quadrant: Slice Y5) opens BundleModal for the outline measured. Bundles are drawn with their members
  * outlined in violet and an "M1" label (numbered per PIR by lowest flag number); the label, or "Open bundle" on a
  * bundled flag's panel, opens BundlePanel. Anyone else sees "Bundled" on a bundled flag. The PIR's flags are read again
  * after a bundle is formed, changed or broken up.
@@ -201,7 +202,10 @@ export default function SketchWorkspace({
   const selectedFlags = flags.filter(flag => selectedIds.includes(flag.id))
   const selected = selectedFlags.length === 1 ? selectedFlags[0] : null
   const onePage = new Set(selectedFlags.map(flag => flag.pir_page_id)).size <= 1
-  const canBundle = selectedFlags.length >= 2 && onePage
+  // A corner quadrant is measured on its own, never in a bundle (Slice Y5)
+  const quadrant = selectedFlags.some(flag => flag.shape === 'corner_quadrant')
+  const canBundle = selectedFlags.length >= 2 && onePage && !quadrant
+  const bundleBar = quadrant ? BUNDLE_CORNER_QUADRANT : BUNDLE_CROSS_PAGE
   const numbers = bundleNumbers(flags)
   const lfItems = contractItems.filter(isLinearFoot)
   const canDrawCurb = writer && scaledPages.length > 0
@@ -498,7 +502,7 @@ export default function SketchWorkspace({
       return { line, partner, caption: matchLineCaption(line, partner) }
     })
 
-  const bundleReason = !canBundle ? (selectedFlags.length < 2 ? BUNDLE_SELECT : BUNDLE_CROSS_PAGE) : undefined
+  const bundleReason = !canBundle ? (selectedFlags.length < 2 ? BUNDLE_SELECT : bundleBar) : undefined
   const anyMode = calibrating || drawingStrip || drawingCurb
 
   return (
@@ -709,7 +713,7 @@ export default function SketchWorkspace({
           ) : selectedFlags.length >= 2 ? (
             <p className="text-sm text-gray-700" data-testid="multi-selection">
               {selectedFlags.length} flags selected ({selectedFlags.map(flag => `#${flag.display_order}`).join(', ')}).
-              {bundleWriter ? (onePage ? ' Bundle them from the toolbar.' : ` ${BUNDLE_CROSS_PAGE}.`) : ''}
+              {bundleWriter ? (canBundle ? ' Bundle them from the toolbar.' : ` ${bundleBar}.`) : ''}
             </p>
           ) : (
             <p className="text-sm text-gray-600">{writer ? PANEL_EMPTY_WRITER_TEXT : PANEL_EMPTY_TEXT}</p>

@@ -5,13 +5,15 @@ export function nextDisplayOrder(flags) {
   return flags.length === 0 ? 1 : Math.max(...flags.map(flag => flag.display_order)) + 1
 }
 
-// The dimensions (feet) a flag of each shape is placed with: a 5 ft piece, to be edited in the panel
+// The dimensions (feet) a flag of each shape is placed with: a 5 ft piece, to be edited in the panel (a corner
+// quadrant a small corner, H/C 0.25, no correction)
 export const DEFAULT_DIMENSIONS = {
   rectangle: { L: 5, W: 5 },
   trapezoid: { a: 4, b: 6, w: 5 },
   triangle: { a: 5, b: 5 },
   polygon: { vertices: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }] },
   arc: { r: 5, theta: Math.PI },
+  corner_quadrant: { H: 2, C: 8, R1: 6, R2: 6, A: 0, B: 0 },
 }
 
 /**

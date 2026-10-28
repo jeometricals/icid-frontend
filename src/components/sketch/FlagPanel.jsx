@@ -6,7 +6,9 @@ import { degreesToRadians, formatArea, polygonArea, radiansToDegrees } from '../
 import {
   FLAG_MARKS, FLAG_NON_ASSESSABLE_REASONS, FLAG_SHAPES, FLAG_THICKNESSES, shapeLabel,
 } from '../../data/flagEnums'
+import { CORNER_QUADRANT_FIELDS, checkCornerQuadrant } from '../../lib/cornerQuadrant'
 import ContractItemPicker from '../ContractItemPicker'
+import CornerQuadrantCard from './CornerQuadrantCard'
 import { shortDate } from '../../lib/shortDate'
 
 // How long a change waits for the next before it is sent
@@ -21,7 +23,11 @@ const DIMENSION_FIELDS = {
   trapezoid: [['a', 'Top edge a (ft)'], ['b', 'Bottom edge b (ft)'], ['w', 'Width between (ft)']],
   triangle: [['a', 'Leg a (ft)'], ['b', 'Leg b (ft)']],
   arc: [['r', 'Radius (ft)'], ['theta', 'Angle (°)']],
+  corner_quadrant: CORNER_QUADRANT_FIELDS.map(([key, label]) => [key, label]),
 }
+
+// What a bundled flag can't become: it would have to leave its bundle (Slice Y5)
+export const CORNER_QUADRANT_BUNDLED = 'Corner quadrant (not for a bundled flag)'
 
 const text = (value) => (value === null || value === undefined ? '' : String(Number(Number(value).toFixed(4))))
 
@@ -41,6 +47,10 @@ export function parseDimensions(shape, typed) {
     const vertices = typed.vertices.map(({ x, y }) => ({ x: finite(x), y: finite(y) }))
     if (vertices.length < 3 || vertices.some(({ x, y }) => x === null || y === null)) return null
     return polygonArea(vertices) > 0 ? { vertices } : null
+  }
+  if (shape === 'corner_quadrant') {
+    const { worked, dimensions } = checkCornerQuadrant(typed)
+    return worked && !worked.error ? dimensions : null
   }
   const values = Object.fromEntries(DIMENSION_FIELDS[shape].map(([key]) => [key, positive(typed[key])]))
   if (Object.values(values).some(value => value === null)) return null
@@ -76,7 +86,8 @@ function draftOf(flag) {
  * changes go together in one PATCH (a pending one is sent at once when another flag is selected). The area shown is
  * the backend's, from the flag it answers with (onSaved). The fields: display order; shape (a new shape starts from
  * its default dimensions, sent with them) and its dimensions (feet; an arc's angle in degrees; a polygon's vertices,
- * three at least); the shape's rotation (degrees); the surveyed mark; "Added in field" (which takes the mark 'none',
+ * three at least; a corner quadrant's six on CornerQuadrantCard, sent together on its Save, and not offered to a
+ * bundled flag: Slice Y5); the shape's rotation (degrees); the surveyed mark; "Added in field" (which takes the mark 'none',
  * and gives 'Number only' back when unticked); "Assessable" (unticked, the reason must be picked before anything is
  * sent); the thickness; the pay item (ContractItemPicker); the computed area; the reported quantity (an override,
  * with "Clear override") and the quantity delta reason. Nothing out of range is sent; a refusal shows at the top.
@@ -124,11 +135,19 @@ export default function FlagPanel({ flag, contractItems, writer, onSaved, onDele
 
   const set = (changes) => setDraft(current => ({ ...current, ...changes }))
 
-  // Typed dimensions for the current shape: kept as typed, sent once all of them are in range
+  // Typed dimensions for the current shape: kept as typed, sent once all of them are in range (a corner quadrant's
+  // only on its card's Save)
   const setDimensions = (typed) => {
     set({ dimensions: { ...draft.dimensions, [draft.shape]: typed } })
+    if (draft.shape === 'corner_quadrant') return
     const parsed = parseDimensions(draft.shape, typed)
     if (parsed) queue({ shape: draft.shape, dimensions: parsed })
+  }
+
+  // A corner quadrant's six, sent at once from its card
+  const saveCornerQuadrant = (dimensions) => {
+    pending.current = { ...pending.current, shape: 'corner_quadrant', dimensions }
+    flush()
   }
 
   const changeShape = (shape) => {
@@ -185,7 +204,10 @@ export default function FlagPanel({ flag, contractItems, writer, onSaved, onDele
           <div>
             <label htmlFor="flag-shape" className="input-label">Shape</label>
             <select id="flag-shape" className="input-field" value={draft.shape} onChange={(e) => changeShape(e.target.value)}>
-              {FLAG_SHAPES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+              {FLAG_SHAPES.map(({ value, label }) => {
+                const barred = value === 'corner_quadrant' && flag.bundled && draft.shape !== value
+                return <option key={value} value={value} disabled={barred}>{barred ? CORNER_QUADRANT_BUNDLED : label}</option>
+              })}
             </select>
           </div>
           <div>
@@ -208,7 +230,10 @@ export default function FlagPanel({ flag, contractItems, writer, onSaved, onDele
 
         <fieldset>
           <legend className="input-label">{shapeLabel(draft.shape)} dimensions</legend>
-          {draft.shape === 'polygon' ? (
+          {draft.shape === 'corner_quadrant' ? (
+            <CornerQuadrantCard typed={typed} onChange={setDimensions} onSave={saveCornerQuadrant} disabled={!writer}
+              saving={saving} />
+          ) : draft.shape === 'polygon' ? (
             <div className="space-y-2">
               {typed.vertices.map((vertex, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -263,7 +288,7 @@ export default function FlagPanel({ flag, contractItems, writer, onSaved, onDele
               ))}
             </div>
           )}
-          {hint(!dimensionsValid, draft.shape === 'polygon'
+          {draft.shape !== 'corner_quadrant' && hint(!dimensionsValid, draft.shape === 'polygon'
             ? 'Three or more vertices that enclose an area.'
             : draft.shape === 'arc' ? 'A radius above 0 and an angle above 0, at most 360°.' : 'Every length above 0.')}
         </fieldset>

@@ -47,7 +47,7 @@ describe('angles and areas', () => {
 
 describe('flag enum labels', () => {
   it('lists the backend\'s values', () => {
-    expect(FLAG_SHAPES.map(entry => entry.value)).toEqual(['rectangle', 'trapezoid', 'triangle', 'polygon', 'arc'])
+    expect(FLAG_SHAPES.map(entry => entry.value)).toEqual(['rectangle', 'trapezoid', 'triangle', 'polygon', 'arc', 'corner_quadrant'])
     expect(FLAG_MARKS.map(entry => entry.value)).toEqual(['number_only', 'cross', 'cross_with_number', 'tick', 'none'])
     // R1b's nine, the thirteen migration 034 added for the Smart PIR survey, and migration 059's (Slice Y1.5)
     expect(FLAG_NON_ASSESSABLE_REASONS).toHaveLength(23)
