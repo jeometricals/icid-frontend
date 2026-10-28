@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SketchWorkspace, {
-  AI_DETECT_TOOLTIP, BUNDLE_CROSS_PAGE, BUNDLE_LINE_READER, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
+  AI_DETECT_TOOLTIP, BUNDLE_CORNER_QUADRANT, BUNDLE_CROSS_PAGE, BUNDLE_LINE_READER, NO_SCALE_REASON, PANEL_EMPTY_WRITER_TEXT,
 } from '../SketchWorkspace'
 import { EMPTY_TEXT } from '../FlagsFallbackList'
 import * as api from '../../../services/api'
@@ -606,6 +606,18 @@ describe('SketchWorkspace — bundles and curbs (Slice Y4a)', () => {
     expect(await screen.findByTestId('bundle-panel')).toBeInTheDocument()
     expect(api.listFlags).toHaveBeenCalledTimes(2) // read again: the flags now carry their bundle
     expect(screen.getByRole('button', { name: 'Bundle M1' })).toBeInTheDocument()
+  })
+
+  it("won't bundle a corner quadrant, saying why (Slice Y5)", async () => {
+    flags = [flag('f1'), flag('f4', { display_order: 4, sketch_x: 350, shape: 'corner_quadrant',
+      dimensions: { H: 2, C: 8, R1: 6, R2: 6, A: 0, B: 0 } })]
+    await renderLoaded({ bundleWriter: true })
+    click(flagShape(1), 300, 200)
+    ctrlPress(flagShape(4), 350, 200)
+    const button = screen.getByRole('button', { name: /Bundle flags/ })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', BUNDLE_CORNER_QUADRANT)
+    expect(screen.getByTestId('multi-selection')).toHaveTextContent("Corner-quadrant flags can't be bundled.")
   })
 
   it('Ctrl-click takes a flag back out of the selection', async () => {

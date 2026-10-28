@@ -1,6 +1,8 @@
 // A flag's area from its shape and dimensions, in square feet: the same formulas the backend uses for
 // computed_quantity (api/services/flag_area.py), so the form can preview what will be stored
 
+import { cornerQuadrant } from './cornerQuadrant'
+
 /** Degrees to radians, for an arc's angle: the form takes degrees, the backend stores radians. */
 export const degreesToRadians = (degrees) => (degrees * Math.PI) / 180
 
@@ -22,7 +24,8 @@ const toCents = (area) => Math.round((area + Number.EPSILON) * 100) / 100
 
 /**
  * A flag's area: rectangle L × W; trapezoid (a + b) / 2 × w; right triangle a × b / 2; polygon by the shoelace
- * formula; arc the circular segment r² / 2 × (θ − sin θ), θ in radians.
+ * formula; arc the circular segment r² / 2 × (θ − sin θ), θ in radians; a corner quadrant Coef(H/C) × H × C +
+ * R1 × R2 / 2 − A × B (lib/cornerQuadrant.js; null when its inputs don't work out).
  * Takes the shape and its dimensions as the backend stores them.
  * Returns the area in square feet to two decimals, or null for an unknown shape.
  */
@@ -33,6 +36,7 @@ export function computeArea(shape, dimensions) {
     case 'triangle': return toCents((dimensions.a * dimensions.b) / 2)
     case 'polygon': return toCents(polygonArea(dimensions.vertices))
     case 'arc': return toCents(((dimensions.r * dimensions.r) / 2) * (dimensions.theta - Math.sin(dimensions.theta)))
+    case 'corner_quadrant': return cornerQuadrant(dimensions).area ?? null
     default: return null
   }
 }

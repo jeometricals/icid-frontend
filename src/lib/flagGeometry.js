@@ -2,6 +2,8 @@
 // pixels. sketch_x / sketch_y (native, unrotated page pixels; see lib/pageGeometry.js) is the centre of the shape's
 // bounding box, and rotation is the shape's own turn about that point, in degrees clockwise.
 
+import { cornerQuadrantOutline } from './cornerQuadrant'
+
 // Points sampled along an arc's curve
 const ARC_STEPS = 32
 
@@ -13,6 +15,7 @@ const ARC_STEPS = 32
  * - polygon {vertices}: its vertices as given
  * - arc {r, theta}: a circular segment, the chord at the bottom and the curve above it (theta in radians)
  * - circle {r} (a feature's only): the circle about its centre
+ * - corner_quadrant {H, C, R1, R2, A, B} (a flag's only, Slice Y5): lib/cornerQuadrant.js's cornerQuadrantOutline
  * Returns [{x, y}, ...], or [] for an unknown shape or missing dimensions.
  */
 export function shapeOutline(shape, dimensions) {
@@ -48,6 +51,8 @@ export function shapeOutline(shape, dimensions) {
         return { x: r * Math.cos(angle), y: r * Math.sin(angle) }
       })
     }
+    case 'corner_quadrant':
+      return cornerQuadrantOutline(dimensions)
     default:
       return []
   }

@@ -957,7 +957,7 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     and the coming tool (Auto-detect with AI); then `SketchCanvas` beside the selected flag's `FlagPanel` (else "Pick a
     shape and click the page to add a flag, or select one to edit it."); under them `FlagsFallbackList`, then
     `SegmentsTable`.
-    - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc) and the thickness
+    - **`ShapeToolbar`**: a toggle per shape (rectangle, trapezoid, right triangle, polygon, arc, corner quadrant) and the thickness
       legend. Picking one arms it (the cursor is a crosshair over the page) until it is picked again or Esc. Off
       without a scale ("Set this page's scale (or calibrate) to draw flags.") or while calibrating.
     - **Placing:** a click on empty page with a shape armed POSTs `createFlagOnPage` with `newFlagValues`: the next
@@ -973,9 +973,22 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       (a refusal puts it back and says so above the page); Esc mid-drag puts it back. The Delete key (or the panel's
       "Delete flag") deletes the selected flag at once, toast "Flag #<n> deleted.". `showCorners` marks (0, 0) and
       (width, height), for checking alignment by eye.
+    - **`CornerQuadrantCard`** (Slice Y5; `lib/cornerQuadrant.js`): a corner-quadrant flag's measure, in `FlagPanel` in
+      place of the dimension inputs. The OE sheet's diagram as inline SVG (A1, R₁, R₂, A, B, H, C), six inputs two to a
+      row (H and C, the arc; R1 and R2, the triangle; A and B, the correction, "Enter 0 if none"), each checked as typed
+      (feet to two places; above 0, A and B 0 or more; the message under it), and the working beneath, worked out again
+      150 ms after the last keystroke (`PREVIEW_DELAY_MS`): H / C halves up to the hundredth, Coef from the OE's 50-entry
+      table, the arc segment, triangle and correction each **cut** to the cent as the OE sheet prints them, and the outer
+      area (the exact sum, halves up: the backend's figure, 129.87 on BLK_13136_LOT_133). The six go together on "Save
+      measurement", off until all are right and the area is above 0 (H / C outside 0.01-0.50 or a correction past the
+      arc and triangle say so). Not offered to a bundled flag ("Corner quadrant (not for a bundled flag)"), and "Bundle
+      flags" stays off with one selected ("Corner-quadrant flags can't be bundled"). It is drawn (`flagGeometry.js`) as
+      the backend draws it: the right angle at the bottom left, legs R1 and R2, an arc of height H out of the hypotenuse
+      and the A × B notch.
     - **`FlagPanel`** (`flag`, `contractItems`, `writer`, `onSaved`, `onDelete`; keyed by the flag): display order;
       shape (a new one starts from its default dimensions, sent with them) and its dimensions (a polygon's vertex
-      rows, Add vertex / remove, never fewer than three; an arc's angle in degrees); rotation (degrees); surveyed
+      rows, Add vertex / remove, never fewer than three; an arc's angle in degrees; a corner quadrant's on its card,
+      below); rotation (degrees); surveyed
       mark (radios: the four marks that aren't `none`); "Added in field" (sends `none` with it, and "Number only"
       back when unticked); "Assessable" (unticked, the reason select must be picked before anything is sent);
       surveyed thickness (radios); pay item (`ContractItemPicker`); the computed area; reported quantity (blank or

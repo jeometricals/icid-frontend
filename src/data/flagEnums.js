@@ -7,6 +7,7 @@ export const FLAG_SHAPES = [
   { value: 'triangle', label: 'Right triangle' },
   { value: 'polygon', label: 'Polygon' },
   { value: 'arc', label: 'Arc' },
+  { value: 'corner_quadrant', label: 'Corner quadrant' },
 ]
 
 export const FLAG_MARKS = [

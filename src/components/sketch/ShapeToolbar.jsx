@@ -8,6 +8,8 @@ const ICONS = {
   triangle: <polygon points="3,3 3,17 17,17" />,
   polygon: <polygon points="10,2 18,8 15,17 5,17 2,8" />,
   arc: <path d="M2 14 A9 9 0 0 1 18 14 Z" />,
+  // A right angle at the bottom left, its notch, and the arc over the hypotenuse
+  corner_quadrant: <path d="M3 3 V13 H7 V17 H17 A14 14 0 0 0 3 3 Z" />,
 }
 
 /**

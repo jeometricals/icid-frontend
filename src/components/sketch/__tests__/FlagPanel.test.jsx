@@ -195,3 +195,39 @@ describe('FlagPanel — a flag an approved IDR claimed', () => {
     expect(screen.queryByText(/Claimed by/)).not.toBeInTheDocument()
   })
 })
+
+describe('FlagPanel — a corner quadrant (Slice Y5)', () => {
+  const QUADRANT = { ...FLAG, shape: 'corner_quadrant', dimensions: { H: 5.66, C: 18, R1: 12.58, R2: 12, A: 4.83, B: 3.83 },
+    computed_quantity: 129.87, quantity: 129.87 }
+
+  it('measures one on its card, sending the six together on Save', async () => {
+    renderPanel({ flag: QUADRANT })
+    expect(screen.getByTestId('corner-quadrant-card')).toBeInTheDocument()
+    expect(screen.getByText('129.87 SF')).toBeInTheDocument()
+    await userEvent.clear(screen.getByLabelText('A (length)'))
+    await userEvent.type(screen.getByLabelText('A (length)'), '0')
+    await new Promise(resolve => setTimeout(resolve, 400))
+    expect(api.updateFlag).not.toHaveBeenCalled() // typing alone sends nothing
+    await userEvent.click(screen.getByRole('button', { name: 'Save measurement' }))
+    expect(sent()).toEqual([{ shape: 'corner_quadrant', dimensions: { H: 5.66, C: 18, R1: 12.58, R2: 12, A: 0, B: 3.83 } }])
+  })
+
+  it('becomes one from its default dimensions', async () => {
+    renderPanel()
+    await userEvent.selectOptions(screen.getByLabelText('Shape'), 'corner_quadrant')
+    expect(screen.getByLabelText('H (height)')).toHaveValue('2')
+    await waitFor(() => expect(sent()).toEqual([{ shape: 'corner_quadrant', dimensions: { H: 2, C: 8, R1: 6, R2: 6, A: 0, B: 0 } }]))
+  })
+
+  it("isn't offered to a bundled flag", () => {
+    renderPanel({ flag: { ...FLAG, bundled: true, measurement_id: 'm1' } })
+    const option = within(screen.getByLabelText('Shape')).getByRole('option', { name: 'Corner quadrant (not for a bundled flag)' })
+    expect(option).toBeDisabled()
+  })
+
+  it('parses its six only when the whole works out', () => {
+    const typed = { H: '5.66', C: '18', R1: '12.58', R2: '12', A: '4.83', B: '3.83' }
+    expect(parseDimensions('corner_quadrant', typed)).toEqual({ H: 5.66, C: 18, R1: 12.58, R2: 12, A: 4.83, B: 3.83 })
+    expect(parseDimensions('corner_quadrant', { ...typed, H: '10' })).toBeNull()
+  })
+})
