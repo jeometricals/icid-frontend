@@ -295,17 +295,23 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   Changing tab drops the other tab's parameters. Back: "Back to Progress and Assessments".
   - **Sidewalk Assessment Summary:** `getAssessmentSites(projectId, { from, to })` (`GET .../assessment-summary`), a
     row per constructed site, its figures summed over the date-constructed period (Constructed from / to, `?from=&to=`,
-    YYYY-MM-DD; none to start, every date; From after To says so and asks nothing). A search box (`?q=`) narrows the
+    YYYY-MM-DD; none to start, every date; From after To says so and asks nothing). A Task order select (`?task_order=`,
+    the project's `listTaskOrders`, "All task orders" to start; the polish slice) asks again for its sites only
+    (`taskOrderId`), and narrows both downloads too. A search box (`?q=`) narrows the
     rows in the page by address, block, lot, block and lot together (`123 45`, `123/45`, `123-45`) or violation no.
     (`matchesSearch`). Columns as the workbook's: Property Address (a link to the site's page, "Block 123 Lot 45 ·
     V-77" under it), CB, the 4" and 7" square feet (two decimals, a dash for none) and amounts (a dash without a rate),
     Grand Total, Remarks, and Construction Report (a "PDF" `DownloadFileButton`, the most recently approved IDR's). A
     totals row sums the rows shown. "N sites" over the table ("of M" while searching); empty: "No constructed sites
     yet.", "No sites were constructed in this period." or "No constructed sites match …".
-  - **Downloads** under the table: "Download tailored report" (`downloadTailoredAssessmentSummary`: the period and,
-    while searching, the shown sites' ids; one tab named for the period; off when no row is shown) and "Download
-    accumulative report" (`downloadAssessmentSummary(projectId)`: the whole project's workbook, a tab per month named
-    "Nov 2026", whatever the filters). A failure shows under its button.
+  - **Downloads** under the table, each a menu of XLSX and CSV (`DownloadFileButton` with `formats`; Esc or a click
+    elsewhere closes it; Retry downloads the format picked again): "Download tailored report"
+    (`downloadTailoredAssessmentSummary`: the period, the task order and, while searching, the shown sites' ids; one tab
+    named for the period, or a CSV of its rows; off when no row is shown) and "Download accumulative report"
+    (`downloadAssessmentSummary(projectId, { format, taskOrderId })`: the project's workbook, a tab for every month named
+    "Nov 2026", or one CSV a row per month and site; the task order narrows it, the period and search don't). Every
+    workbook tab ends with the backend's footer (Compiled by, Date, Project Engineer, Approved IDRs only). A failure
+    shows under its button.
 - **Progress from PIR flags** (R1g). How much of the sidewalk work the PIR flags describe is approved (claimed by an
   approved IDR), in flight (attributed to an open IDR) or unclaimed, per pay item a flag can fill. Two places: the top
   of the Progress page (`ProjectFlagProgress`) and the task order page (`TaskOrderProgress`).

@@ -11,8 +11,11 @@ vi.mock('../../services/api', () => ({
   getAssessmentSites: vi.fn(), downloadAssessmentSummary: vi.fn(), downloadTailoredAssessmentSummary: vi.fn(),
   downloadConstructionReport: vi.fn(),
   listPedRampInspections: vi.fn(), bulkDownloadPedRampInspections: vi.fn(), downloadInspectionDotForms: vi.fn(),
-  listUsers: vi.fn(), downloadFile: vi.fn(), LISTING_PAGE_SIZE: 30,
+  listUsers: vi.fn(), downloadFile: vi.fn(), LISTING_PAGE_SIZE: 30, listTaskOrders: vi.fn(),
 }))
+
+const TASK_ORDERS = [{ id: 't0000000-0000-4000-8000-000000000001', task_order_number: 'TO-001' },
+  { id: 't0000000-0000-4000-8000-000000000002', task_order_number: 'TO-002' }]
 
 const MAIN = 'a0000000-0000-4000-8000-000000000001'
 const ELM = 'a0000000-0000-4000-8000-000000000002'
@@ -83,6 +86,7 @@ beforeEach(() => {
   api.getAssessmentSites.mockResolvedValue(FOUND)
   api.listPedRampInspections.mockResolvedValue({ total: 0, page: 1, page_size: 30, rows: [] })
   api.listUsers.mockResolvedValue([])
+  api.listTaskOrders.mockResolvedValue(TASK_ORDERS)
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({ user: TEST_USER })
 })
 
@@ -246,28 +250,104 @@ describe('AssessmentsPage — the period and the search', () => {
   })
 })
 
+// Open a download's menu and pick a format
+async function pick(label, format) {
+  await userEvent.click(screen.getByRole('button', { name: label }))
+  await userEvent.click(within(screen.getByRole('menu', { name: label })).getByRole('menuitem', { name: format }))
+}
+
 describe('AssessmentsPage — the downloads', () => {
   it('the tailored report is the period, and every site when nothing is searched', async () => {
     api.downloadTailoredAssessmentSummary.mockResolvedValue('t.xlsx')
     renderPage('?from=2026-10-01')
     await table()
-    await userEvent.click(screen.getByRole('button', { name: 'Download tailored report' }))
-    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', { from: '2026-10-01', to: '', propertyIds: undefined })
+    await pick('Download tailored report', 'XLSX')
+    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', {
+      from: '2026-10-01', to: '', format: 'xlsx', taskOrderId: undefined, propertyIds: undefined })
   })
 
   it('the tailored report is the rows the search shows', async () => {
     api.downloadTailoredAssessmentSummary.mockResolvedValue('t.xlsx')
     renderPage('?q=main')
     await table()
-    await userEvent.click(screen.getByRole('button', { name: 'Download tailored report' }))
-    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', { from: '', to: '', propertyIds: [ELM] })
+    await pick('Download tailored report', 'XLSX')
+    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', {
+      from: '', to: '', format: 'xlsx', taskOrderId: undefined, propertyIds: [ELM] })
   })
 
-  it('the accumulative report is the whole project\'s workbook, whatever the filters', async () => {
+  it('the accumulative report is the whole project\'s workbook, whatever the period and search', async () => {
     api.downloadAssessmentSummary.mockResolvedValue('a.xlsx')
     renderPage('?from=2026-10-01&q=main')
     await table()
+    await pick('Download accumulative report', 'XLSX')
+    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023', { format: 'xlsx', taskOrderId: undefined })
+  })
+
+  it('offers each as XLSX or CSV from its menu (the polish slice)', async () => {
+    api.downloadTailoredAssessmentSummary.mockResolvedValue('t.csv')
+    api.downloadAssessmentSummary.mockResolvedValue('a.csv')
+    renderPage()
+    await table()
+    await userEvent.click(screen.getByRole('button', { name: 'Download tailored report' }))
+    const menu = screen.getByRole('menu', { name: 'Download tailored report' })
+    expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['XLSX', 'CSV'])
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'CSV' }))
+    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', expect.objectContaining({ format: 'csv' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    await pick('Download accumulative report', 'CSV')
+    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023', { format: 'csv', taskOrderId: undefined })
+  })
+
+  it('closes the menu on Escape without downloading', async () => {
+    renderPage()
+    await table()
     await userEvent.click(screen.getByRole('button', { name: 'Download accumulative report' }))
-    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(api.downloadAssessmentSummary).not.toHaveBeenCalled()
+  })
+})
+
+describe('AssessmentsPage — the task order filter (the polish slice)', () => {
+  it("lists the project's task orders, all of them to start", async () => {
+    renderPage()
+    await table()
+    expect(api.listTaskOrders).toHaveBeenCalledWith('HWS0023')
+    const select = screen.getByLabelText('Task order')
+    expect(select).toHaveValue('')
+    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['All task orders', 'TO-001', 'TO-002'])
+    expect(api.getAssessmentSites).toHaveBeenCalledWith('HWS0023', { from: '', to: '', taskOrderId: undefined })
+  })
+
+  it('asks again for a task order\'s sites, keeps it in the URL and narrows both downloads', async () => {
+    api.downloadTailoredAssessmentSummary.mockResolvedValue('t.xlsx')
+    api.downloadAssessmentSummary.mockResolvedValue('a.xlsx')
+    renderPage()
+    await table()
+    await userEvent.selectOptions(screen.getByLabelText('Task order'), TASK_ORDERS[1].id)
+    await waitFor(() => expect(api.getAssessmentSites).toHaveBeenLastCalledWith('HWS0023', {
+      from: '', to: '', taskOrderId: TASK_ORDERS[1].id }))
+    expect(url()).toContain(`task_order=${TASK_ORDERS[1].id}`)
+    await table()
+    await pick('Download tailored report', 'CSV')
+    expect(api.downloadTailoredAssessmentSummary).toHaveBeenCalledWith('HWS0023', expect.objectContaining({
+      taskOrderId: TASK_ORDERS[1].id, format: 'csv' }))
+    await pick('Download accumulative report', 'XLSX')
+    expect(api.downloadAssessmentSummary).toHaveBeenCalledWith('HWS0023', { format: 'xlsx', taskOrderId: TASK_ORDERS[1].id })
+  })
+
+  it('opens on the task order a link names', async () => {
+    renderPage(`?task_order=${TASK_ORDERS[0].id}`)
+    await table()
+    expect(api.getAssessmentSites).toHaveBeenCalledWith('HWS0023', { from: '', to: '', taskOrderId: TASK_ORDERS[0].id })
+    await waitFor(() => expect(screen.getByLabelText('Task order')).toHaveValue(TASK_ORDERS[0].id))
+  })
+
+  it('still filters by everything when the task orders can\'t be read', async () => {
+    api.listTaskOrders.mockRejectedValue(new Error('boom'))
+    renderPage()
+    await table()
+    expect(within(screen.getByLabelText('Task order')).getAllByRole('option')).toHaveLength(1)
   })
 })

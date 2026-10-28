@@ -91,3 +91,29 @@ describe('downloadTailoredAssessmentSummary', () => {
     expect(fetchUrl().search).toBe('')
   })
 })
+
+describe('the polish slice: a task order, and CSV', () => {
+  it("asks for a task order's sites", async () => {
+    mockFetch(200, { data: { sites: [] } })
+    await getAssessmentSites('HWS0023', { taskOrderId: 'to-1' })
+    expect(fetchUrl().pathname).toBe('/v1/projects/HWS0023/assessment-summary')
+    expect(fetchUrl().searchParams.get('task_order_id')).toBe('to-1')
+  })
+
+  it('downloads the tailored view as CSV, narrowed to a task order', async () => {
+    mockFile(200)
+    expect(await downloadTailoredAssessmentSummary('HWS0023', { taskOrderId: 'to-1', format: 'csv', propertyIds: ['p1'] }))
+      .toBe('HWS0023_assessment_summary_tailored.csv')
+    expect(fetchUrl().pathname).toBe('/v1/projects/HWS0023/assessment-summary/tailored.csv')
+    expect(fetchUrl().searchParams.get('task_order_id')).toBe('to-1')
+    expect(fetchUrl().searchParams.getAll('property_id')).toEqual(['p1'])
+  })
+
+  it('downloads the accumulative report as CSV, narrowed to a task order', async () => {
+    mockFile(200)
+    expect(await downloadAssessmentSummary('HWS0023', { format: 'csv', taskOrderId: 'to-1' }))
+      .toBe('HWS0023_assessment_summary.csv')
+    expect(fetchUrl().pathname).toBe('/v1/projects/HWS0023/assessment-summary.csv')
+    expect(fetchUrl().searchParams.get('task_order_id')).toBe('to-1')
+  })
+})
