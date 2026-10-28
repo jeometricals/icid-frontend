@@ -1,12 +1,11 @@
 /**
  * A site's PIR workspace (route params :projectId and :propertyId), at /project/:projectId/properties/:propertyId/pir,
- * for anyone on the project: the PIR's scanned pages, one at a time. Prev / Next and "Page n of N" (also the [ and ]
- * keys) move between them, and the page shown is in the URL (?page=, replaced rather than pushed). Each page shows
- * at its rotation, with its scale ("15 px/ft", or "not set"), in the sketch workspace (SketchWorkspace: the shape
- * toolbar, the page's flags drawn over it, the selected flag's panel, Calibrate, and every flag listed below). A
- * writer (a member who isn't a demo user; while the site is deleted only an admin) can use Rotate (a quarter turn
- * clockwise, saved on that page), Set scale (that page only), Replace PIR (a new upload replaces every page) and
- * Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
+ * for anyone on the project: the PIR's scanned pages in one scroll (Slice Y4b; SketchWorkspace: the sticky shape
+ * toolbar, each page under its own header bar with its flags drawn over it, the selected flag's sticky panel, and every
+ * flag listed below). The page in view is in the URL (?page=, replaced rather than pushed), and opening it there scrolls
+ * to that page; the [ and ] and 1-9 keys scroll between pages. A writer (a member who isn't a demo user; while the site
+ * is deleted only an admin) can use each page's Rotate (a quarter turn clockwise, saved on that page) and Set scale,
+ * Replace PIR (a new upload replaces every page) and Remove pages, and draw; for a reader they are there but disabled. With no pages the card prompts an upload. The
  * heading names the site by its display_address (a ped ramp's intersection), Back by siteName. The backend refuses
  * anyone not on the project (403), which shows as the load error.
  * ?flag=<id> selects that flag to start (sketchLink in lib/idrFlags.js), and a flag's "IDR #042" badge opens
@@ -21,14 +20,14 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw, Ruler, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useProjectRoles } from '../contexts/ProjectRolesContext'
 import {
   deletePirPages, getPageTitleBlock, getPirByProperty, getProperty, listPirPages, nextRotation, setPirPageRotation,
 } from '../services/api'
 import { isAdmin } from '../lib/reviewRoles'
-import { PIR_DEMO_NOTE } from '../lib/pirs'
+import { PIR_DEMO_NOTE, scaleText } from '../lib/pirs'
 import { siteName } from '../lib/properties'
 import { readReturnTo, withReturnTo } from '../lib/returnTo'
 import BackToReportButton from '../components/BackToReportButton'
@@ -50,7 +49,7 @@ export const NO_PAGES_READ_ONLY = 'No PIR pages uploaded yet.'
 export const IMAGE_FAILED_TEXT = "The page didn't load; its link may have expired."
 
 // "15 px/ft", "12.35 px/ft"; "not set" for a page without a scale
-export const scaleText = (scale) => (scale == null ? 'not set' : `${Number(Number(scale).toFixed(2))} px/ft`)
+export { scaleText }
 
 // The title block the Construction Report prints: page 1's title block (null when it has none) and the PIR's bearing
 const titleBlockOf = (pir, annotation) => ({
@@ -81,10 +80,6 @@ export const streetsLine = (block) =>
 // "3 pages", "1 page"
 const pagesText = (count) => `${count} ${count === 1 ? 'page' : 'pages'}`
 
-// Whether a key press belongs to a form control (or a modifier shortcut), not to page navigation
-const typingIn = (e) => e.ctrlKey || e.metaKey || e.altKey
-  || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable
-
 export default function PirPage() {
   const { projectId, propertyId } = useParams()
   const navigate = useNavigate()
@@ -105,6 +100,7 @@ export default function PirPage() {
   const [titleBlock, setTitleBlock] = useState(null) // what the Construction Report prints; null until read
   const [titleBlockError, setTitleBlockError] = useState(null)
   const [dialog, setDialog] = useState(null) // 'upload', 'scale', 'remove' or 'title-block'
+  const [scalePage, setScalePage] = useState(null) // the page Set scale was opened for
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null) // a failed rotate or remove
   const [imageFailed, setImageFailed] = useState(false)
@@ -142,35 +138,24 @@ export default function PirPage() {
     return () => { ignore = true }
   }, [propertyId, attempt])
 
-  // The page shown: ?page= within 1..N, else the first
+  // The page asked for (?page=, within 1..N, else the first): the workspace opens scrolled to it
   const count = pages.length
   const asked = Number.parseInt(searchParams.get('page') ?? '1', 10)
   const pageNumber = count === 0 ? 0 : Math.min(Math.max(Number.isNaN(asked) ? 1 : asked, 1), count)
-  const page = pages[pageNumber - 1] ?? null
 
+  // The page in view, into the URL (replaced, not pushed)
   const goTo = useCallback((number) => {
-    setImageFailed(false)
     setSearchParams(prev => {
+      if (prev.get('page') === String(number)) return prev
       const next = new URLSearchParams(prev)
       next.set('page', String(number))
       return next
     }, { replace: true })
   }, [setSearchParams])
 
-  // [ and ] move a page back and forward, unless a dialog is open or the key is being typed into a field
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (dialog || typingIn(e) || count === 0) return
-      if (e.key === '[' && pageNumber > 1) goTo(pageNumber - 1)
-      if (e.key === ']' && pageNumber < count) goTo(pageNumber + 1)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [dialog, count, pageNumber, goTo])
-
   const replacePage = (saved) => setPages(current => current.map(found => (found.pir_page_id === saved.pir_page_id ? saved : found)))
 
-  const rotate = async () => {
+  const rotate = async (page) => {
     setBusy(true)
     setActionError(null)
     try {
@@ -201,7 +186,9 @@ export default function PirPage() {
     const replacing = count > 0
     setPages(saved.pages ?? [])
     setDialog(null)
+    setImageFailed(false)
     goTo(1)
+    window.scrollTo(0, 0)
     setToast(`PIR ${replacing ? 'replaced' : 'uploaded'}: ${pagesText(saved.pages?.length ?? 0)}.`)
   }
 
@@ -298,41 +285,10 @@ export default function PirPage() {
       ) : (
         <section aria-label="PIR pages" className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => goTo(pageNumber - 1)}
-                disabled={pageNumber <= 1}
-                aria-label="Previous page"
-                title="Previous page ([)"
-                className="btn-secondary px-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-sm font-medium text-gray-900 tabular-nums" aria-live="polite">
-                Page {pageNumber} of {count}
-              </span>
-              <button
-                type="button"
-                onClick={() => goTo(pageNumber + 1)}
-                disabled={pageNumber >= count}
-                aria-label="Next page"
-                title="Next page (])"
-                className="btn-secondary px-2"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <span className="text-sm text-gray-500 ml-3">Scale: {scaleText(page.scale_px_per_ft)}</span>
-            </div>
+            <span className="text-sm font-medium text-gray-900" title="[ and ] or 1-9 scroll between pages">
+              {pagesText(count)}
+            </span>
             <div className="flex flex-wrap gap-2" title={writer ? undefined : 'Read-only'}>
-              <button type="button" onClick={rotate} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
-                <RotateCw className="h-4 w-4" />
-                <span>Rotate</span>
-              </button>
-              <button type="button" onClick={() => setDialog('scale')} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
-                <Ruler className="h-4 w-4" />
-                <span>Set scale</span>
-              </button>
               <button type="button" onClick={() => setDialog('upload')} disabled={busy || !writer} className="btn-secondary inline-flex items-center space-x-2">
                 <Upload className="h-4 w-4" />
                 <span>Replace PIR</span>
@@ -360,7 +316,6 @@ export default function PirPage() {
             <SketchWorkspace
               key={pages.map(found => found.pir_page_id).join()}
               pir={pir}
-              page={page}
               pages={pages}
               writer={writer}
               stripWriter={stripWriter}
@@ -369,9 +324,13 @@ export default function PirPage() {
                 replacePage(saved)
                 setToast(`Page ${saved.page_number} scale set to ${scaleText(saved.scale_px_per_ft)}.`)
               }}
-              onJump={goTo}
+              onRotate={rotate}
+              onSetScale={(page) => { setScalePage(page); setDialog('scale') }}
+              pageBusy={busy}
               onImageError={() => setImageFailed(true)}
               initialFlagId={searchParams.get('flag')}
+              initialPageNumber={pageNumber}
+              onPageVisible={goTo}
               onOpenIdr={(flag) => navigate(`/project/${flag.project_id}/idr/${flag.claimed_by_idr_id}`)}
             />
           )}
@@ -410,9 +369,9 @@ export default function PirPage() {
         />
       )}
 
-      {dialog === 'scale' && (
+      {dialog === 'scale' && scalePage && (
         <PageScaleModal
-          page={page}
+          page={scalePage}
           onSaved={(saved) => {
             replacePage(saved)
             setDialog(null)

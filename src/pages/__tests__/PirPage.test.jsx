@@ -16,7 +16,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     getProperty: vi.fn(), getPirByProperty: vi.fn(), listPirPages: vi.fn(), deletePirPages: vi.fn(),
     setPirPageRotation: vi.fn(), setPirPageScale: vi.fn(),
     listFlags: vi.fn(), getContractItems: vi.fn(), createFlagOnPage: vi.fn(), updateFlag: vi.fn(), deleteFlag: vi.fn(),
-    listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(),
+    listPirFeatures: vi.fn(), listPirSegments: vi.fn(), listFlagNonAssessableAreas: vi.fn(), listPirMatchLines: vi.fn(),
     getPageTitleBlock: vi.fn(), updatePirTitleBlock: vi.fn(),
     getPropertyPayItemSummary: vi.fn(),
     getIdr: vi.fn(), listReportSites: vi.fn(), getIdrFlags: vi.fn(), getIdrSegments: vi.fn(),
@@ -63,6 +63,7 @@ beforeEach(() => {
   api.getContractItems.mockResolvedValue([])
   api.listPirFeatures.mockResolvedValue([])
   api.listPirSegments.mockResolvedValue([])
+  api.listPirMatchLines.mockResolvedValue([])
   api.getPageTitleBlock.mockResolvedValue(null) // page 1 has no title block unless a test gives it one
 })
 
@@ -88,18 +89,23 @@ async function renderLoaded(options) {
   await screen.findByRole('heading', { name: /PIR · 12 Main St/ })
 }
 
-const shownImage = () => screen.getByRole('img', { name: /PIR page \d/ })
-const pageBox = () => screen.getByTestId('page-box')
+const pageImage = (number = 1) => screen.getByRole('img', { name: `PIR page ${number}` })
+const pageBlock = (number = 1) => screen.getByRole('region', { name: `Page ${number}` })
+const pageBox = (number = 1) => within(pageBlock(number)).getByTestId('page-box')
 
 describe('PirPage — loading', () => {
-  it('reads the site, its live PIR and its pages, and shows page 1 of N', async () => {
+  it('reads the site, its live PIR and its pages, and draws every page under its own header', async () => {
     await renderLoaded()
     expect(api.getProperty).toHaveBeenCalledWith(PROPERTY_ID)
     expect(api.getPirByProperty).toHaveBeenCalledWith(PROPERTY_ID)
     expect(api.listPirPages).toHaveBeenCalledWith(PIR.id)
-    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
-    expect(shownImage()).toHaveAttribute('src', 'https://s/p1.png')
-    expect(screen.getByText('Scale: 15 px/ft')).toBeInTheDocument()
+    expect(screen.getByText('3 pages')).toBeInTheDocument()
+    for (const number of [1, 2, 3]) {
+      expect(within(screen.getByTestId(`page-header-${number}`)).getByText(`Page ${number} of 3`)).toBeInTheDocument()
+      expect(pageImage(number)).toHaveAttribute('src', `https://s/p${number}.png`)
+    }
+    expect(within(screen.getByTestId('page-header-1')).getByText('Scale: 15 px/ft')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-header-2')).getByText('Scale: not set')).toBeInTheDocument()
   })
 
   it("shows a non-member's 403 as the load error, with Retry", async () => {
@@ -159,7 +165,7 @@ describe('PirPage — loading', () => {
 
   it('offers "Reload pages" when an image fails to load (an expired link), which reads the pages again', async () => {
     await renderLoaded()
-    fireEvent.error(shownImage())
+    fireEvent.error(pageImage(2))
     expect(screen.getByText(IMAGE_FAILED_TEXT)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reload pages' }))
     expect(await screen.findByRole('img', { name: 'PIR page 1' })).toBeInTheDocument()
@@ -167,95 +173,95 @@ describe('PirPage — loading', () => {
   })
 })
 
-describe('PirPage — moving between pages', () => {
-  it('goes forward and back with the buttons, keeping the page in ?page=', async () => {
+describe('PirPage — scrolling between pages (Slice Y4b)', () => {
+  it('opens on page 1 without scrolling', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     await renderLoaded()
-    expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
-    expect(shownImage()).toHaveAttribute('src', 'https://s/p2.png')
-    expect(screen.getByTestId('url')).toHaveTextContent('?page=2')
-    expect(screen.getByText('Scale: not set')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Next page' }))
-    expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: 'Previous page' }))
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    expect(pageImage(1)).toBeInTheDocument()
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(screen.getByTestId('url').textContent).not.toContain('page=')
   })
 
-  it('opens on the page the URL names, and keeps a page out of range within 1..N', async () => {
-    await renderLoaded({ search: '?page=3' })
-    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument()
-  })
+  it.each([['?page=3', '?page=3'], ['?page=9', '?page=3'], ['?page=2', '?page=2']])(
+    'opens %s scrolled to its page, keeping %s in the URL', async (search, kept) => {
+      const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+      await renderLoaded({ search })
+      await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+      await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(kept))
+    })
 
-  it.each([['?page=9', 'Page 3 of 3'], ['?page=0', 'Page 1 of 3'], ['?page=x', 'Page 1 of 3']])('reads %s as %s', async (search, shown) => {
-    await renderLoaded({ search })
-    expect(screen.getByText(shown)).toBeInTheDocument()
-  })
-
-  it('moves with the [ and ] keys, but not while typing in a field', async () => {
+  it('scrolls with the ] and [ and number keys, keeping the page in ?page=, but not while a dialog is open', async () => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     await renderLoaded()
     await userEvent.keyboard(']')
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
-    await userEvent.keyboard(']]')
-    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('?page=2'))
+    await userEvent.keyboard('3')
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('?page=3'))
     await userEvent.keyboard('[[')
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('?page=2'))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Set scale' }))
-    await userEvent.type(screen.getByLabelText('Scale (px/ft)'), '[[')
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Set the scale of page 2' }))
+    await userEvent.type(screen.getByLabelText('Scale (px/ft)'), '1')
+    expect(screen.getByTestId('url')).toHaveTextContent('?page=2')
   })
 })
 
 describe('PirPage — rotation', () => {
-  it('turns the page a quarter at a time, saving each turn on that page, and swaps the box for 90 / 270', async () => {
+  it("turns a page a quarter at a time from its own header, saving each turn on that page, and swaps the box for 90 / 270", async () => {
     await renderLoaded()
-    expect(pageBox().style.transform).toContain('rotate(0deg)')
-    expect(screen.getByTestId('rotated-page')).toHaveAttribute('data-width', '1200')
+    expect(pageBox(1).style.transform).toContain('rotate(0deg)')
+    expect(within(pageBlock(1)).getByTestId('rotated-page')).toHaveAttribute('data-width', '1200')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Rotate' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate page 1' }))
     expect(api.setPirPageRotation).toHaveBeenCalledWith('page-1', 90)
-    await waitFor(() => expect(pageBox().style.transform).toContain('rotate(90deg)'))
-    expect(screen.getByTestId('rotated-page')).toHaveAttribute('data-width', '800')
-    expect(screen.getByTestId('rotated-page')).toHaveAttribute('data-height', '1200')
+    await waitFor(() => expect(pageBox(1).style.transform).toContain('rotate(90deg)'))
+    expect(within(pageBlock(1)).getByTestId('rotated-page')).toHaveAttribute('data-width', '800')
+    expect(within(pageBlock(1)).getByTestId('rotated-page')).toHaveAttribute('data-height', '1200')
+    expect(pageBox(2).style.transform).toContain('rotate(0deg)')
+  })
+
+  it('turns page 3 from its header, not page 1', async () => {
+    await renderLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate page 3' }))
+    expect(api.setPirPageRotation).toHaveBeenCalledWith('page-3', 90)
+    await waitFor(() => expect(pageBox(3).style.transform).toContain('rotate(90deg)'))
+    expect(pageBox(1).style.transform).toContain('rotate(0deg)')
   })
 
   it.each([[90, 180], [180, 270], [270, 0]])('goes from %i to %i', async (from, to) => {
     pages[0].rotation_deg = from
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Rotate' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate page 1' }))
     expect(api.setPirPageRotation).toHaveBeenCalledWith('page-1', to)
   })
 
   it('says so when the turn is refused, and leaves the page as it was', async () => {
     api.setPirPageRotation.mockRejectedValue(new Error('Page is deleted'))
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Rotate' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate page 1' }))
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't rotate page 1: Page is deleted")
-    expect(pageBox().style.transform).toContain('rotate(0deg)')
+    expect(pageBox(1).style.transform).toContain('rotate(0deg)')
   })
 })
 
 describe('PirPage — scale per page', () => {
-  it('sets the shown page\'s scale only, saying which page it applies to', async () => {
-    await renderLoaded({ search: '?page=2' })
-    await userEvent.click(screen.getByRole('button', { name: 'Set scale' }))
+  it("sets one page's scale from its header only, saying which page it applies to", async () => {
+    await renderLoaded()
+    await userEvent.click(screen.getByRole('button', { name: 'Set the scale of page 2' }))
     const dialog = screen.getByRole('dialog', { name: 'Page scale' })
     expect(within(dialog).getByText('Applies to page 2.')).toBeInTheDocument()
     await userEvent.type(within(dialog).getByLabelText('Scale (px/ft)'), '22.5')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     expect(api.setPirPageScale).toHaveBeenCalledWith('page-2', 22.5)
-    expect(await screen.findByText('Scale: 22.5 px/ft')).toBeInTheDocument()
+    expect(await within(screen.getByTestId('page-header-2')).findByText('Scale: 22.5 px/ft')).toBeInTheDocument()
     expect(screen.getByText('Page 2 scale set to 22.5 px/ft.')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Previous page' }))
-    expect(screen.getByText('Scale: 15 px/ft')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-header-1')).getByText('Scale: 15 px/ft')).toBeInTheDocument()
   })
 
   it('keeps a refused scale in the dialog', async () => {
     api.setPirPageScale.mockRejectedValue(new Error('scale must be a positive number'))
     await renderLoaded()
-    await userEvent.click(screen.getByRole('button', { name: 'Set scale' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Set the scale of page 1' }))
     const dialog = screen.getByRole('dialog', { name: 'Page scale' })
     await userEvent.clear(within(dialog).getByLabelText('Scale (px/ft)'))
     await userEvent.type(within(dialog).getByLabelText('Scale (px/ft)'), '20')
@@ -306,12 +312,14 @@ describe('PirPage — read-only', () => {
   it('gives a demo user the pages and navigation, with the note and every change disabled', async () => {
     await renderLoaded({ user: DEMO_USER })
     expect(screen.getByText(PIR_DEMO_NOTE)).toBeInTheDocument()
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
-    for (const name of ['Rotate', 'Set scale', 'Replace PIR', 'Remove pages', 'Calibrate', 'Rectangle', 'Arc']) {
+    for (const name of ['Rotate page 1', 'Set the scale of page 1', 'Replace PIR', 'Remove pages', 'Rectangle', 'Arc']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
+    for (const button of screen.getAllByRole('button', { name: /Calibrate/ })) expect(button).toBeDisabled()
     await userEvent.keyboard(']')
-    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('?page=2'))
   })
 
   it('gives a demo user no upload when there are no pages', async () => {
@@ -324,18 +332,19 @@ describe('PirPage — read-only', () => {
   it("keeps a deleted site's pages from a member, but not from an admin", async () => {
     property.deleted_at = '2026-10-02T09:00:00'
     await renderLoaded()
-    expect(screen.getByRole('button', { name: 'Rotate' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Rotate page 1' })).toBeDisabled()
   })
 
   it('lets an admin change a deleted site\'s pages', async () => {
     property.deleted_at = '2026-10-02T09:00:00'
     await renderLoaded({ user: ADMIN })
-    expect(screen.getByRole('button', { name: 'Rotate' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Rotate page 1' })).toBeEnabled()
   })
 })
 
 describe('PirPage — the sketch workspace', () => {
-  it("jumps from the flags list to a flag's page, in the URL, and selects it there", async () => {
+  it("scrolls from the flags list to a flag's page, in the URL, and selects it there", async () => {
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     api.listFlags.mockResolvedValue([{
       id: 'f9', pir_id: PIR.id, pir_page_id: 'page-3', display_order: 7, shape: 'rectangle', dimensions: { L: 5, W: 5 },
       sketch_x: 100, sketch_y: 100, rotation: 0, surveyed_mark: 'number_only', surveyed_is_assessable: true,
@@ -345,8 +354,7 @@ describe('PirPage — the sketch workspace', () => {
     await renderLoaded()
     const list = await screen.findByRole('region', { name: 'All flags' })
     await userEvent.click(within(list).getAllByRole('row')[1])
-    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument()
-    expect(screen.getByTestId('url')).toHaveTextContent('?page=3')
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent('?page=3'))
     expect(screen.getByRole('button', { name: 'Flag #7' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('complementary', { name: 'Flag #7' })).toBeInTheDocument()
   })
@@ -372,9 +380,9 @@ describe('PirPage — the sketch workspace', () => {
     expect(screen.getByTestId('url')).toHaveTextContent('/project/HWS0023/idr/idr-9')
   })
 
-  it('keeps the shape tools off on a page without a scale', async () => {
-    await renderLoaded({ search: '?page=2' })
-    expect(screen.getByText('Scale: not set')).toBeInTheDocument()
+  it('keeps the shape tools off while no page has a scale', async () => {
+    pages = pages.map(found => ({ ...found, scale_px_per_ft: null }))
+    await renderLoaded()
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeDisabled()
   })
 })

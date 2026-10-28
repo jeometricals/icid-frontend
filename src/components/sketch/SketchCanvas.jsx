@@ -33,6 +33,9 @@ export const STRIP_INK = '#dc2626'
 export const BUNDLE_INK = '#7c3aed'
 // A selected curb run's halo, and a curb being drawn (Slice Y4a)
 const SEGMENT_SELECTED_INK = '#f59e0b'
+// A match line's ink, and its caption's when it has just been scrolled to (Slice Y4b)
+export const MATCH_LINE_INK = '#111827'
+export const MATCH_LINE_LIT = '#d97706'
 const CURB_DRAW_INK = '#374151'
 
 /** What a claimed flag's badge reads: "IDR #042" (or "IDR" for one without a number). */
@@ -69,8 +72,12 @@ export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${fl
  * - Curb runs take clicks (onSelectSegment) when nothing is being drawn; the selected one (selectedSegmentId) has an
  *   amber halo. While drawing a curb (drawingCurb), a click anywhere adds a point (onCurbPoint), a double-click
  *   finishes it (onCurbFinish), and the points so far are joined by a dashed line on to the pointer.
+ * - Match lines (Slice Y4b; R1h.1a's): a heavy dashed line, a circled letter at each end, and its caption beside its
+ *   middle (MATCH LINE "A" — SEE PAGE 2); a caption with a partner is a button (onMatchLineClick(line, partner)), drawn
+ *   amber while it is highlightedLineId.
  * Pointer positions are turned into page pixels with toNativeCoords against the page's on-screen box.
- * Props: page, flags, areas, features and segments (this page's), selectedId, selectedIds, bundles ([{id, number,
+ * Props: matchLines ([{line, caption, partner}], this page's), highlightedLineId, onMatchLineClick; page, flags, areas,
+ * features and segments (this page's), selectedId, selectedIds, bundles ([{id, number,
  * flagIds}]), selectedBundleId, selectedSegmentId, drawingCurb, curbPoints, onCurbPoint, onCurbFinish,
  * onToggleSelect(id), onSelectBundle(id), onSelectSegment(id), activeShape, calibrating,
  * calibratePoints ([{x, y}]), writer, strip (the saved strip's points, or null), stripShown, drawingStrip,
@@ -84,6 +91,7 @@ export default function SketchCanvas({
   onPlace, onSelect, onMove, onCalibratePoint, onOpenIdr, onImageError, showCorners = false,
   selectedIds = null, bundles = [], selectedBundleId = null, selectedSegmentId = null, drawingCurb = false, curbPoints = [],
   onCurbPoint, onCurbFinish, onToggleSelect, onSelectBundle, onSelectSegment,
+  matchLines = [], highlightedLineId = null, onMatchLineClick,
 }) {
   const boxRef = useRef(null)
   const [drag, setDrag] = useState(null) // {id, start, origin, at}: a selected flag being moved
@@ -156,6 +164,9 @@ export default function SketchCanvas({
 
   const crosshair = activeShape || calibrating || drawingLine
   const text = labelSize(scale)
+  // A match line's letters and caption: at least a fiftieth of the page across, so a caption reads (and clicks) at a
+  // page's fitted size
+  const lineText = Math.max(text, (page.width_px ?? 0) / 50)
   // This page's flags as drawn: a dragged one at the pointer, and none that can't be drawn (no scale, no place)
   const drawn = flags
     .map(flag => {
@@ -483,6 +494,57 @@ export default function SketchCanvas({
             ))}
           </g>
         )}
+
+        <g data-testid="match-lines" className="select-none">
+          {matchLines.map(({ line, caption, partner }) => {
+            const r = lineText * 0.6
+            const midX = (line.x1 + line.x2) / 2
+            const midY = (line.y1 + line.y2) / 2
+            const length = Math.hypot(line.x2 - line.x1, line.y2 - line.y1) || 1
+            // The caption sits beside the line's middle, a little off it
+            const offX = (-(line.y2 - line.y1) / length) * lineText * 1.3
+            const offY = ((line.x2 - line.x1) / length) * lineText * 1.3
+            const lit = line.match_line_id === highlightedLineId
+            const go = partner ? () => onMatchLineClick?.(line, partner) : null
+            return (
+              <g key={line.match_line_id} data-match-line-id={line.match_line_id}>
+                <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={MATCH_LINE_INK} strokeWidth="2.5"
+                  strokeDasharray="10 5" vectorEffect="non-scaling-stroke" className="pointer-events-none" />
+                {[[line.x1, line.y1], [line.x2, line.y2]].map(([x, y]) => (
+                  <g key={`${x},${y}`} className="pointer-events-none">
+                    <circle cx={x} cy={y} r={r} fill="#ffffff" stroke={MATCH_LINE_INK} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={r * 1.2} fontWeight="700"
+                      fill={MATCH_LINE_INK}>{line.label}</text>
+                  </g>
+                ))}
+                <g
+                  data-match-caption={line.match_line_id}
+                  role={go ? 'button' : undefined}
+                  tabIndex={go ? 0 : undefined}
+                  aria-label={go ? `${caption}: go to page ${partner.page_number}` : undefined}
+                  className={go ? 'cursor-pointer' : 'pointer-events-none'}
+                  onPointerDown={(e) => { if (go) e.stopPropagation() }}
+                  onClick={(e) => {
+                    if (!go) return
+                    e.stopPropagation()
+                    go()
+                  }}
+                  onKeyDown={(e) => {
+                    if (!go || (e.key !== 'Enter' && e.key !== ' ')) return
+                    e.preventDefault()
+                    go()
+                  }}
+                >
+                  <text x={midX + offX} y={midY + offY} textAnchor="middle" dominantBaseline="central" fontSize={lineText * 0.85}
+                    fontWeight="700" fill={lit ? MATCH_LINE_LIT : MATCH_LINE_INK} stroke="#ffffff" strokeWidth={lineText / 6}
+                    paintOrder="stroke" textDecoration={go ? 'underline' : undefined}>
+                    {caption}
+                  </text>
+                </g>
+              </g>
+            )
+          })}
+        </g>
 
         {strip && stripShown && !drawingStrip && strip.length >= 3 && (
           <g data-testid="sidewalk-strip" className="pointer-events-none">

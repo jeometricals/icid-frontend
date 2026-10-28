@@ -211,3 +211,42 @@ describe('SketchCanvas — flags an approved IDR claimed', () => {
     expect(claimBadgeText({ claimed_by_idr_number: '042' })).toBe('IDR #042')
   })
 })
+
+describe('SketchCanvas — match lines (Slice Y4b)', () => {
+  const A1 = { match_line_id: 'a1', pir_page_id: 'p1', page_number: 1, label: 'A', x1: 100, y1: 700, x2: 1100, y2: 700 }
+  const A2 = { match_line_id: 'a2', pir_page_id: 'p2', page_number: 2, label: 'A', x1: 100, y1: 50, x2: 1100, y2: 50 }
+  const B1 = { match_line_id: 'b1', pir_page_id: 'p1', page_number: 1, label: 'B', x1: 50, y1: 100, x2: 50, y2: 600 }
+  const LINES = [
+    { line: A1, partner: A2, caption: 'MATCH LINE "A" — SEE PAGE 2' },
+    { line: B1, partner: null, caption: 'MATCH LINE "B"' },
+  ]
+  const draw = (props = {}) => render(<SketchCanvas page={{ ...PAGE, rotation_deg: 0 }} flags={[]} matchLines={LINES} {...props} />)
+
+  it('draws each line dashed, its letter circled at both ends, and its caption', () => {
+    draw()
+    const a = screen.getByTestId('match-lines').querySelector('[data-match-line-id="a1"]')
+    expect(a.querySelector('line')).toHaveAttribute('stroke-dasharray')
+    expect([...a.querySelectorAll('circle')]).toHaveLength(2)
+    expect(a).toHaveTextContent('MATCH LINE "A" — SEE PAGE 2')
+    expect(screen.getByTestId('match-lines')).toHaveTextContent('MATCH LINE "B"')
+  })
+
+  it('makes a caption with a partner a button, by click or by key; one without is not', async () => {
+    const onMatchLineClick = vi.fn()
+    draw({ onMatchLineClick })
+    const go = screen.getByRole('button', { name: 'MATCH LINE "A" — SEE PAGE 2: go to page 2' })
+    await userEvent.click(go)
+    expect(onMatchLineClick).toHaveBeenCalledWith(A1, A2)
+    go.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onMatchLineClick).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: /MATCH LINE "B"/ })).not.toBeInTheDocument()
+  })
+
+  it('lights up the caption scrolled to', () => {
+    draw({ highlightedLineId: 'a1' })
+    const caption = (id) => screen.getByTestId('match-lines').querySelector(`[data-match-caption="${id}"] text`)
+    expect(caption('a1')).toHaveAttribute('fill', '#d97706')
+    expect(caption('b1')).toHaveAttribute('fill', '#111827')
+  })
+})

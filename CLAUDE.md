@@ -863,15 +863,26 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     PIR): folded to start (`FoldingPanel`), only the other IDRs' entries (`otherIdrsItems`: an item's total summed again
     from them, an item left with none dropped), and nothing at all unless another IDR has one. A change in the table
     above reads either again (its `refreshKey`).
-    - **Pages:** Prev / Next and "Page n of N", and the `[` and `]` keys (not while a dialog is open or a field has
-      the focus). The page shown is `?page=` (replaced, not pushed); a number out of range shows the nearest page.
-      Each page shows at its rotation in the sketch workspace (`SketchWorkspace`; see Flags) with "Scale: 15 px/ft"
-      ("not set" without one). If its image fails to load (an expired link), "Reload pages" reads them again.
-    - **A writer** (a member who isn't a demo user; while the site is deleted only an admin) also gets Rotate (a
-      quarter turn clockwise, PATCHed on that page; a refusal shows above the page), Set scale (`PageScaleModal`:
-      a number above 0, "Applies to page {n}."), Replace PIR (the upload dialog, warning that the pages and their
-      flags go) and Remove pages (confirmed). With no pages the card reads "Upload PIR (image or PDF, any number of
-      pages)." with Upload PIR. After an upload the page lands on page 1 and toasts "PIR uploaded: 2 pages." /
+    - **Pages (Slice Y4b): one scroll.** Every page is drawn, top to bottom, in the sketch workspace (`SketchWorkspace`;
+      see Flags), each under its own header bar: "Page n of N", "Scale: 15 px/ft" ("not set" without one), Rotate, Set
+      scale, Calibrate and Sidewalk strip. The card's header says "3 pages". The shape toolbar (shapes, curb, Bundle) is
+      one sticky row (it scrolls sideways when narrow, never wraps) and the side panel is sticky beside the pages. The
+      page in view (the one across a line a third of the way down the window, an `IntersectionObserver`) is `?page=`
+      (replaced, not pushed); opening `?page=3` (or `?flag=`) scrolls to that page, a number out of range to the
+      nearest. `[` and `]` scroll a page back or on, `1`-`9` to that page (not with a modifier, while a dialog is open
+      or a field has the focus). Picking a flag in the list scrolls to its page. If an image fails to load (an expired
+      link), "Reload pages" reads them again. No zoom, no virtualization (17 PIRs, at most 2 pages, on prod).
+    - **Match lines (Slice Y4b):** the PIR's live lines (`listPirMatchLines`, R1h.1a's route) are drawn on their pages,
+      dashed with a circled letter at each end, captioned `MATCH LINE "A" — SEE PAGE 2` (the partner: the same label on
+      another page; `lib/matchLines.js`), or `MATCH LINE "A"` without one. A caption with a partner is a button: it eases
+      the window (300 ms, `lib/pageScroll.js`; at once for reduced motion) to centre the partner line, sets `?page=` to
+      its page, and lights the partner's caption amber for 1.5 s. Bundling flags on more than one page is refused at the
+      button ("The flags are on more than one page").
+    - **A writer** (a member who isn't a demo user; while the site is deleted only an admin) also gets each page's
+      Rotate (a quarter turn clockwise, PATCHed on that page; a refusal shows above the pages) and Set scale
+      (`PageScaleModal`: a number above 0, "Applies to page {n}."), Replace PIR (the upload dialog, warning that the
+      pages and their flags go) and Remove pages (confirmed). With no pages the card reads "Upload PIR (image or PDF,
+      any number of pages)." with Upload PIR. After an upload the view goes to page 1 and toasts "PIR uploaded: 2 pages." /
       "PIR replaced: ...". For a reader (a demo user, or anyone but an admin on a deleted site) these controls are
       there but disabled; a demo user reads "Demo mode: sites and PIRs are read-only."
   - **`PirUploadModal`** (`pirId`, `replacing`, `onUploaded`, `onClose`; "Upload PIR" / "Replace PIR"): a file input
