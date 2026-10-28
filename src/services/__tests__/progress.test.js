@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { getProjectProgress, getTaskOrderProgress } from '../progress'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { downloadProjectProgress, downloadTaskOrderProgress, getProjectProgress, getTaskOrderProgress } from '../progress'
 import { mockFetch, fetchUrl } from '../../test/mockFetch'
 import { PROJECT_PROGRESS, TASK_ORDER_PROGRESS, TO_002, MAIN_ST } from '../../test/progress'
+import { setToken, clearToken } from '../session'
 
 beforeEach(() => {
   vi.restoreAllMocks()
@@ -42,5 +43,53 @@ describe('getTaskOrderProgress', () => {
     mockFetch(200, { data: TASK_ORDER_PROGRESS })
     await getTaskOrderProgress(TO_002, { includeEmpty: true })
     expect(fetchUrl().search).toBe('?include_empty=true')
+  })
+})
+
+describe('the Progress CSVs (Slice ML2)', () => {
+  let clicked // the downloads started: [href, download name]
+
+  // A CSV response under the backend's file name
+  function mockCsv(disposition) {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: new Headers(disposition ? { 'Content-Disposition': disposition } : {}),
+      blob: () => Promise.resolve(new Blob(['csv'])),
+      text: () => Promise.resolve('csv'),
+    })
+  }
+
+  beforeEach(() => {
+    setToken('token-abc')
+    clicked = []
+    global.URL.createObjectURL = vi.fn(() => 'blob:progress')
+    global.URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function click() {
+      clicked.push([this.getAttribute('href'), this.download])
+    })
+  })
+
+  afterEach(() => { clearToken() })
+
+  it("downloads the project's table under the backend's file name, as filtered", async () => {
+    mockCsv('attachment; filename="SE384_progress_TO-002_2026-10-28.csv"')
+    expect(await downloadProjectProgress('SE384', { taskOrderId: TO_002, propertyId: MAIN_ST }))
+      .toBe('SE384_progress_TO-002_2026-10-28.csv')
+    expect(fetchUrl().pathname).toBe('/v1/projects/SE384/progress-rollup.csv')
+    expect(fetchUrl().searchParams.get('task_order_id')).toBe(TO_002)
+    expect(fetchUrl().searchParams.get('property_id')).toBe(MAIN_ST)
+    expect(clicked).toEqual([['blob:progress', 'SE384_progress_TO-002_2026-10-28.csv']])
+  })
+
+  it('sends no filters when there are none, and names the file itself without a name', async () => {
+    mockCsv(null)
+    expect(await downloadProjectProgress('SE384')).toBe('SE384_progress.csv')
+    expect(fetchUrl().search).toBe('')
+  })
+
+  it("downloads a task order's", async () => {
+    mockCsv('attachment; filename="SE384_progress_TO-002_2026-10-28.csv"')
+    await downloadTaskOrderProgress(TO_002)
+    expect(fetchUrl().pathname).toBe(`/v1/task-orders/${TO_002}/progress-rollup.csv`)
   })
 })

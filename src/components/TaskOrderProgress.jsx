@@ -1,6 +1,7 @@
 /**
  * The task order page's Progress section (getTaskOrderProgress): a headline ("Overall 100.0% approved · 2 of 5 sites
- * started"), the pay-item table from its sites' PIR flags, a line per site with unmapped flags, and a row per bundled
+ * started") with "Download CSV" beside it (downloadTaskOrderProgress: its rows and each site's, Slice ML2), the pay-item
+ * table from its sites' PIR flags, a line per site with unmapped flags, and a row per bundled
  * site that folds open to that site's own table (closed to start), with a note under them on rounding. The whole
  * section folds too (open to start).
  * Read again whenever the task order it is handed changes (an edit, a bundle or an unbundle).
@@ -8,8 +9,9 @@
  */
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { getTaskOrderProgress } from '../services/api'
+import { downloadTaskOrderProgress, getTaskOrderProgress } from '../services/api'
 import { formatPercent } from '../lib/payItemFormat'
+import DownloadFileButton from './DownloadFileButton'
 import FlagProgressTable, { flagCount } from './FlagProgressTable'
 import UnmappedFlagsNote from './UnmappedFlagsNote'
 
@@ -102,9 +104,17 @@ export default function TaskOrderProgress({ taskOrder }) {
         </div>
       ) : shown && (
         <>
-          <p aria-label="Task order progress overall" className="text-lg font-semibold text-gray-900 tabular-nums mb-3">
-            {taskOrderHeadline(shown)}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <p aria-label="Task order progress overall" className="text-lg font-semibold text-gray-900 tabular-nums">
+              {taskOrderHeadline(shown)}
+            </p>
+            <DownloadFileButton
+              label="Download CSV"
+              enabled={shown.pay_items.length > 0}
+              disabledTitle="No pay items to download"
+              download={() => downloadTaskOrderProgress(taskOrder.id)}
+            />
+          </div>
           {shown.pay_items.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
               No flags with pay items on these sites yet

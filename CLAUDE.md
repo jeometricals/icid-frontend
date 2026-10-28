@@ -318,6 +318,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
   - **Service:** `services/progress.js`: `getProjectProgress(projectId, { taskOrderId, propertyId, includeEmpty })`
     and `getTaskOrderProgress(taskOrderId, { includeEmpty })`. The backend does every sum and lists only the pay items
     a flag in scope is on (`includeEmpty` would list the whole flag-measurable catalog: SE384 has 265; not used).
+  - **CSV** (Slice ML2): "Download CSV" (a plain `DownloadFileButton`, no format menu) beside each headline, off when
+    there are no pay items: `downloadProjectProgress(projectId, { taskOrderId, propertyId })` on the Progress page (the
+    table as filtered) and `downloadTaskOrderProgress(taskOrderId)` on the task order page (its rows, then each site's).
+    The backend writes the table verbatim, a row per pay item led by its Scope.
   - **`FlagProgressTable`** (`payItems`, `label`): Pay Item ("4.13 AAS (SF)", its budget code under it), Description,
     Approved, In flight, Unclaimed, Live total and %. A state prints its quantity to two decimals (`formatFlagQuantity`;
     the backend sends it unrounded) and its flag count ("383.44 (10 flags)"; "(3 segments)" on a pay item in LF, which
