@@ -1,5 +1,6 @@
 // How the sketch dresses a page's flags as the DOT Construction Report does: each flag's fill, the "4" Conc." /
 // "7" Conc." labels on runs of same-thickness flags, and the A-labels of the non-assessable areas
+import { abut } from './bundleGeometry'
 import { boundsOf, flagOutline } from './flagGeometry'
 
 /**
@@ -17,10 +18,12 @@ const SLAB = { '4in': '4', '7in': '7', '7in_as_4in': '7' }
 export const groupLabel = (slab) => `${slab}" Conc.`
 
 /**
- * The runs of a page's flags that share a slab thickness, in display order: consecutive flags of the same slab make
- * one run, and a flag of another thickness (or one that can't be drawn) ends it. Each run is {slab, label, flagIds,
- * x, y}: (x, y) is the middle of the run's bounding box, in page pixels, or for a run of one flag just under it, so
- * the label stays off the flag's own number and defect codes. Returns [] without a scale.
+ * The runs of a page's flags that share a slab thickness, in display order: consecutive flags of the same slab that
+ * touch make one run (a flag joins the run when it shares an edge, within SLAB_TOLERANCE_FT, with a flag already in
+ * it: lib/bundleGeometry.js's abut, as the Construction Report's slabs do), and a flag of another thickness, one that
+ * can't be drawn, or one drawn apart from the run ends it. Each run is {slab, label, flagIds, x, y}: (x, y) is the
+ * middle of the run's bounding box, in page pixels, or for a run of one flag just under it, so the label stays off the
+ * flag's own number and defect codes. Returns [] without a scale.
  */
 export function thicknessRuns(flags, scale) {
   const runs = []
@@ -33,12 +36,14 @@ export function thicknessRuns(flags, scale) {
       current = null
       continue
     }
-    if (!current || current.slab !== slab) {
-      current = { slab, flagIds: [], points: [] }
+    const feet = outline.map(({ x, y }) => ({ x: x / scale, y: y / scale }))
+    if (!current || current.slab !== slab || !current.outlines.some(other => abut(feet, other))) {
+      current = { slab, flagIds: [], points: [], outlines: [] }
       runs.push(current)
     }
     current.flagIds.push(flag.id)
     current.points.push(...outline)
+    current.outlines.push(feet)
   }
   return runs.map(({ slab, flagIds, points }) => {
     const box = boundsOf(points)

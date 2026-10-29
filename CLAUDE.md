@@ -1060,8 +1060,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
     - **Flag marks:** the display order in an orange circle at the outline's top-left, and the defect codes
       ("1 6A") in its middle.
     - **Group labels** (`thicknessRuns`): "4\" Conc." / "7\" Conc." on each run of consecutive flags (by display
-      order) of one slab, a 7" assessed as 4" counting as 7"; at the middle of the run's bounding box, or just
-      under a run of one flag so it stays off that flag's marks.
+      order) of one slab that touch, a 7" assessed as 4" counting as 7"; a flag joins the run only when it shares an
+      edge with a flag already in it (`abut`, within 0.1 ft, as the Construction Report's slabs do), so a flag drawn
+      apart starts its own run and never pulls the label away (U1, 2026-10-29); at the middle of the run's bounding box,
+      or just under a run of one flag so it stays off that flag's marks.
   - **`SketchLegend`**, always shown, unturned, in the lower-left of the page (`RotatedPage`'s `frame`): the four
     fills, the X, the flag-number circle and a north "+". Nothing records which way north is, so the "+" is only
     in the legend.

@@ -42,6 +42,36 @@ describe('thicknessRuns', () => {
     expect(thicknessRuns(flags, 10).map(run => run.flagIds)).toEqual([['f1'], ['f3']])
     expect(thicknessRuns(flags, null)).toEqual([])
   })
+
+  // The label drift fix (U1): a run is flags that touch, as the Construction Report's slabs are
+  it('labels two flags of one thickness drawn apart separately, so a new far-away flag pulls no label', () => {
+    const far = flag('f2', 2, '4in', { sketch_x: 900, sketch_y: 600 })
+    const runs = thicknessRuns([flag('f1', 1, '4in'), far], 10)
+    expect(runs.map(run => run.flagIds)).toEqual([['f1'], ['f2']])
+    // f1's label stays where it was alone: under f1 (x 75..125, y 75..125)
+    expect(runs[0]).toMatchObject({ x: 100, y: 125 + labelSize(10) })
+  })
+
+  it('keeps two abutting flags of one thickness in one run, labelled between them', () => {
+    const runs = thicknessRuns([flag('f1', 1, '4in'), flag('f2', 2, '4in')], 10)
+    expect(runs.map(run => run.flagIds)).toEqual([['f1', 'f2']])
+    expect(runs[0]).toMatchObject({ x: 125, y: 100 })
+  })
+
+  it('chains a run through a flag that touches one already in it', () => {
+    // A (x 75..125) touches B (125..175), B touches C (175..225); A doesn't touch C
+    const runs = thicknessRuns([flag('a', 1, '4in'), flag('b', 2, '4in'), flag('c', 3, '4in')], 10)
+    expect(runs.map(run => run.flagIds)).toEqual([['a', 'b', 'c']])
+    // A fourth flag below the first (y 125..175) touches A, two flags back: it still joins
+    const under = flag('d', 4, '4in', { sketch_x: 100, sketch_y: 150 })
+    expect(thicknessRuns([flag('a', 1, '4in'), flag('b', 2, '4in'), flag('c', 3, '4in'), under], 10)
+      .map(run => run.flagIds)).toEqual([['a', 'b', 'c', 'd']])
+  })
+
+  it('never joins flags of another slab, touching or not', () => {
+    const runs = thicknessRuns([flag('f1', 1, '4in'), flag('f2', 2, '7in'), flag('f3', 3, '7in_as_4in')], 10)
+    expect(runs.map(run => [run.label, run.flagIds])).toEqual([['4" Conc.', ['f1']], ['7" Conc.', ['f2', 'f3']]])
+  })
 })
 
 describe('labelledAreas', () => {

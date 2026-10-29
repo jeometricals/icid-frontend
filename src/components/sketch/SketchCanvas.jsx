@@ -52,7 +52,7 @@ export const claimBadgeText = (flag) => (flag.claimed_by_idr_number ? `IDR #${fl
  * - non-assessable areas, in yellow stripes, labelled A1, A2, ... at render time (`labelledAreas`);
  * - features, by their key symbols (FeatureGlyph);
  * - each flag's number in an orange circle at its top-left and its defect codes in its middle;
- * - "4\" Conc." / "7\" Conc." on each run of consecutive same-thickness flags (`thicknessRuns`);
+ * - "4\" Conc." / "7\" Conc." on each run of consecutive same-thickness flags that touch (`thicknessRuns`);
  * - on a flag an approved IDR claimed (R1f), an "IDR #042" badge at its top-right, which opens that IDR (onOpenIdr).
  * Only the flags and the badges take clicks; the rest is drawing. A legend (SketchLegend) sits in the page's lower-left corner.
  * - A click on empty page: places the armed shape there (onPlace), else a calibration point while calibrating
