@@ -8,6 +8,7 @@ import { ELM_ST, EMPTY_PROGRESS, MAIN_ST, PROJECT_PROGRESS, TO_002 } from '../..
 
 vi.mock('../../services/api', () => ({
   listQuantities: vi.fn(), getProjectProgress: vi.fn(), downloadAssessmentSummary: vi.fn(), listTaskOrders: vi.fn(), listProperties: vi.fn(), getTaskOrder: vi.fn(),
+  downloadProjectProgress: vi.fn(),
 }))
 
 // A pay item of the roll-up; without a budget it is unbudgeted, as the backend sends one no contract item matches
@@ -613,12 +614,33 @@ describe('ProgressPage — sidewalk progress from PIR flags', () => {
     expect(lastProgressCall()).toEqual(['HWS0023', { taskOrderId: undefined, propertyId: undefined }])
   })
 
+  it('downloads the table as a CSV, as filtered (Slice ML2)', async () => {
+    api.downloadProjectProgress.mockResolvedValue('HWS0023_progress.csv')
+    renderPage(`?task_order=${TO_002}`)
+    await flagTable()
+    const button = within(flagSection()).getByRole('button', { name: 'Download CSV' })
+    expect(button).not.toHaveAttribute('aria-haspopup')
+    fireEvent.click(button)
+    await waitFor(() => expect(api.downloadProjectProgress).toHaveBeenCalledWith('HWS0023', {
+      taskOrderId: TO_002, propertyId: undefined }))
+  })
+
+  it("shows a CSV download's failure under it, with Retry", async () => {
+    api.downloadProjectProgress.mockRejectedValue(Object.assign(new Error('Failed to fetch'), { status: 500 }))
+    renderPage()
+    await flagTable()
+    fireEvent.click(within(flagSection()).getByRole('button', { name: 'Download CSV' }))
+    expect(await within(flagSection()).findByRole('alert')).toHaveTextContent('Download failed: Failed to fetch')
+    expect(within(flagSection()).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
   it('reads a dash for the percent when nothing is live, and says there is nothing yet', async () => {
     api.getProjectProgress.mockResolvedValue(EMPTY_PROGRESS)
     renderPage()
     expect(await within(flagSection()).findByLabelText('Flag progress overall'))
       .toHaveTextContent('— approved overall · $0.00 of $0.00 live')
     expect(within(flagSection()).getByText('No flags with pay items here yet')).toBeInTheDocument()
+    expect(within(flagSection()).getByRole('button', { name: 'Download CSV' })).toBeDisabled()
   })
 
   it('offers every task order, and every live site of the project while none is picked', async () => {

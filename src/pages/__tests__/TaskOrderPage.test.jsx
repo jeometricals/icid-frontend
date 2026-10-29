@@ -31,7 +31,7 @@ const GONE = property(4, '4007770007', '1 Gone Ct', '1_3_family', { deleted_at: 
 vi.mock('../../services/api', () => ({
   getTaskOrder: vi.fn(), listAdminUsers: vi.fn(), listUsers: vi.fn(), updateTaskOrder: vi.fn(), softDeleteTaskOrder: vi.fn(),
   undeleteTaskOrder: vi.fn(), unbundleProperty: vi.fn(), bundleProperty: vi.fn(), listProperties: vi.fn(),
-  getTaskOrderProgress: vi.fn(),
+  getTaskOrderProgress: vi.fn(), downloadTaskOrderProgress: vi.fn(),
 }))
 
 let record // the task order's own columns
@@ -370,6 +370,14 @@ describe('TaskOrderPage — Progress', () => {
     expect(within(table).getAllByRole('row').slice(1).map(tr => within(tr).getAllByRole('cell')[0].textContent))
       .toEqual(['4.13 AAS (SF)SE384-CONS', '73.21AC (CY)SE384-CONS'])
     expect(api.getTaskOrderProgress).toHaveBeenCalledWith(TASK_ORDER_ID)
+  })
+
+  it('downloads its progress as a CSV (Slice ML2)', async () => {
+    api.downloadTaskOrderProgress.mockResolvedValue('progress.csv')
+    await renderLoaded()
+    await within(progressSection()).findByLabelText('Task order progress overall')
+    await userEvent.click(within(progressSection()).getByRole('button', { name: 'Download CSV' }))
+    expect(api.downloadTaskOrderProgress).toHaveBeenCalledWith(TASK_ORDER_ID)
   })
 
   it('lists each site folded, and folds one open to its own table and shut again', async () => {

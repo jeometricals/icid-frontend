@@ -2,13 +2,17 @@
  * The Progress page's "Sidewalk progress (PIR flags)" section: how much of the work the project's PIR flags describe
  * is approved, in flight or unclaimed, per pay item (getProjectProgress). Task order and Site filters narrow it; both
  * live in the URL (?task_order=&property=), and picking another task order clears the site. A headline gives the
- * approved share by value, the table the pay items, and a line per site its unmapped flags. Its own loading and
+ * approved share by value with "Download CSV" beside it (downloadProjectProgress: the table as filtered, Slice ML2), the
+ * table the pay items, and a line per site its unmapped flags. Its own loading and
  * error states, apart from the budget view's. Props: projectId.
  */
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getProjectProgress, getTaskOrder, listProperties, listTaskOrders } from '../services/api'
+import {
+  downloadProjectProgress, getProjectProgress, getTaskOrder, listProperties, listTaskOrders,
+} from '../services/api'
 import { formatDollars, formatPercent } from '../lib/payItemFormat'
+import DownloadFileButton from './DownloadFileButton'
 import FlagProgressTable from './FlagProgressTable'
 import UnmappedFlagsNote from './UnmappedFlagsNote'
 
@@ -125,9 +129,19 @@ export default function ProjectFlagProgress({ projectId }) {
         </div>
       ) : shown && (
         <>
-          <p aria-label="Flag progress overall" className="text-lg font-semibold text-gray-900 tabular-nums mb-3">
-            {overallLine(shown.overall)}
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <p aria-label="Flag progress overall" className="text-lg font-semibold text-gray-900 tabular-nums">
+              {overallLine(shown.overall)}
+            </p>
+            <DownloadFileButton
+              label="Download CSV"
+              enabled={shown.pay_items.length > 0}
+              disabledTitle="No pay items to download"
+              download={() => downloadProjectProgress(projectId, {
+                taskOrderId: taskOrderId || undefined, propertyId: propertyId || undefined,
+              })}
+            />
+          </div>
           {shown.pay_items.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-6 text-center text-gray-600">
               No flags with pay items here yet

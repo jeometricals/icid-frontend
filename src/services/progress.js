@@ -1,4 +1,5 @@
-import { apiFetch } from './apiClient'
+import { apiFetch, apiFetchFile } from './apiClient'
+import { saveFile } from './exports'
 
 // Progress from PIR flags (R1g): per pay item a flag can fill, how much is approved (claimed by an approved IDR), in
 // flight (attributed to an open IDR) and unclaimed. A rollup is {scope: {project_id, task_order_id, property_id},
@@ -35,4 +36,27 @@ export async function getTaskOrderProgress(taskOrderId, { includeEmpty = false }
   const query = includeEmpty ? '?include_empty=true' : ''
   const json = await apiFetch(`/v1/task-orders/${taskOrderId}/progress-rollup${query}`)
   return json.data
+}
+
+// The Progress CSVs (Slice ML2): the table as the page shows it, a row per pay item led by its Scope
+
+/**
+ * Downloads a project's progress table as a CSV, narrowed as getProjectProgress narrows it (taskOrderId, propertyId).
+ * Returns the file name. Throws apiFetch's error (403, 404 as for the rollup).
+ */
+export async function downloadProjectProgress(projectId, { taskOrderId, propertyId } = {}) {
+  const params = new URLSearchParams()
+  if (taskOrderId) params.set('task_order_id', taskOrderId)
+  if (propertyId) params.set('property_id', propertyId)
+  const query = params.toString() ? `?${params}` : ''
+  return saveFile(await apiFetchFile(`/v1/projects/${encodeURIComponent(projectId)}/progress-rollup.csv${query}`,
+    `${projectId}_progress.csv`))
+}
+
+/**
+ * Downloads a task order's progress as a CSV: its own rows, then each bundled site's. Returns the file name. Throws
+ * apiFetch's error (403, 404 as for the task order).
+ */
+export async function downloadTaskOrderProgress(taskOrderId) {
+  return saveFile(await apiFetchFile(`/v1/task-orders/${taskOrderId}/progress-rollup.csv`, 'progress.csv'))
 }
