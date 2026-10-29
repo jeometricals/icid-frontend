@@ -249,4 +249,13 @@ describe('SketchCanvas — match lines (Slice Y4b)', () => {
     expect(caption('a1')).toHaveAttribute('fill', '#d97706')
     expect(caption('b1')).toHaveAttribute('fill', '#111827')
   })
+
+  it("turns a vertical line's caption to run along it, reading bottom to top; a level one's stays level", () => {
+    draw()
+    const caption = (id) => screen.getByTestId('match-lines').querySelector(`[data-match-caption="${id}"] text`)
+    // B1 runs down the page's left edge: turned a quarter anticlockwise, and slid onto the page
+    expect(caption('b1').getAttribute('transform')).toMatch(/^rotate\(-90 /)
+    expect(Number(caption('b1').getAttribute('x'))).toBeGreaterThan(0)
+    expect(caption('a1').getAttribute('transform')).toMatch(/^rotate\(0 /)
+  })
 })
