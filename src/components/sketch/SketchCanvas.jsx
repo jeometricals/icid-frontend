@@ -6,6 +6,7 @@ import SketchPatterns, { FLAG_NUMBER_COLOR, NON_ASSESSABLE_INK, fillUrl } from '
 import { boundsOf, centreOf, flagOutline, svgPoints } from '../../lib/flagGeometry'
 import { flagFill, labelSize, labelledAreas, thicknessRuns } from '../../lib/flagGroups'
 import { thicknessColor } from '../../lib/flags'
+import { captionPlacement } from '../../lib/matchLines'
 import { toNativeCoords } from '../../lib/pageGeometry'
 import { areaReasonLabel, segmentTypeLabel } from '../../data/flagEnums'
 
@@ -498,12 +499,8 @@ export default function SketchCanvas({
         <g data-testid="match-lines" className="select-none">
           {matchLines.map(({ line, caption, partner }) => {
             const r = lineText * 0.6
-            const midX = (line.x1 + line.x2) / 2
-            const midY = (line.y1 + line.y2) / 2
-            const length = Math.hypot(line.x2 - line.x1, line.y2 - line.y1) || 1
-            // The caption sits beside the line's middle, a little off it
-            const offX = (-(line.y2 - line.y1) / length) * lineText * 1.3
-            const offY = ((line.x2 - line.x1) / length) * lineText * 1.3
+            // The caption beside the line's middle, along it (a vertical one's reading bottom to top) and on the page
+            const placed = captionPlacement(line, caption, page, lineText * 0.85, lineText * 1.3)
             const lit = line.match_line_id === highlightedLineId
             const go = partner ? () => onMatchLineClick?.(line, partner) : null
             return (
@@ -535,8 +532,8 @@ export default function SketchCanvas({
                     go()
                   }}
                 >
-                  <text x={midX + offX} y={midY + offY} textAnchor="middle" dominantBaseline="central" fontSize={lineText * 0.85}
-                    fontWeight="700" fill={lit ? MATCH_LINE_LIT : MATCH_LINE_INK} stroke="#ffffff" strokeWidth={lineText / 6}
+                  <text x={placed.x} y={placed.y} transform={`rotate(${placed.angle} ${placed.x} ${placed.y})`}
+                    textAnchor="middle" dominantBaseline="central" fontSize={placed.fontSize} fontWeight="700" fill={lit ? MATCH_LINE_LIT : MATCH_LINE_INK} stroke="#ffffff" strokeWidth={lineText / 6}
                     paintOrder="stroke" textDecoration={go ? 'underline' : undefined}>
                     {caption}
                   </text>

@@ -884,7 +884,10 @@ Commands: `npm run dev` (port 3000) · `npm test` · `npm run test:coverage` · 
       link), "Reload pages" reads them again. No zoom, no virtualization (17 PIRs, at most 2 pages, on prod).
     - **Match lines (Slice Y4b):** the PIR's live lines (`listPirMatchLines`, R1h.1a's route) are drawn on their pages,
       dashed with a circled letter at each end, captioned `MATCH LINE "A" — SEE PAGE 2` (the partner: the same label on
-      another page; `lib/matchLines.js`), or `MATCH LINE "A"` without one. A caption with a partner is a button: it eases
+      another page; `lib/matchLines.js`), or `MATCH LINE "A"` without one. The caption runs along its line beside the
+      middle (`captionPlacement`, pilot sweep #2, as the Construction Report's): a line taller than wide as the page shows
+      it (its rotation applied) has it turned to read bottom to top, any other reads left to right along its slope; it
+      slides along the line to stay on the page, shrunk when the page is shorter than it. A caption with a partner is a button: it eases
       the window (300 ms, `lib/pageScroll.js`; at once for reduced motion) to centre the partner line, sets `?page=` to
       its page, and lights the partner's caption amber for 1.5 s. Bundling flags on more than one page is refused at the
       button ("The flags are on more than one page").
